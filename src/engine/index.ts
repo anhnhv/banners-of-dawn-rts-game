@@ -23,3 +23,5 @@ export {
   type SpawnPoint,
 } from './map/loadMap';
 export { validateMap, RULES as MAP_RULES, type SpawnSummary, type ValidationResult } from './map/validateMap';
+export { createGame, Game, type GameOptions } from './Game';
+export { UNIT_STATS, type UnitStats } from './entities/Unit';

@@ -1086,13 +1086,38 @@ Sizes: **S** ≈ small, **M** ≈ medium, **L** ≈ large (relative effort).
 - **Checks:** `npm run check` now also runs the map validator, and `tests/maps/maps.test.ts` validates every shipped map.
 - **Screenshots:** `docs/milestones/m1-*.png`. The style preview is still available at `/?preview`.
 
-### M2: Units, selection & movement (M)
-- [ ] Entities, World, fixed-tick `GameHost` with interpolation between ticks.
-- [ ] `EntityRenderer` with instanced unit parts, team colors, walk animation, facing from movement.
-- [ ] `Picker` (screen projection), box select, control groups, selection rings, x-ray silhouettes.
-- [ ] A\*, smoothing, group slots, separation, stuck detection.
+### M2: Units, selection & movement (M) ✅ done 2026-11-06
+- [x] Entities, World, fixed-tick `GameHost` with interpolation between ticks.
+- [x] `EntityRenderer` with instanced unit parts, team colors, walk animation, facing from movement.
+- [x] `Picker` (screen projection), box select, control groups, selection rings, x-ray silhouettes.
+- [x] A\*, smoothing, group slots, separation, stuck detection.
 
 **Done when:** 50 units move around obstacles, can be selected precisely (including when partly hidden behind buildings), and the frame stays under the draw-call budget.
+
+*Implementation notes:*
+- **Shared contracts:** `shared/commands.ts` defines `move` (with `queue`) and `stop`; `shared/view.ts` defines `PlayerView` / `UnitView` (current and previous position for interpolation).
+- **Engine:**
+  - `engine/Game.ts` exposes `createGame(map, {seed, testArmy})`, `enqueue`, `step`, `getView` (cached per tick), `stateHash` and `debugSpawn` (for tests).
+  - Starting units come from the map's `start.units` and spawn around each Town Hall.
+  - Unit stats live in `src/data/units.json`.
+- **Movement** (`engine/systems/movement.ts`):
+  - Each unit's order turns into a path request. Pathfinding is budgeted at 20k A\* nodes per tick.
+  - Paths are smoothed by a line-of-sight check that refuses corner squeezing.
+  - Units follow their path at terrain speed.
+  - A unit with no progress for 24 ticks requests a new path, up to 3 times. In a crowd at the destination it counts as arrived once within 1 tile.
+  - Soft separation: a standing unit yields to a moving one, and no unit is ever pushed onto a blocked tile.
+- **Group moves:** `formationSlots` and `assignSlots` give every unit its own spot around the click. Each unit walks at its own speed, so cavalry arrives first.
+- **Host:** `host/GameHost.ts` owns the `requestAnimationFrame` loop. `FixedStepClock` runs 20 ticks/s; the host stamps UI commands with the current tick (and logs them), then calls `GameScreen.frame(dt, view, alpha)`.
+- **UI:**
+  - `ui/screens/GameScreen.ts` replaces the M1 map view.
+  - `render/UnitRenderer.ts` draws each (unit type, team) with one InstancedMesh for the body and one for all legs, plus an x-ray silhouette pass.
+  - The silhouette pass draws after the world and before the units, with an inverted depth test. It shows only where terrain, trees or buildings hide a unit, never the hidden inner faces of the voxel models.
+  - `input/SelectionController.ts` and `input/picking.ts` handle click, box, shift, double-click, Ctrl/Alt+1-9 groups, right-click move, W stop and Esc.
+  - `render/MoveMarkers.ts` shows the move marker. The minimap shows unit dots.
+- **Models:** added a Scout Rider. The catapult still uses the militia model until M6.
+- **Dev:** `/?army=50` adds 50 mixed units in front of your base.
+- **Results:** 50 units around 130 draw calls including shadow passes. 87 tests, including a 50-unit group walking around a wall, determinism (same seed and commands give the same state hash) and command rejection for enemy units.
+- **Screenshots:** `docs/milestones/m2-*.png`.
 
 ### M3: Economy (M)
 - [ ] Trees, berries, gold; the gather loop; drop sites; auto-retarget; work animations.
@@ -1198,5 +1223,25 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Name | **Banners of Dawn** |
 | Pace | Configurable: Relaxed / Standard / Fast / Blitz presets plus Custom sliders |
 
-### Next step
-Please review the **style preview** (`npm run dev`, keys `1` `2` `3`, or the screenshots in `docs/preview/`). Once you approve the look, I start **M1**. After each milestone I will stop so you can review it before the next one.
+### Current status (updated 2026-11-06)
+| Milestone | State |
+|---|---|
+| M0 setup, M0.5 style preview, M1 maps, M2 units & movement | ✅ done and committed |
+| **Next: M3 Economy** | not started |
+
+**How to resume:**
+1. `nvm use && npm install && npm run dev`, then open `/?army=50` to see the current state.
+2. `npm run check` must stay green (typecheck, lint with module boundaries, map validation, tests).
+3. Continue with the first unchecked milestone in §12.
+4. After each milestone: tick its checklist, add implementation notes under it, update this table, commit.
+
+**Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
+
+**M3 plan in short:**
+1. Resource nodes become engine entities, using `loadMap().resources`.
+2. Workers get a gather order: walk to the node, harvest, carry, drop at the Town Hall or a Storehouse, repeat. Then auto-retarget to the nearest node of the same type when one runs out.
+3. Right-clicking a resource with workers selected issues `gather`.
+4. Town Hall entities with a production queue train workers (cost, time, pop cap, refunds).
+5. `MatchRules` + `applyRules` + pace presets (`src/data/pace.json`).
+6. HUD: resource bar and idle-worker button.
+7. Renderer: trees disappear (become stumps) when they run out; work animation.

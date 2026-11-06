@@ -1,13 +1,22 @@
 /**
- * Boot sequence (M1): load the map index and a map, decode it, validate it with the engine,
- * then hand it to the UI. From M2 on this also creates the engine Game and the controllers.
+ * Boot sequence: load the map index and a map, decode it, validate it with the engine,
+ * create the Game and the in-game screen, and start the host loop.
  */
 import { decodeMap, MapFormatError } from '../shared';
-import { validateMap } from '../engine';
-import { createMapView, showFatalError } from '../ui';
+import { createGame, validateMap } from '../engine';
+import { createGameScreen, showFatalError } from '../ui';
+import { GameHost } from './GameHost';
 import { loadMapFile, loadMapIndex } from './loaders';
 
-export async function bootGame(container: HTMLElement, requestedMapId?: string | null): Promise<void> {
+export interface BootOptions {
+  mapId?: string | null;
+  /** Dev: extra units for the human player (`?army=50`). */
+  testArmy?: number;
+  seed?: number;
+}
+
+export async function bootGame(container: HTMLElement, options: BootOptions = {}): Promise<void> {
+  const requestedMapId = options.mapId;
   try {
     const index = await loadMapIndex();
     const entry =
@@ -22,7 +31,15 @@ export async function bootGame(container: HTMLElement, requestedMapId?: string |
       showFatalError(container, `Map "${map.name}" is not valid`, result.errors);
       return;
     }
-    createMapView(container, map, { warnings: result.warnings });
+    const game = createGame(map, { seed: options.seed ?? 1, testArmy: options.testArmy });
+    const host = new GameHost(game, 0);
+    const screen = createGameScreen(container, map, {
+      player: 0,
+      onCommand: (cmd) => host.issue(cmd),
+      warnings: result.warnings,
+    });
+    host.attach(screen);
+    host.start();
   } catch (err) {
     if (err instanceof MapFormatError) {
       showFatalError(container, 'The map file has errors', err.issues);

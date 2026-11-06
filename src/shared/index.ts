@@ -9,3 +9,5 @@ export * from './ids';
 export * from './map';
 export * from './mapSchema';
 export * from './rng';
+export * from './commands';
+export * from './view';

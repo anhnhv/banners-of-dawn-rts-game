@@ -3,8 +3,9 @@
 3D voxel-style (low-poly with pixel textures) 1v1 real-time strategy game in the browser, played against a local
 machine player. The full design is in [PLAN.md](PLAN.md).
 
-Right now `npm run dev` shows the **map view** (M1): Green Valley in 3D with the RTS camera, tile inspection and an
-interactive minimap. Open `/?preview` for the style-preview diorama (keys `1` `2` `3` switch views).
+Right now `npm run dev` shows **M2**: Green Valley in 3D with your starting units. Select units (click, box, double
+click, Ctrl/Alt+1-9 groups), right-click to move (Shift queues), W stops. `/?army=50` adds 50 test units.
+Open `/?preview` for the style-preview diorama (keys `1` `2` `3` switch views).
 Screenshots: [docs/preview/](docs/preview/) and [docs/milestones/](docs/milestones/).
 
 ## Setup

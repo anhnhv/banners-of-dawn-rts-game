@@ -51,8 +51,11 @@ export class Minimap {
     this.bindInput();
   }
 
-  /** Redraw with the camera's ground footprint (4 grid points), if known. */
-  draw(cameraQuad: Array<{ x: number; z: number }> | null): void {
+  /** Redraw with the camera's ground footprint (4 grid points) and unit dots. */
+  draw(
+    cameraQuad: Array<{ x: number; z: number }> | null,
+    units: ReadonlyArray<{ x: number; z: number; owner: number }> = [],
+  ): void {
     const { ctx, projection: p, dpr } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.element.width, this.element.height);
@@ -61,8 +64,14 @@ export class Minimap {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.base, 0, 0);
 
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const u of units) {
+      const { u: mx, v: my } = gridToMinimap(p, u.x, u.z);
+      ctx.fillStyle = u.owner === 1 ? '#ff5a4a' : '#7fb6ff';
+      ctx.fillRect(Math.round(mx) - 1, Math.round(my) - 1, 2, 2);
+    }
+
     if (cameraQuad && cameraQuad.length === 4) {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.beginPath();
       cameraQuad.forEach((pt, i) => {
         const { u, v } = gridToMinimap(p, pt.x, pt.z);

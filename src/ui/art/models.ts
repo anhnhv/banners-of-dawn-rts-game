@@ -13,7 +13,7 @@ import { VoxelBuilder, type BuiltGeometry } from './VoxelBuilder';
 
 export type BuildingModel = 'townHall' | 'house' | 'barracks' | 'farm' | 'tower' | 'goldMine' | 'berryBush';
 export type WallAxis = 'x' | 'z';
-export type UnitModel = 'worker' | 'militia' | 'archer' | 'knight';
+export type UnitModel = 'worker' | 'militia' | 'archer' | 'scoutRider' | 'knight';
 export type TreeModel = 'oak' | 'oakTall' | 'pine' | 'pineSmall';
 
 function builder(team: TeamName): VoxelBuilder {
@@ -282,7 +282,19 @@ export function rockGeometry(): BuiltGeometry {
 
 // ---- Units ---------------------------------------------------------------------------------------
 
-/** A unit is a group: a merged body plus separate legs so they can swing when walking. */
+/** Leg (or horse leg) geometry with its pivot point (hip) in model space. */
+export interface LegPart {
+  geometry: BuiltGeometry;
+  pivot: [number, number, number];
+}
+
+/** The pieces of a unit model: a rigid body plus legs that swing when walking. */
+export interface UnitPartGeometry {
+  body: BuiltGeometry;
+  legs: LegPart[];
+}
+
+/** A unit as a scene-graph group (used by the style preview). */
 export interface UnitParts {
   group: THREE.Group;
   legs: THREE.Object3D[];
@@ -300,7 +312,7 @@ function humanoid(b: VoxelBuilder, y0: number, torso: string, arms: string): voi
   b.boxC(-0.05, y0 + 0.28, 0.1, 0.035, 0.045, 0.01, 'plain', 'ink');
 }
 
-function legMesh(
+function leg(
   team: TeamName,
   color: string,
   w: number,
@@ -309,29 +321,35 @@ function legMesh(
   x: number,
   y: number,
   z: number,
-): THREE.Mesh {
+): LegPart {
   const b = builder(team);
   b.box(-w / 2, -h, -d / 2, w, h, d, 'plain', color);
-  const mesh = meshFrom(b.build());
-  mesh.position.set(x, y, z); // pivot at the hip
-  return mesh;
+  return { geometry: b.build(), pivot: [x, y, z] };
 }
 
-export function buildUnit(model: UnitModel, team: TeamName): UnitParts {
+function horse(b: VoxelBuilder, team: TeamName, coat: string, dark: string, legs: LegPart[]): void {
+  b.boxC(0, 0.3, 0, 0.3, 0.26, 0.62, 'plain', coat);
+  b.boxC(0, 0.3, 0, 0.34, 0.15, 0.5, 'cloth', 'team');
+  b.boxC(0, 0.45, 0.27, 0.18, 0.3, 0.18, 'plain', coat);
+  b.boxC(0, 0.65, 0.39, 0.16, 0.14, 0.28, 'plain', coat);
+  b.boxC(0, 0.72, 0.3, 0.05, 0.12, 0.2, 'plain', dark); // mane
+  b.boxC(0, 0.42, -0.34, 0.06, 0.22, 0.08, 'plain', dark); // tail
+  for (const [x, z] of [
+    [0.1, 0.22],
+    [-0.1, 0.22],
+    [0.1, -0.22],
+    [-0.1, -0.22],
+  ] as const)
+    legs.push(leg(team, dark, 0.08, 0.3, 0.08, x, 0.3, z));
+}
+
+export function unitParts(model: UnitModel, team: TeamName): UnitPartGeometry {
   const b = builder(team);
-  const group = new THREE.Group();
-  const legs: THREE.Object3D[] = [];
+  const legs: LegPart[] = [];
   const hip = 0.17;
 
   if (model === 'knight') {
-    // horse
-    b.boxC(0, 0.3, 0, 0.3, 0.26, 0.62, 'plain', 'horse');
-    b.boxC(0, 0.3, 0, 0.34, 0.15, 0.5, 'cloth', 'team');
-    b.boxC(0, 0.45, 0.27, 0.18, 0.3, 0.18, 'plain', 'horse');
-    b.boxC(0, 0.65, 0.39, 0.16, 0.14, 0.28, 'plain', 'horse');
-    b.boxC(0, 0.72, 0.3, 0.05, 0.12, 0.2, 'plain', 'horse-dark'); // mane
-    b.boxC(0, 0.42, -0.34, 0.06, 0.22, 0.08, 'plain', 'horse-dark'); // tail
-    // rider
+    horse(b, team, 'horse', 'horse-dark', legs);
     b.boxC(0, 0.56, -0.02, 0.26, 0.2, 0.18, 'plain', 'iron');
     b.boxC(0, 0.56, 0.0, 0.27, 0.06, 0.19, 'cloth', 'team');
     b.boxC(0.16, 0.58, 0, 0.07, 0.17, 0.09, 'plain', 'iron-dark');
@@ -342,13 +360,18 @@ export function buildUnit(model: UnitModel, team: TeamName): UnitParts {
     b.boxC(0.2, 0.62, 0.25, 0.04, 0.04, 0.9, 'bark', 'wood'); // lance
     b.boxC(0.2, 0.61, 0.72, 0.06, 0.06, 0.1, 'plain', 'iron');
     b.boxC(-0.21, 0.5, 0.02, 0.04, 0.24, 0.2, 'planks', 'team'); // shield
-    for (const [x, z] of [
-      [0.1, 0.22],
-      [-0.1, 0.22],
-      [0.1, -0.22],
-      [-0.1, -0.22],
-    ] as const)
-      legs.push(legMesh(team, 'horse-dark', 0.08, 0.3, 0.08, x, 0.3, z));
+  } else if (model === 'scoutRider') {
+    horse(b, team, 'wood-light', 'wood', legs);
+    b.boxC(0, 0.56, -0.02, 0.25, 0.19, 0.17, 'plain', 'leather');
+    b.boxC(0, 0.6, -0.11, 0.27, 0.22, 0.03, 'cloth', 'team'); // cape
+    b.boxC(0.16, 0.58, 0, 0.07, 0.16, 0.09, 'cloth', 'team-dark');
+    b.boxC(-0.16, 0.58, 0, 0.07, 0.16, 0.09, 'cloth', 'team-dark');
+    b.boxC(0, 0.75, -0.02, 0.2, 0.19, 0.19, 'plain', 'skin');
+    b.boxC(0.045, 0.83, 0.075, 0.03, 0.04, 0.01, 'plain', 'ink');
+    b.boxC(-0.045, 0.83, 0.075, 0.03, 0.04, 0.01, 'plain', 'ink');
+    b.boxC(0, 0.92, -0.02, 0.22, 0.06, 0.22, 'cloth', 'team-light'); // cap
+    b.boxC(0.2, 0.55, 0.12, 0.03, 0.03, 0.55, 'bark', 'wood'); // short spear
+    b.boxC(0.2, 0.545, 0.42, 0.05, 0.05, 0.08, 'plain', 'iron');
   } else {
     const torso = model === 'worker' ? 'team-light' : 'team';
     humanoid(b, hip, torso, model === 'worker' ? 'cloth' : 'team-dark');
@@ -375,12 +398,22 @@ export function buildUnit(model: UnitModel, team: TeamName): UnitParts {
       b.boxC(0.06, hip + 0.27, -0.11, 0.06, 0.05, 0.04, 'plain', 'cloth');
     }
     const legColor = model === 'militia' ? 'iron-dark' : 'leather';
-    legs.push(legMesh(team, legColor, 0.09, hip, 0.1, 0.065, hip, 0));
-    legs.push(legMesh(team, legColor, 0.09, hip, 0.1, -0.065, hip, 0));
+    legs.push(leg(team, legColor, 0.09, hip, 0.1, 0.065, hip, 0));
+    legs.push(leg(team, legColor, 0.09, hip, 0.1, -0.065, hip, 0));
   }
+  return { body: b.build(), legs };
+}
 
-  const body = meshFrom(b.build());
-  group.add(body, ...legs);
+/** Unit as a scene-graph group with separate leg meshes (style preview). */
+export function buildUnit(model: UnitModel, team: TeamName): UnitParts {
+  const parts = unitParts(model, team);
+  const group = new THREE.Group();
+  const legs = parts.legs.map((l) => {
+    const mesh = meshFrom(l.geometry);
+    mesh.position.set(...l.pivot);
+    return mesh;
+  });
+  group.add(meshFrom(parts.body), ...legs);
   group.name = `${team}:${model}`;
   return { group, legs };
 }

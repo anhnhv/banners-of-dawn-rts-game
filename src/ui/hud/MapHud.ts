@@ -25,6 +25,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 export class MapHud {
   readonly root: HTMLElement;
   private readonly hover: HTMLElement;
+  private readonly selection: HTMLElement;
   private readonly perf: HTMLElement;
 
   constructor(container: HTMLElement, map: DecodedMap, minimap: Minimap, warnings: readonly string[]) {
@@ -40,7 +41,8 @@ export class MapHud {
       el('div', 'info-line info-teams', 'You: blue base (bottom) · Machine: red base (top)'),
     );
     this.hover = el('div', 'info-hover', 'Hover the map to inspect a tile');
-    info.append(this.hover);
+    this.selection = el('div', 'info-selection', '');
+    info.append(this.hover, this.selection);
     if (warnings.length > 0) {
       info.append(el('div', 'info-warn', `${warnings.length} map warning(s), see the console`));
       warnings.forEach((w) => console.warn(`[map] ${w}`));
@@ -48,8 +50,10 @@ export class MapHud {
 
     const help = el('div', 'hud-help panel');
     help.append(
-      el('div', '', 'Arrows / screen edge / middle-drag: pan'),
-      el('div', '', 'Mouse wheel: zoom · Minimap: click or drag'),
+      el('div', '', 'Left click / drag: select · Double click: same type'),
+      el('div', '', 'Right click: move (Shift: queue) · W: stop'),
+      el('div', '', 'Ctrl/Alt+1-9: group · 1-9: recall (twice: jump)'),
+      el('div', '', 'Arrows / edge / middle-drag: pan · Wheel: zoom'),
     );
     this.perf = el('div', 'help-perf', '');
     help.append(this.perf);
@@ -70,6 +74,10 @@ export class MapHud {
     let text = `Tile ${x}, ${y} · ${t.name} (${flags})`;
     if (object) text += ` · ${describe(object)}`;
     this.hover.textContent = text;
+  }
+
+  setSelection(text: string | null): void {
+    this.selection.textContent = text ?? 'Nothing selected';
   }
 
   clearTile(): void {

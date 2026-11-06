@@ -10,7 +10,9 @@ import './style.css';
 import './hud/hud.css';
 import type { DecodedMap } from '../shared';
 import { StylePreview } from './preview/StylePreview';
-import { MapViewScreen, type MapViewOptions } from './screens/MapViewScreen';
+import { GameScreen, type GameScreenOptions } from './screens/GameScreen';
+
+export type { GameScreen, GameScreenOptions };
 
 export { showFatalError } from './screens/ErrorScreen';
 
@@ -21,13 +23,11 @@ export function startStylePreview(container: HTMLElement): StylePreview {
   return app;
 }
 
-/** Show a decoded map in the 3D view (M1). */
-export function createMapView(
+/** Create the in-game screen. The host drives it by calling frame() every animation frame. */
+export function createGameScreen(
   container: HTMLElement,
   map: DecodedMap,
-  options?: MapViewOptions,
-): MapViewScreen {
-  const screen = new MapViewScreen(container, map, options);
-  screen.start();
-  return screen;
+  options: GameScreenOptions,
+): GameScreen {
+  return new GameScreen(container, map, options);
 }

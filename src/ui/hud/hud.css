@@ -350,3 +350,18 @@
   padding-left: 20px;
   line-height: 1.45;
 }
+
+.info-selection {
+  font-size: 18px;
+  color: var(--brass-hi);
+}
+
+/* ---- box selection ---- */
+.select-box {
+  position: fixed;
+  display: none;
+  border: 2px solid #7dff6a;
+  background: rgba(125, 255, 106, 0.12);
+  pointer-events: none;
+  z-index: 5;
+}
