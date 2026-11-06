@@ -263,3 +263,90 @@
 .hud-tag b {
   color: var(--brass-hi);
 }
+
+/* ---- map view (M1) ---- */
+.hud-minimap-live {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 10px;
+  line-height: 0;
+}
+
+.minimap-canvas {
+  display: block;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+.hud-info {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: min(620px, calc(100vw - 340px));
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--brass-hi);
+  text-shadow: 2px 2px 0 #0f111a;
+}
+
+.info-line {
+  font-size: 16px;
+  color: #c9c2b2;
+}
+
+.info-teams {
+  color: #e9e3d4;
+}
+
+.info-hover {
+  margin-top: 4px;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.info-warn {
+  font-size: 15px;
+  color: #ffcf6a;
+}
+
+.hud-help {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 8px 12px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: #e9e3d4;
+  text-align: right;
+}
+
+.help-perf {
+  color: var(--brass-hi);
+}
+
+/* ---- fatal error ---- */
+.hud.fatal {
+  display: grid;
+  place-items: center;
+  background: rgba(15, 17, 26, 0.6);
+}
+
+.fatal-panel {
+  max-width: 760px;
+  padding: 18px 22px;
+  font-size: 17px;
+}
+
+.fatal-panel ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  line-height: 1.45;
+}

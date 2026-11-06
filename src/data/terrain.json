@@ -1,0 +1,11 @@
+{
+  "note": "Terrain rules (PLAN §5.5). speed is a movement multiplier.",
+  "types": {
+    "grass": { "name": "Grass", "passable": true, "buildable": true, "speed": 1.0 },
+    "dirt": { "name": "Dirt", "passable": true, "buildable": true, "speed": 1.0 },
+    "sand": { "name": "Sand", "passable": true, "buildable": true, "speed": 1.0 },
+    "shallow": { "name": "Shallow water", "passable": true, "buildable": false, "speed": 0.7 },
+    "water": { "name": "Deep water", "passable": false, "buildable": false, "speed": 0 },
+    "rock": { "name": "Rock", "passable": false, "buildable": false, "speed": 0 }
+  }
+}

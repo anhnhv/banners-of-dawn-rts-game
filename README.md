@@ -3,7 +3,9 @@
 3D voxel-style (low-poly with pixel textures) 1v1 real-time strategy game in the browser, played against a local
 machine player. The full design is in [PLAN.md](PLAN.md).
 
-Right now `npm run dev` shows the **style preview** (keys `1` `2` `3` switch views). Screenshots: [docs/preview/](docs/preview/).
+Right now `npm run dev` shows the **map view** (M1): Green Valley in 3D with the RTS camera, tile inspection and an
+interactive minimap. Open `/?preview` for the style-preview diorama (keys `1` `2` `3` switch views).
+Screenshots: [docs/preview/](docs/preview/) and [docs/milestones/](docs/milestones/).
 
 ## Setup
 
@@ -16,16 +18,18 @@ npm run dev        # http://localhost:5173
 
 ## Scripts
 
-| Script              | What it does                                                           |
-| ------------------- | ---------------------------------------------------------------------- |
-| `npm run dev`       | Dev server with hot reload                                             |
-| `npm run build`     | Typecheck, then production build into `dist/`                          |
-| `npm run preview`   | Serve the production build                                             |
-| `npm run typecheck` | Type-check every module with its own `tsconfig` (engine/AI get no DOM) |
-| `npm run lint`      | ESLint, including the architecture rules                               |
-| `npm test`          | Vitest                                                                 |
-| `npm run check`     | typecheck + lint + test                                                |
-| `npm run format`    | Prettier                                                               |
+| Script                  | What it does                                                           |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `npm run dev`           | Dev server with hot reload                                             |
+| `npm run build`         | Typecheck, then production build into `dist/`                          |
+| `npm run preview`       | Serve the production build                                             |
+| `npm run typecheck`     | Type-check every module with its own `tsconfig` (engine/AI get no DOM) |
+| `npm run lint`          | ESLint, including the architecture rules                               |
+| `npm test`              | Vitest                                                                 |
+| `npm run check`         | typecheck + lint + validate-maps + test                                |
+| `npm run validate-maps` | Validate every map in `maps/` (playable, fair, symmetric)              |
+| `npm run maps:generate` | Regenerate `maps/green_valley.json` from its generator script          |
+| `npm run format`        | Prettier                                                               |
 
 ## Module layout
 

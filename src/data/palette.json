@@ -32,6 +32,7 @@
     { "id": "crop", "hex": "#8cc152" },
     { "id": "crop-ripe", "hex": "#e8c552" },
     { "id": "water", "hex": "#3d8fd1" },
+    { "id": "shallow", "hex": "#7cc4e8" },
     { "id": "water-deep", "hex": "#2a6aa8" },
     { "id": "foam", "hex": "#bfe6f7" },
     { "id": "gold", "hex": "#f6c945" },

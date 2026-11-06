@@ -17,7 +17,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm run validate-maps && npm test",
+    "validate-maps": "tsx tools/validate-maps.ts",
+    "maps:generate": "tsx tools/maps/generate-green-valley.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

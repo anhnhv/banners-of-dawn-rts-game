@@ -33,7 +33,7 @@ describe('machine player (src/ai) isolation', () => {
 
   it.each([
     ['engine', "import { ENGINE_INFO } from '../engine';\nexport const x = ENGINE_INFO;\n"],
-    ['ui', "import { startApp } from '../ui';\nexport const x = startApp;\n"],
+    ['ui', "import { createMapView } from '../ui';\nexport const x = createMapView;\n"],
     ['host', "import { FixedStepClock } from '../host';\nexport const x = FixedStepClock;\n"],
     ['data', "import palette from '../data/palette.json';\nexport const x = palette;\n"],
   ])('may NOT import %s', async (_name, code) => {
@@ -82,7 +82,7 @@ describe('engine (src/engine) purity', () => {
   });
 
   it.each([
-    ['ui', "import { startApp } from '../ui';\nexport const x = startApp;\n"],
+    ['ui', "import { createMapView } from '../ui';\nexport const x = createMapView;\n"],
     ['ai', "import { AI_INFO } from '../ai';\nexport const x = AI_INFO;\n"],
     ['host', "import { FixedStepClock } from '../host';\nexport const x = FixedStepClock;\n"],
   ])('may NOT import %s', async (_name, code) => {
@@ -122,7 +122,7 @@ describe('UI, shared and host boundaries', () => {
   it('host may wire engine, AI and UI together', async () => {
     const file = 'src/host/__probe__.ts';
     const code =
-      "import { ENGINE_INFO } from '../engine';\nimport { AI_INFO } from '../ai';\nimport { startApp } from '../ui';\nexport const x = [ENGINE_INFO, AI_INFO, startApp];\n";
+      "import { ENGINE_INFO } from '../engine';\nimport { AI_INFO } from '../ai';\nimport { createMapView } from '../ui';\nexport const x = [ENGINE_INFO, AI_INFO, createMapView];\n";
     expect(await ruleIds(file, code)).toEqual([]);
   });
 });

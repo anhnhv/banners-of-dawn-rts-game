@@ -3,7 +3,7 @@
  * Creates a match and wires the engine, the human controller (UI) and the machine
  * player (AI worker) together. Owns the fixed-step game loop and the command log (PLAN §10).
  *
- * The game loop arrives in M2. For now this only exposes the clock used by the UI.
+ * M1: boots the map view (load → decode → validate → render). The game loop arrives in M2.
  */
 import { TICK_MS } from '../shared';
 
@@ -39,3 +39,5 @@ export class FixedStepClock {
     this.accumulator = 0;
   }
 }
+
+export { bootGame } from './boot';

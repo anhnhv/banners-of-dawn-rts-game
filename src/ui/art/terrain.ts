@@ -2,35 +2,49 @@
  * Terrain mesh for a tile grid (grid x → world x, grid y → world z; 1 tile = 1 world unit).
  * - Land tiles are flat quads at y = 0 sampling one big pixel texture (TEXELS_PER_TILE per tile).
  *   Borders between terrain types are ragged and blocky, which gives the voxel/pixel look.
- * - Water tiles sit lower, with a translucent animated surface and earthy bank sides.
- * - The map edge gets vertical "diorama" sides.
+ * - Water has one flat surface level; shallow fords have a shallow bed, deep water a deep one.
+ * - Steps between beds get earthy bank sides, and the map edge gets vertical "diorama" sides.
  */
 import * as THREE from 'three';
+import type { TerrainType } from '../../shared';
 import { hex } from './palette';
 import { voxelMaterial } from './materials';
 import { pixelTexture } from './textures';
 import { VoxelBuilder } from './VoxelBuilder';
 
-export type TerrainType = 'grass' | 'dirt' | 'sand' | 'water';
+export type { TerrainType };
 
 export interface TerrainGrid {
   width: number;
   height: number;
   /** Row-major: tiles[y * width + x]. */
-  tiles: TerrainType[];
+  tiles: readonly TerrainType[];
 }
 
 export const TEXELS_PER_TILE = 8;
-const WATER_BED = -0.38;
-const WATER_SURFACE = -0.1;
+export const WATER_SURFACE = -0.08;
 const EDGE_DEPTH = -1.2;
+
+/** Height of the ground (or the river bed) for each terrain type. */
+const BED: Record<TerrainType, number> = {
+  grass: 0,
+  dirt: 0,
+  sand: 0,
+  rock: 0,
+  shallow: -0.17,
+  water: -0.4,
+};
 
 const SHADES: Record<TerrainType, string[]> = {
   grass: ['grass', 'grass', 'grass-light', 'grass-dark'],
   dirt: ['dirt', 'dirt', 'dirt-dark', 'sand-dark'],
   sand: ['sand', 'sand', 'sand-dark', 'plaster'],
+  rock: ['stone', 'stone-dark', 'stone', 'stone-light'],
+  shallow: ['sand', 'sand-dark', 'sand', 'plaster'],
   water: ['sand-dark', 'sand-dark', 'dirt', 'sand'],
 };
+
+const isWet = (t: TerrainType | null): boolean => t === 'water' || t === 'shallow';
 
 export interface TerrainView {
   group: THREE.Group;
@@ -47,25 +61,20 @@ export function buildTerrain(grid: TerrainGrid, seed = 1): TerrainView {
       ? null
       : (grid.tiles[y * grid.width + x] ?? 'grass');
 
-  // ---- Ground quads (land at 0, water bed lower) ------------------------------------------------
+  // ---- Ground quads ---------------------------------------------------------------------------------
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
   for (let y = 0; y < grid.height; y++) {
     for (let x = 0; x < grid.width; x++) {
-      const h = tileAt(x, y) === 'water' ? WATER_BED : 0;
+      const h = BED[tileAt(x, y) ?? 'grass'];
       const base = positions.length / 3;
       positions.push(x, h, y + 1, x + 1, h, y + 1, x + 1, h, y, x, h, y);
-      uvs.push(
-        x / grid.width,
-        (y + 1) / grid.height,
-        (x + 1) / grid.width,
-        (y + 1) / grid.height,
-        (x + 1) / grid.width,
-        y / grid.height,
-        x / grid.width,
-        y / grid.height,
-      );
+      const u0 = x / grid.width;
+      const u1 = (x + 1) / grid.width;
+      const v0 = y / grid.height;
+      const v1 = (y + 1) / grid.height;
+      uvs.push(u0, v1, u1, v1, u1, v0, u0, v0);
       indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
   }
@@ -79,15 +88,14 @@ export function buildTerrain(grid: TerrainGrid, seed = 1): TerrainView {
   groundMesh.name = 'ground';
   group.add(groundMesh);
 
-  // ---- Banks (land ↔ water) and map-edge sides ---------------------------------------------------
+  // ---- Bank sides between bed heights, and the map edge -------------------------------------------
   const sides = new VoxelBuilder();
   const bank = hex('dirt-dark');
   const edge = hex('dirt');
   for (let y = 0; y < grid.height; y++) {
     for (let x = 0; x < grid.width; x++) {
-      const here = tileAt(x, y);
-      const top = here === 'water' ? WATER_BED : 0;
-      const neighbours: Array<[number, number, 'px' | 'nx' | 'pz' | 'nz']> = [
+      const here = BED[tileAt(x, y) ?? 'grass'];
+      const neighbours: Array<[number, number, Side]> = [
         [x + 1, y, 'px'],
         [x - 1, y, 'nx'],
         [x, y + 1, 'pz'],
@@ -95,11 +103,8 @@ export function buildTerrain(grid: TerrainGrid, seed = 1): TerrainView {
       ];
       for (const [nx, ny, dir] of neighbours) {
         const other = tileAt(nx, ny);
-        if (other === null) {
-          sideQuad(sides, x, y, dir, EDGE_DEPTH, top, edge);
-        } else if (here !== 'water' && other === 'water') {
-          sideQuad(sides, x, y, dir, WATER_BED, 0, bank);
-        }
+        if (other === null) sideQuad(sides, x, y, dir, EDGE_DEPTH, here, edge);
+        else if (BED[other] < here) sideQuad(sides, x, y, dir, BED[other], here, bank);
       }
     }
   }
@@ -111,30 +116,33 @@ export function buildTerrain(grid: TerrainGrid, seed = 1): TerrainView {
   sidesMesh.receiveShadow = true;
   group.add(sidesMesh);
 
-  // ---- Water surface -------------------------------------------------------------------------------
+  // ---- Water surface (one level for deep and shallow water) ---------------------------------------
   const waterTex = pixelTexture('water').clone();
   waterTex.needsUpdate = true;
-  waterTex.repeat.set(1, 1);
   const water = new VoxelBuilder();
   let hasWater = false;
+  const s = WATER_SURFACE;
   for (let y = 0; y < grid.height; y++) {
     for (let x = 0; x < grid.width; x++) {
-      if (tileAt(x, y) !== 'water') continue;
+      const t = tileAt(x, y);
+      if (!isWet(t)) continue;
       hasWater = true;
-      const s = WATER_SURFACE;
-      water.quad('water', hex('water'), [x, s, y + 1], [x + 1, s, y + 1], [x + 1, s, y], [x, s, y]);
+      const color = hex(t === 'shallow' ? 'shallow' : 'water');
+      water.quad('water', color, [x, s, y + 1], [x + 1, s, y + 1], [x + 1, s, y], [x, s, y]);
     }
   }
-  const waterMaterial = new THREE.MeshLambertMaterial({
-    map: waterTex,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.82,
-    depthWrite: false,
-  });
   if (hasWater) {
     const builtWater = water.build();
-    const waterMesh = new THREE.Mesh(builtWater.geometry, waterMaterial);
+    const waterMesh = new THREE.Mesh(
+      builtWater.geometry,
+      new THREE.MeshLambertMaterial({
+        map: waterTex,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+      }),
+    );
     waterMesh.name = 'water';
     waterMesh.renderOrder = 1;
     group.add(waterMesh);
@@ -148,11 +156,13 @@ export function buildTerrain(grid: TerrainGrid, seed = 1): TerrainView {
   };
 }
 
+type Side = 'px' | 'nx' | 'pz' | 'nz';
+
 function sideQuad(
   b: VoxelBuilder,
   x: number,
   y: number,
-  dir: 'px' | 'nx' | 'pz' | 'nz',
+  dir: Side,
   bottom: number,
   top: number,
   color: string,
@@ -195,12 +205,21 @@ function paintTerrainTexture(grid: TerrainGrid, seed: number): THREE.CanvasTextu
 
   for (let py = 0; py < H; py++) {
     for (let px = 0; px < W; px++) {
-      // Ragged borders: jitter the sample position in 2×2-texel blocks.
+      const own = tileAt(Math.floor(px / TEXELS_PER_TILE), Math.floor(py / TEXELS_PER_TILE));
+      // Ragged borders: jitter the sample position in 2×2-texel blocks (land only; water beds keep
+      // their own color so the bank sides line up).
       const bx = px >> 1;
       const by = py >> 1;
-      const jx = (hash(bx, by, seed) % 5) - 2;
-      const jy = (hash(bx, by, seed + 17) % 5) - 2;
-      const type = tileAt(Math.floor((px + jx) / TEXELS_PER_TILE), Math.floor((py + jy) / TEXELS_PER_TILE));
+      let type = own;
+      if (!isWet(own)) {
+        const jx = (hash(bx, by, seed) % 5) - 2;
+        const jy = (hash(bx, by, seed + 17) % 5) - 2;
+        const sampled = tileAt(
+          Math.floor((px + jx) / TEXELS_PER_TILE),
+          Math.floor((py + jy) / TEXELS_PER_TILE),
+        );
+        if (!isWet(sampled)) type = sampled;
+      }
       const shades = SHADES[type];
       const r = hash(bx, by, seed + 101) % 100;
       const shade = r < 52 ? shades[0] : r < 74 ? shades[1] : r < 90 ? shades[2] : shades[3];

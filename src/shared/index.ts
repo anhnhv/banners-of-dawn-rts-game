@@ -6,4 +6,6 @@
  */
 export * from './constants';
 export * from './ids';
+export * from './map';
+export * from './mapSchema';
 export * from './rng';

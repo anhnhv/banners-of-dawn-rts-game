@@ -253,6 +253,25 @@ export function treeGeometry(model: TreeModel): BuiltGeometry {
   return b.build();
 }
 
+/** Boulder block that fills one 'rock' terrain tile (3 variants). Origin: tile center. */
+export function rockBlockGeometry(variant: 0 | 1 | 2): BuiltGeometry {
+  const b = builder('blue');
+  if (variant === 0) {
+    b.boxC(0, 0, 0, 0.98, 0.5, 0.98, 'rock', 'stone', { topColor: 'stone-light' });
+    b.boxC(0.12, 0.5, -0.06, 0.62, 0.32, 0.6, 'rock', 'stone', { topColor: 'stone-light' });
+    b.boxC(-0.2, 0.82, 0.05, 0.3, 0.16, 0.3, 'rock', 'stone-light');
+  } else if (variant === 1) {
+    b.boxC(0, 0, 0, 0.98, 0.34, 0.98, 'rock', 'stone-dark', { topColor: 'stone' });
+    b.boxC(-0.15, 0.34, 0.1, 0.56, 0.42, 0.58, 'rock', 'stone', { topColor: 'stone-light' });
+    b.boxC(0.28, 0.34, -0.25, 0.32, 0.22, 0.34, 'rock', 'stone');
+  } else {
+    b.boxC(0, 0, 0, 0.98, 0.7, 0.98, 'rock', 'stone', { topColor: 'stone-light' });
+    b.boxC(0.05, 0.7, 0.05, 0.7, 0.4, 0.66, 'rock', 'stone-dark', { topColor: 'stone' });
+    b.boxC(-0.06, 1.1, -0.04, 0.36, 0.2, 0.36, 'rock', 'stone');
+  }
+  return b.build();
+}
+
 export function rockGeometry(): BuiltGeometry {
   const b = builder('blue');
   b.boxC(0, 0, 0, 0.5, 0.3, 0.42, 'rock', 'stone');

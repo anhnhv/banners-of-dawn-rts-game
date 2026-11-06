@@ -904,7 +904,7 @@ Maps are stored in **grid space** as character grids (grid x → world x, grid y
   "symmetry": "rotate180",
   "legend": {
     "terrain": { ".": "grass", ",": "dirt", ":": "sand", "~": "shallow", "W": "water", "#": "rock" },
-    "objects": { "T": "tree", "G": "gold_mine", "B": "berry_bush", "1": "spawn_p1", "2": "spawn_p2", "r": "decor_stone" }
+    "objects": { "T": "tree", "P": "pine", "G": "gold_mine", "B": "berry_bush", "r": "stone", "1": "spawn_p1", "2": "spawn_p2" }
   },
   "terrain": [ "................................................................................", "..." ],
   "objects": [ "TTTTTTTTT.......................................................................", "..." ],
@@ -1071,12 +1071,20 @@ Sizes: **S** ≈ small, **M** ≈ medium, **L** ≈ large (relative effort).
 
 **Done when:** you confirm the visual direction.
 
-### M1: Terrain from map files, camera & minimap (M)
-- [ ] Map schema, loader, validator, `validate-maps` tool; a rough first version of Green Valley.
-- [ ] Terrain, trees and resources built from the loaded map (instanced); camera clamped to the map.
-- [ ] Ground picking: highlight the tile under the cursor; the minimap with the camera trapezoid, click to move the camera.
+### M1: Terrain from map files, camera & minimap (M) ✅ done 2026-11-06
+- [x] Map schema, loader, validator, `validate-maps` tool; a rough first version of Green Valley.
+- [x] Terrain, trees and resources built from the loaded map (instanced); camera clamped to the map.
+- [x] Ground picking: highlight the tile under the cursor; the minimap with the camera trapezoid, click to move the camera.
 
 **Done when:** Green Valley loads from `maps/`, renders in the voxel style, and the hovered tile and the minimap camera view are correct.
+
+*Implementation notes:*
+- **Map pipeline:** `shared/mapSchema.ts` (zod) and `shared/map.ts` (`decodeMap`) → `engine/map/loadMap.ts` (Grid + resource nodes + spawns) → `engine/map/validateMap.ts` → host `boot.ts` → UI `MapViewScreen`.
+- **Green Valley** is produced by `tools/maps/generate-green-valley.ts` (`npm run maps:generate`). The script designs one half and mirrors it, so both sides are equal: 7 berry bushes, 125 trees within 12 tiles and 2 gold mines each, plus a rich 1500-gold center mine. The output is a normal, hand-editable map file.
+- **Rule data:** terrain rules live in `src/data/terrain.json` (shallow water is walkable but not buildable), resource amounts in `src/data/resources.json`.
+- **Validator:** decorative stones block movement. Trees count as cuttable when checking whether a resource can be reached, but the path between the two bases must exist without cutting anything.
+- **Checks:** `npm run check` now also runs the map validator, and `tests/maps/maps.test.ts` validates every shipped map.
+- **Screenshots:** `docs/milestones/m1-*.png`. The style preview is still available at `/?preview`.
 
 ### M2: Units, selection & movement (M)
 - [ ] Entities, World, fixed-tick `GameHost` with interpolation between ticks.

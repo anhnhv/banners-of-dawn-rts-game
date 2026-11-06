@@ -1,0 +1,9 @@
+{
+  "note": "Resource nodes placed by maps (PLAN §2.1). amount can be overridden per node in the map file.",
+  "nodes": {
+    "tree": { "name": "Tree", "resource": "wood", "amount": 100 },
+    "pine": { "name": "Pine", "resource": "wood", "amount": 100 },
+    "berry_bush": { "name": "Berry bush", "resource": "food", "amount": 100 },
+    "gold_mine": { "name": "Gold mine", "resource": "gold", "amount": 800 }
+  }
+}

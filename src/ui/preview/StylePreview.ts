@@ -23,11 +23,11 @@ import { hex, type TeamName } from '../art/palette';
 import { voxelMaterial } from '../art/materials';
 import { buildTerrain, type TerrainGrid, type TerrainType, type TerrainView } from '../art/terrain';
 import { PreviewHud } from '../hud/PreviewHud';
+import { CameraController } from '../input/CameraController';
 import { World3D } from '../three/World3D';
 
 const W = 44;
 const H = 40;
-const EDGE_SCROLL_PX = 6;
 
 interface Walker {
   unit: UnitParts;
@@ -53,9 +53,7 @@ export class StylePreview {
   private readonly workers: Worker[] = [];
   private readonly idlers: UnitParts[] = [];
   private readonly rng = new Rng(20261106);
-  private readonly keys = new Set<string>();
-  private pointer: { x: number; y: number } | null = null;
-  private dragging: { x: number; y: number } | null = null;
+  private readonly camera: CameraController;
   private time = 0;
   private last = 0;
   private fpsFrames = 0;
@@ -77,6 +75,7 @@ export class StylePreview {
     this.placeUnits();
 
     this.hud = new PreviewHud(container, this.makeMinimap());
+    this.camera = new CameraController(this.world.rig, this.world.canvas);
     this.bindInput();
   }
 
@@ -320,7 +319,9 @@ export class StylePreview {
       grass: hex('grass'),
       dirt: hex('dirt'),
       sand: hex('sand'),
+      shallow: hex('shallow'),
       water: hex('water'),
+      rock: hex('stone-dark'),
     };
     for (let z = 0; z < H; z++) {
       for (let x = 0; x < W; x++) {
@@ -360,7 +361,7 @@ export class StylePreview {
     const dt = this.last === 0 ? 0 : Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
     this.time += dt;
-    this.updateCamera(dt);
+    this.camera.update(dt);
     this.animate(dt);
     this.terrain.update(this.time);
     const stats = this.world.render();
@@ -414,60 +415,9 @@ export class StylePreview {
   }
 
   private bindInput(): void {
-    const canvas = this.world.canvas;
     window.addEventListener('keydown', (e) => {
-      this.keys.add(e.key);
       if (e.key === '1' || e.key === '2' || e.key === '3') this.setView(e.key);
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key));
-    window.addEventListener('blur', () => this.keys.clear());
-    window.addEventListener('pointermove', (e) => {
-      this.pointer = { x: e.clientX, y: e.clientY };
-      if (this.dragging) {
-        const wpp = this.world.rig.worldPerPixel(window.innerHeight);
-        const pitch = Math.sin(this.world.rig.pitch);
-        this.world.rig.pan(
-          -(e.clientX - this.dragging.x) * wpp,
-          ((e.clientY - this.dragging.y) * wpp) / pitch,
-        );
-        this.dragging = { x: e.clientX, y: e.clientY };
-      }
-    });
-    document.addEventListener('pointerleave', () => (this.pointer = null));
-    canvas.addEventListener('pointerdown', (e) => {
-      if (e.button === 1) {
-        e.preventDefault();
-        this.dragging = { x: e.clientX, y: e.clientY };
-      }
-    });
-    window.addEventListener('pointerup', () => (this.dragging = null));
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    canvas.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        this.world.rig.zoom(Math.exp(e.deltaY * 0.0012));
-      },
-      { passive: false },
-    );
-  }
-
-  private updateCamera(dt: number): void {
-    const speed = this.world.rig.distance * 0.9 * dt;
-    let dx = 0;
-    let dy = 0;
-    if (this.keys.has('ArrowLeft')) dx -= 1;
-    if (this.keys.has('ArrowRight')) dx += 1;
-    if (this.keys.has('ArrowUp')) dy += 1;
-    if (this.keys.has('ArrowDown')) dy -= 1;
-    const p = this.pointer;
-    if (p && !this.dragging) {
-      if (p.x <= EDGE_SCROLL_PX) dx -= 1;
-      if (p.x >= window.innerWidth - EDGE_SCROLL_PX) dx += 1;
-      if (p.y <= EDGE_SCROLL_PX) dy += 1;
-      if (p.y >= window.innerHeight - EDGE_SCROLL_PX) dy -= 1;
-    }
-    if (dx !== 0 || dy !== 0) this.world.rig.pan(dx * speed, dy * speed);
   }
 }
 
