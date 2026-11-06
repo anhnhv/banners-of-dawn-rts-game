@@ -1,0 +1,7 @@
+{
+  // Game engine: pure simulation. No DOM types on purpose. Using `window`,
+  // `document`, canvas, etc. here is a type error (and a lint error).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "lib": ["ES2023"], "types": [] },
+  "include": ["./**/*.ts"]
+}

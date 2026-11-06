@@ -1,0 +1,5 @@
+{
+  "note": "Runtime assets that are data, not code: sfx presets and music note data (arrive in M10). Models and textures are generated in code (src/ui/art, PLAN §7.8).",
+  "sfx": [],
+  "music": []
+}

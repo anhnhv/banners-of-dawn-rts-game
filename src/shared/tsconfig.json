@@ -1,0 +1,6 @@
+{
+  // Shared contracts: pure TypeScript, no DOM, no Node.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "lib": ["ES2023"], "types": [] },
+  "include": ["./**/*.ts"]
+}

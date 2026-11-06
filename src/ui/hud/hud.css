@@ -1,0 +1,265 @@
+/* HUD overlay: chunky, pixel-styled panels drawn over the 3D world (PLAN §7). */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'Pixelify Sans', monospace;
+  color: #f4ecdc;
+  user-select: none;
+  --panel: rgba(30, 34, 52, 0.9);
+  --panel-edge: #0f111a;
+  --panel-hi: #4a5578;
+  --brass: #d9a24a;
+  --brass-hi: #f5cf7a;
+  --brass-lo: #8c5d22;
+}
+
+.hud > * {
+  pointer-events: auto;
+}
+
+.px-icon {
+  image-rendering: pixelated;
+  width: 36px;
+  height: 36px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 3px solid var(--panel-edge);
+  box-shadow:
+    inset 0 0 0 3px var(--panel-hi),
+    0 4px 0 0 rgba(0, 0, 0, 0.25);
+}
+
+/* ---- top resource bar ---- */
+.hud-resources {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+
+.res-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px 4px 6px;
+  font-size: 26px;
+  font-weight: 700;
+  text-shadow: 2px 2px 0 #0f111a;
+}
+
+.res-pill .px-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.res-era {
+  color: var(--brass-hi);
+}
+
+/* ---- minimap ---- */
+.hud-minimap {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 210px;
+  height: 140px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.hud-minimap canvas {
+  image-rendering: pixelated;
+  width: 132px;
+  height: 132px;
+  transform: scaleY(0.62) rotate(45deg);
+  outline: 3px solid var(--panel-edge);
+}
+
+/* ---- top-right menu ---- */
+.hud-menu {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+/* ---- buttons ---- */
+.px-btn {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  background: var(--brass);
+  border: 3px solid #2a1a0c;
+  box-shadow:
+    inset -4px -4px 0 var(--brass-lo),
+    inset 4px 4px 0 var(--brass-hi);
+  cursor: pointer;
+  padding: 0;
+}
+
+.px-btn:hover {
+  filter: brightness(1.08);
+}
+
+.px-btn:active {
+  box-shadow:
+    inset 4px 4px 0 var(--brass-lo),
+    inset -4px -4px 0 var(--brass-hi);
+}
+
+.px-btn.empty {
+  background: rgba(15, 17, 26, 0.55);
+  border-color: #23283a;
+  box-shadow: inset 0 0 0 2px #2f3650;
+  cursor: default;
+}
+
+.px-btn .hotkey {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff7e0;
+  text-shadow: 1px 1px 0 #2a1a0c;
+}
+
+.px-btn .px-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.px-btn.small {
+  width: 52px;
+  height: 52px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff7e0;
+  text-shadow: 2px 2px 0 #2a1a0c;
+}
+
+/* ---- bottom panel ---- */
+.hud-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 156px;
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+}
+
+.sel-portrait {
+  width: 120px;
+  display: grid;
+  place-items: center;
+  background: #1a1e2e;
+  border: 3px solid var(--panel-edge);
+  box-shadow: inset 0 0 0 3px var(--brass-lo);
+}
+
+.sel-portrait .px-icon {
+  width: 84px;
+  height: 84px;
+}
+
+.sel-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sel-info > * {
+  flex-shrink: 0;
+}
+
+.sel-name {
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--brass-hi);
+  text-shadow: 2px 2px 0 #0f111a;
+}
+
+.hp-bar {
+  width: 260px;
+  height: 14px;
+  background: #3a0f12;
+  border: 3px solid var(--panel-edge);
+}
+
+.hp-bar > div {
+  height: 100%;
+  background: linear-gradient(#7fe36a 0 50%, #4caf3e 50% 100%);
+}
+
+.sel-stats {
+  font-size: 17px;
+  line-height: 1;
+  color: #c9c2b2;
+}
+
+.queue {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.queue .px-btn {
+  width: 52px;
+  height: 52px;
+}
+
+.queue .progress {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  height: 6px;
+  background: #2a1a0c;
+}
+
+.queue .progress > div {
+  height: 100%;
+  width: 60%;
+  background: #7fe36a;
+}
+
+.cmd-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 64px);
+  grid-template-rows: repeat(2, 64px);
+  gap: 6px;
+  align-content: center;
+}
+
+/* ---- preview tag / debug ---- */
+.hud-tag {
+  position: absolute;
+  left: 16px;
+  bottom: 168px;
+  padding: 6px 10px;
+  font-size: 16px;
+  line-height: 1.35;
+  color: #e9e3d4;
+}
+
+.hud-tag b {
+  color: var(--brass-hi);
+}

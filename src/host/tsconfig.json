@@ -1,0 +1,6 @@
+{
+  // Host / glue: browser main thread (game loop, worker management).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "lib": ["ES2023", "DOM", "DOM.Iterable"], "types": ["vite/client"] },
+  "include": ["./**/*.ts"]
+}
