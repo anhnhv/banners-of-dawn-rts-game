@@ -1,0 +1,56 @@
+{
+  "note": "Building definitions (PLAN §2.5). 'actions' drive the command grid: what can be trained/researched here, with hotkeys. Costs and times of trained units come from units.json. 'panel' lists the info fields shown when selected.",
+  "buildings": {
+    "town_hall": {
+      "name": "Town Hall",
+      "description": "The heart of your town. Trains workers and accepts every resource.",
+      "model": "townHall",
+      "icon": "townHall",
+      "footprint": [3, 3],
+      "hp": 1500,
+      "armor": 1,
+      "popProvided": 5,
+      "dropSite": ["food", "wood", "gold"],
+      "cost": { "wood": 300, "gold": 150 },
+      "buildTime": 90,
+      "panel": ["hp", "armor", "pop", "queue"],
+      "actions": [
+        { "type": "train", "unit": "worker", "hotkey": "Q" },
+        { "type": "setRally", "hotkey": "Z" }
+      ]
+    },
+    "house": {
+      "name": "House",
+      "description": "Gives room for 5 more units.",
+      "model": "house",
+      "icon": "house",
+      "footprint": [2, 2],
+      "hp": 300,
+      "armor": 1,
+      "popProvided": 5,
+      "dropSite": [],
+      "cost": { "wood": 30 },
+      "buildTime": 15,
+      "panel": ["hp", "armor"],
+      "actions": []
+    },
+    "barracks": {
+      "name": "Barracks",
+      "description": "Trains infantry.",
+      "model": "barracks",
+      "icon": "sword",
+      "footprint": [3, 3],
+      "hp": 1000,
+      "armor": 1,
+      "popProvided": 0,
+      "dropSite": [],
+      "cost": { "wood": 150 },
+      "buildTime": 40,
+      "panel": ["hp", "armor", "queue"],
+      "actions": [
+        { "type": "train", "unit": "militia", "hotkey": "Q" },
+        { "type": "setRally", "hotkey": "Z" }
+      ]
+    }
+  }
+}

@@ -11,3 +11,4 @@ export * from './mapSchema';
 export * from './rng';
 export * from './commands';
 export * from './view';
+export * from './gameData';

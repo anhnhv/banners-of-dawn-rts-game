@@ -1,6 +1,7 @@
 /**
- * Movement-related systems (PLAN §5.3 steps 4–7): orders → path requests, budgeted pathfinding,
- * path following with stuck detection, and soft separation between units.
+ * Movement systems (PLAN §5.3 steps 5–7). Orders decide WHERE a unit should go by setting its
+ * `goal` (setGoal); these systems find the path (budgeted), walk it with stuck detection, and keep
+ * units apart. When the goal is reached `arrived` is set; the order system reacts next tick.
  */
 import { TICK_RATE } from '../../shared';
 import { clearPath, type Unit } from '../entities/Unit';
@@ -15,34 +16,46 @@ const STUCK_TICKS = 24;
 const MAX_REPATHS = 3;
 const ARRIVE_EPSILON = 0.02;
 
-/** Step 4: units with a move order but no path ask for one. */
-export function orderSystem(state: GameState): void {
-  for (const u of state.units.values()) {
-    const order = u.orders[0];
-    if (!order) {
-      u.moving = false;
-      continue;
-    }
-    if (order.kind === 'move' && !u.path && !u.pathPending) requestPath(state, u);
-  }
+/** Send the unit toward `p` (no-op if it is already heading there). */
+export function setGoal(state: GameState, u: Unit, p: Point): void {
+  if (u.goal && Math.abs(u.goal.x - p.x) < 0.01 && Math.abs(u.goal.y - p.y) < 0.01) return;
+  u.goal = { x: p.x, y: p.y };
+  u.arrived = false;
+  u.blocked = false;
+  u.repaths = 0;
+  clearPath(u);
+  requestPath(state, u);
 }
 
-export function requestPath(state: GameState, u: Unit): void {
+/** Stop moving and forget the goal. */
+export function clearGoal(u: Unit): void {
+  u.goal = null;
+  u.arrived = false;
+  u.blocked = false;
+  u.pathPending = false;
+  clearPath(u);
+}
+
+function requestPath(state: GameState, u: Unit): void {
   u.pathPending = true;
   state.pathQueue.push(u.id);
 }
 
-/** Step 5: answer path requests until the node budget for this tick is used up. */
+function arrive(u: Unit, blocked: boolean): void {
+  clearPath(u);
+  u.arrived = true;
+  u.blocked = blocked;
+}
+
+/** Answer path requests until the node budget for this tick is used up. */
 export function pathfindingSystem(state: GameState): void {
   let budget = PATH_BUDGET_PER_TICK;
   while (budget > 0 && state.pathQueue.length > 0) {
     const id = state.pathQueue.shift() as number;
     const u = state.units.get(id);
-    if (!u || !u.pathPending) continue;
+    if (!u || !u.pathPending || !u.goal) continue;
     u.pathPending = false;
-    const order = u.orders[0];
-    if (!order || order.kind !== 'move') continue;
-    budget -= computePath(state, u, order);
+    budget -= computePath(state, u, u.goal);
   }
 }
 
@@ -50,7 +63,7 @@ function computePath(state: GameState, u: Unit, target: Point): number {
   const { grid } = state;
   const goal = nearestPassable(grid, target.x, target.y);
   if (!goal) {
-    finishOrder(u);
+    arrive(u, true);
     return 1;
   }
   const result = state.pathFinder.find(
@@ -60,7 +73,7 @@ function computePath(state: GameState, u: Unit, target: Point): number {
     Math.floor(goal.y),
   );
   if (result.tiles.length === 0) {
-    finishOrder(u);
+    arrive(u, true);
     return result.expanded + 1;
   }
   const points: Point[] = result.tiles.map((i) => ({
@@ -77,13 +90,7 @@ function computePath(state: GameState, u: Unit, target: Point): number {
   return result.expanded + 1;
 }
 
-function finishOrder(u: Unit): void {
-  u.orders.shift();
-  clearPath(u);
-  u.repaths = 0;
-}
-
-/** Step 6: follow the path; detect being stuck and ask for a new path. */
+/** Follow the path; detect being stuck and ask for a new path. */
 export function movementSystem(state: GameState): void {
   const { grid } = state;
   for (const u of state.units.values()) {
@@ -94,17 +101,17 @@ export function movementSystem(state: GameState): void {
     }
     const wp = path[u.pathIndex];
     if (!wp) {
-      finishOrder(u);
+      arrive(u, false);
       continue;
     }
     const dx = wp.x - u.x;
     const dy = wp.y - u.y;
     const dist = Math.hypot(dx, dy);
     const isLast = u.pathIndex === path.length - 1;
-    const tile = grid.inBounds(Math.floor(u.x), Math.floor(u.y))
-      ? grid.rule(Math.floor(u.x), Math.floor(u.y))
-      : null;
-    const step = (u.speed * (tile && tile.speed > 0 ? tile.speed : 1)) / TICK_RATE;
+    const tx = Math.floor(u.x);
+    const ty = Math.floor(u.y);
+    const terrain = grid.inBounds(tx, ty) ? grid.rule(tx, ty).speed : 1;
+    const step = (u.speed * (terrain > 0 ? terrain : 1)) / TICK_RATE;
 
     if (dist <= Math.max(step, ARRIVE_EPSILON)) {
       u.x = wp.x;
@@ -112,7 +119,7 @@ export function movementSystem(state: GameState): void {
       u.pathIndex++;
       u.bestDist = Infinity;
       u.stuckTicks = 0;
-      if (isLast) finishOrder(u);
+      if (isLast) arrive(u, false);
       else u.moving = true;
       continue;
     }
@@ -122,16 +129,14 @@ export function movementSystem(state: GameState): void {
     u.facing = Math.atan2(dx, dy);
     u.moving = true;
 
-    // Stuck detection: no real progress toward the waypoint for a while.
     if (dist < u.bestDist - 0.01) {
       u.bestDist = dist;
       u.stuckTicks = 0;
     } else if (++u.stuckTicks > STUCK_TICKS) {
-      // Crowded at the destination: close enough counts as arrived.
       if (isLast && dist < 1.0) {
-        finishOrder(u);
+        arrive(u, false); // crowded at the destination: close enough
       } else if (u.repaths >= MAX_REPATHS) {
-        finishOrder(u);
+        arrive(u, true);
       } else {
         u.repaths++;
         clearPath(u);
@@ -142,8 +147,8 @@ export function movementSystem(state: GameState): void {
 }
 
 /**
- * Step 7: soft separation. Overlapping units push each other apart; units standing still yield
- * more than moving ones so groups can pass through idle units. Never pushes into blocked tiles.
+ * Soft separation. Overlapping units push each other apart; units standing still yield more than
+ * moving ones so groups can pass through idle units. Never pushes into blocked tiles.
  */
 export function separationSystem(state: GameState): void {
   const { spatial, grid } = state;
@@ -164,7 +169,6 @@ export function separationSystem(state: GameState): void {
       let nx: number;
       let ny: number;
       if (d < 1e-6) {
-        // exactly on top of each other: deterministic direction from the ids
         const angle = ((a.id * 7919 + b.id * 104729) % 360) * (Math.PI / 180);
         nx = Math.cos(angle);
         ny = Math.sin(angle);
@@ -174,12 +178,16 @@ export function separationSystem(state: GameState): void {
         ny = dy / d;
       }
       const overlap = (min - d) * 0.5;
-      const aWeight = a.moving === b.moving ? 0.5 : a.moving ? 0.2 : 0.8;
-      const bWeight = 1 - aWeight;
-      pushX.set(a.id, (pushX.get(a.id) ?? 0) - nx * overlap * aWeight);
-      pushY.set(a.id, (pushY.get(a.id) ?? 0) - ny * overlap * aWeight);
-      pushX.set(b.id, (pushX.get(b.id) ?? 0) + nx * overlap * bWeight);
-      pushY.set(b.id, (pushY.get(b.id) ?? 0) + ny * overlap * bWeight);
+      // working units hold their spot; moving units yield to nobody but working ones
+      const weight = (u: typeof a): number => (u.activity === 'work' ? 0.1 : u.moving ? 0.3 : 1);
+      const wa = weight(a);
+      const wb = weight(b);
+      const aShare = wa / (wa + wb);
+      const bShare = 1 - aShare;
+      pushX.set(a.id, (pushX.get(a.id) ?? 0) - nx * overlap * aShare);
+      pushY.set(a.id, (pushY.get(a.id) ?? 0) - ny * overlap * aShare);
+      pushX.set(b.id, (pushX.get(b.id) ?? 0) + nx * overlap * bShare);
+      pushY.set(b.id, (pushY.get(b.id) ?? 0) + ny * overlap * bShare);
     });
   }
 
@@ -187,7 +195,7 @@ export function separationSystem(state: GameState): void {
     const u = state.units.get(id);
     if (!u) continue;
     const py = pushY.get(id) ?? 0;
-    const max = 0.08; // per tick, keeps it smooth
+    const max = 0.08;
     const sx = Math.max(-max, Math.min(max, px));
     const sy = Math.max(-max, Math.min(max, py));
     const nx = clamp(u.x + sx, u.radius, grid.width - u.radius);

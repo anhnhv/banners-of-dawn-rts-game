@@ -199,6 +199,18 @@ const BUILDINGS: Record<BuildingModel, (b: VoxelBuilder) => void> = {
   },
 };
 
+const UNIT_MODELS: readonly UnitModel[] = ['worker', 'militia', 'archer', 'scoutRider', 'knight'];
+
+/** Resolve a config `model` name to a known unit model (unknown names fall back to militia). */
+export function unitModel(name: string): UnitModel {
+  return (UNIT_MODELS as readonly string[]).includes(name) ? (name as UnitModel) : 'militia';
+}
+
+/** Resolve a config `model` name to a known building model, or null if there is none yet. */
+export function buildingModel(name: string): BuildingModel | null {
+  return name in BUILDINGS ? (name as BuildingModel) : null;
+}
+
 export function buildingGeometry(model: BuildingModel, team: TeamName): BuiltGeometry {
   const b = builder(team);
   BUILDINGS[model](b);

@@ -1,9 +1,12 @@
 /**
  * The authoritative game (PLAN §5). Fixed 20 Hz ticks, deterministic for a given map, seed and
  * command log. The host feeds it commands and calls step(); the UI reads getView().
+ *
+ * Tick pipeline: commands → production → orders → pathfinding → movement → separation.
  */
 import {
   Rng,
+  type BuildingView,
   type Command,
   type CommandEnvelope,
   type DecodedMap,
@@ -11,16 +14,22 @@ import {
   type GameEvent,
   type PlayerId,
   type PlayerView,
+  type ResourceAmounts,
+  type ResourceView,
   type UnitTypeId,
   type UnitView,
 } from '../shared';
-import { clearPath, createUnit, type Unit } from './entities/Unit';
-import type { GameState } from './GameState';
+import { DATA } from './data';
+import type { Building, ResourceNode } from './entities/Building';
+import { createUnit, gatherRate, type Unit } from './entities/Unit';
+import type { GameState, PlayerState } from './GameState';
 import { loadMap, type LoadedMap, type SpawnPoint } from './map/loadMap';
 import { PathFinder } from './path/astar';
 import { assignSlots, formationSlots } from './path/groupMove';
 import { SpatialHash } from './spatial/SpatialHash';
-import { movementSystem, orderSystem, pathfindingSystem, separationSystem } from './systems/movement';
+import { clearGoal, movementSystem, pathfindingSystem, separationSystem } from './systems/movement';
+import { acceptsDrop, describeTask, orderSystem } from './systems/orders';
+import { canTrain, populationOf, productionSystem, shortOf, trainTicks } from './systems/production';
 
 export interface GameOptions {
   seed: number;
@@ -28,8 +37,9 @@ export interface GameOptions {
   testArmy?: number;
 }
 
-const START_UNIT_IDS = new Set<string>(['worker', 'militia', 'archer', 'scout_rider', 'knight', 'catapult']);
 const TEST_ARMY_MIX: UnitTypeId[] = ['militia', 'militia', 'archer', 'knight', 'worker', 'scout_rider'];
+/** Building type placed at each map spawn. */
+const SPAWN_BUILDING = 'town_hall';
 
 export class Game {
   private readonly state: GameState;
@@ -44,16 +54,40 @@ export class Game {
       tick: 0,
       grid,
       rng: new Rng(options.seed),
+      players: new Map(),
       units: new Map(),
+      buildings: new Map(),
+      nodes: new Map(),
+      nodeViews: new Map(),
+      nodesVersion: 0,
       nextId: 1,
       pathFinder: new PathFinder(grid),
       pathQueue: [],
       spatial: new SpatialHash<Unit>(1),
+      events: [],
     };
+    for (const p of [0, 1] as const) {
+      this.state.players.set(p, { id: p, resources: { ...DATA.game.startingResources } });
+    }
+    // Resource nodes (their tiles are already blocked by loadMap).
+    for (const r of this.loaded.resources) {
+      const node: ResourceNode = {
+        id: this.state.nextId++,
+        kind: r.kind,
+        resource: r.resource,
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+        amount: r.amount,
+      };
+      this.state.nodes.set(node.id, node);
+      this.state.nodeViews.set(node.id, { ...node });
+    }
+    // Town Halls at the spawns (tiles already blocked by loadMap), then starting units.
+    for (const spawn of this.loaded.spawns) this.addBuilding(spawn.player, SPAWN_BUILDING, spawn, false);
     for (const spawn of this.loaded.spawns) {
-      for (const [type, count] of map.startUnits) {
-        if (START_UNIT_IDS.has(type)) this.spawnAround(spawn, type as UnitTypeId, count);
-      }
+      for (const [type, count] of map.startUnits) if (DATA.units[type]) this.spawnAround(spawn, type, count);
     }
     const home = this.loaded.spawns.find((s) => s.player === 0);
     if (home && options.testArmy) this.spawnTestArmy(home, options.testArmy);
@@ -76,6 +110,20 @@ export class Game {
     return this.state.units;
   }
 
+  get buildings(): ReadonlyMap<EntityId, Readonly<Building>> {
+    return this.state.buildings;
+  }
+
+  get nodes(): ReadonlyMap<EntityId, Readonly<ResourceNode>> {
+    return this.state.nodes;
+  }
+
+  player(id: PlayerId): Readonly<PlayerState> {
+    const p = this.state.players.get(id);
+    if (!p) throw new Error(`No player ${id}`);
+    return p;
+  }
+
   /** Queue a command; it is applied at the start of the first step with tick ≥ env.tick. */
   enqueue(env: CommandEnvelope): void {
     this.pending.push(env);
@@ -84,35 +132,32 @@ export class Game {
   /** Advance exactly one tick. Returns the events that happened during it. */
   step(): GameEvent[] {
     const s = this.state;
-    const events: GameEvent[] = [];
+    s.events = [];
     for (const u of s.units.values()) {
       u.prevX = u.x;
       u.prevY = u.y;
     }
-
-    // 1. commands due this tick, in arrival order
     const due = this.pending.filter((c) => c.tick <= s.tick);
     if (due.length > 0) {
       this.pending.splice(0, this.pending.length, ...this.pending.filter((c) => c.tick > s.tick));
-      for (const env of due) this.apply(env, events);
+      for (const env of due) this.apply(env);
     }
-
-    // 4–7. orders → paths → movement → separation
+    productionSystem(s, (owner, type, x, y) => this.addUnit(owner, type, x, y));
     orderSystem(s);
     pathfindingSystem(s);
     movementSystem(s);
     separationSystem(s);
-
     s.tick++;
     this.viewCache.clear();
-    return events;
+    return s.events;
   }
 
   getView(player: PlayerId): PlayerView {
     const cached = this.viewCache.get(player);
     if (cached) return cached;
+    const s = this.state;
     const units: UnitView[] = [];
-    for (const u of this.state.units.values()) {
+    for (const u of s.units.values()) {
       units.push({
         id: u.id,
         owner: u.owner,
@@ -123,12 +168,47 @@ export class Game {
         prevY: u.prevY,
         facing: u.facing,
         moving: u.moving,
+        activity: u.moving ? 'walk' : u.activity,
+        task: describeTask(u),
+        hasOrders: u.orders.length > 0,
+        carry: u.carry ? { ...u.carry } : null,
         radius: u.radius,
         hp: u.hp,
         maxHp: u.maxHp,
       });
     }
-    const view: PlayerView = { tick: this.state.tick, player, units };
+    const buildings: BuildingView[] = [];
+    for (const b of s.buildings.values()) {
+      buildings.push({
+        id: b.id,
+        owner: b.owner,
+        type: b.type,
+        x: b.x,
+        y: b.y,
+        w: b.w,
+        h: b.h,
+        hp: b.hp,
+        maxHp: b.maxHp,
+        queue: b.queue.map((q) => ({ unit: q.unit, progress: q.total > 0 ? q.progress / q.total : 1 })),
+        popBlocked: b.popBlocked,
+        rally: b.rally ? { ...b.rally } : null,
+      });
+    }
+    const me = this.player(player);
+    const resources: ResourceAmounts = {
+      food: Math.floor(me.resources.food),
+      wood: Math.floor(me.resources.wood),
+      gold: Math.floor(me.resources.gold),
+    };
+    const view: PlayerView = {
+      tick: s.tick,
+      player,
+      self: { resources, ...populationOf(s, player) },
+      units,
+      buildings,
+      resources: s.nodeViews as ReadonlyMap<EntityId, ResourceView>,
+      resourcesVersion: s.nodesVersion,
+    };
     this.viewCache.set(player, view);
     return view;
   }
@@ -144,59 +224,149 @@ export class Game {
       mix(u.x);
       mix(u.y);
       mix(u.orders.length);
+      mix(u.carry?.amount ?? -1);
     }
+    for (const p of this.state.players.values()) {
+      mix(p.resources.food);
+      mix(p.resources.wood);
+      mix(p.resources.gold);
+    }
+    mix(this.state.nodes.size);
     return (h >>> 0).toString(16);
   }
 
   // ---- commands ----------------------------------------------------------------------------------
 
-  private apply(env: CommandEnvelope, events: GameEvent[]): void {
+  private apply(env: CommandEnvelope): void {
+    const s = this.state;
     const reject = (reason: string): void => {
-      events.push({ type: 'commandRejected', player: env.player, reason });
+      s.events.push({ type: 'commandRejected', player: env.player, reason });
     };
     const cmd: Command = env.cmd;
-    const own = (ids: readonly EntityId[]): Unit[] =>
-      ids.map((id) => this.state.units.get(id)).filter((u): u is Unit => !!u && u.owner === env.player);
+    const ownUnits = (ids: readonly EntityId[]): Unit[] =>
+      ids.map((id) => s.units.get(id)).filter((u): u is Unit => !!u && u.owner === env.player);
+    const ownBuilding = (id: EntityId): Building | null => {
+      const b = s.buildings.get(id);
+      return b && b.owner === env.player ? b : null;
+    };
 
     switch (cmd.type) {
       case 'move': {
-        const units = own(cmd.units);
+        const units = ownUnits(cmd.units);
         if (units.length === 0) return reject('NO_UNITS');
         if (!Number.isFinite(cmd.to.x) || !Number.isFinite(cmd.to.y)) return reject('BAD_TARGET');
-        const target = {
-          x: Math.max(0, Math.min(this.width - 0.01, cmd.to.x)),
-          y: Math.max(0, Math.min(this.height - 0.01, cmd.to.y)),
-        };
-        const spacing = Math.max(0.62, Math.max(...units.map((u) => u.radius)) * 2.1);
-        const slots = formationSlots(this.state.grid, target, units.length, spacing);
-        const assignment = assignSlots(units, slots, target);
-        units.forEach((u, i) => {
-          const slot = slots[assignment[i] ?? -1] ?? target;
-          const order = { kind: 'move' as const, x: slot.x, y: slot.y };
-          if (cmd.queue && u.orders.length > 0) {
-            u.orders.push(order);
+        this.orderMove(units, cmd.to, cmd.queue ?? false);
+        return;
+      }
+      case 'interact': {
+        const units = ownUnits(cmd.units);
+        if (units.length === 0) return reject('NO_UNITS');
+        const node = s.nodes.get(cmd.target);
+        const building = s.buildings.get(cmd.target);
+        const movers: Unit[] = [];
+        for (const u of units) {
+          if (node && gatherRate(u.type, node.kind) > 0) {
+            this.giveOrder(
+              u,
+              {
+                kind: 'gather',
+                target: node.id,
+                resource: node.resource,
+                phase: 'toNode',
+                lastX: node.x,
+                lastY: node.y,
+              },
+              cmd.queue ?? false,
+            );
+          } else if (
+            building &&
+            building.owner === u.owner &&
+            u.carry &&
+            acceptsDrop(building, u.carry.resource)
+          ) {
+            this.giveOrder(u, { kind: 'deposit', target: building.id }, cmd.queue ?? false);
           } else {
-            u.orders = [order];
-            clearPath(u);
-            u.pathPending = false;
-            u.repaths = 0;
+            movers.push(u);
           }
-        });
+        }
+        // units that cannot do anything with the target just walk next to it
+        const rect = node ?? building;
+        if (movers.length > 0 && rect)
+          this.orderMove(movers, { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }, cmd.queue ?? false);
+        if (!rect) return reject('BAD_TARGET');
         return;
       }
       case 'stop': {
-        const units = own(cmd.units);
+        const units = ownUnits(cmd.units);
         if (units.length === 0) return reject('NO_UNITS');
         for (const u of units) {
           u.orders = [];
-          clearPath(u);
-          u.pathPending = false;
+          clearGoal(u);
         }
+        return;
+      }
+      case 'train': {
+        const b = ownBuilding(cmd.building);
+        if (!b) return reject('NOT_OWNER');
+        if (!canTrain(b, cmd.unit)) return reject('NOT_AVAILABLE');
+        if (b.queue.length >= DATA.game.production.queueMax) return reject('QUEUE_FULL');
+        const def = DATA.units[cmd.unit];
+        const player = s.players.get(env.player);
+        if (!def || !player) return reject('NOT_AVAILABLE');
+        const short = shortOf(player.resources, def.cost);
+        if (short) return reject(`NOT_ENOUGH_${short.toUpperCase()}`);
+        for (const [r, v] of Object.entries(def.cost)) player.resources[r as keyof ResourceAmounts] -= v ?? 0;
+        b.queue.push({ unit: cmd.unit, progress: 0, total: trainTicks(cmd.unit) });
+        return;
+      }
+      case 'cancelTrain': {
+        const b = ownBuilding(cmd.building);
+        if (!b) return reject('NOT_OWNER');
+        const item = b.queue[cmd.index];
+        if (!item) return reject('BAD_TARGET');
+        b.queue.splice(cmd.index, 1);
+        const player = s.players.get(env.player);
+        const def = DATA.units[item.unit];
+        if (player && def)
+          for (const [r, v] of Object.entries(def.cost))
+            player.resources[r as keyof ResourceAmounts] += v ?? 0;
+        if (cmd.index === 0) b.popBlocked = false;
+        return;
+      }
+      case 'setRally': {
+        const b = ownBuilding(cmd.building);
+        if (!b) return reject('NOT_OWNER');
+        if (!DATA.buildings[b.type]?.actions.some((a) => a.type === 'setRally'))
+          return reject('NOT_AVAILABLE');
+        b.rally = { x: cmd.to.x, y: cmd.to.y, ...(cmd.target !== undefined ? { target: cmd.target } : {}) };
         return;
       }
       default:
         return reject('UNKNOWN_COMMAND');
     }
+  }
+
+  private giveOrder(u: Unit, order: Unit['orders'][number], queue: boolean): void {
+    if (queue && u.orders.length > 0) {
+      u.orders.push(order);
+    } else {
+      u.orders = [order];
+      clearGoal(u);
+    }
+  }
+
+  private orderMove(units: Unit[], to: { x: number; y: number }, queue: boolean): void {
+    const target = {
+      x: Math.max(0, Math.min(this.width - 0.01, to.x)),
+      y: Math.max(0, Math.min(this.height - 0.01, to.y)),
+    };
+    const spacing = Math.max(0.62, Math.max(...units.map((u) => u.radius)) * 2.1);
+    const slots = formationSlots(this.state.grid, target, units.length, spacing);
+    const assignment = assignSlots(units, slots, target);
+    units.forEach((u, i) => {
+      const slot = slots[assignment[i] ?? -1] ?? target;
+      this.giveOrder(u, { kind: 'move', x: slot.x, y: slot.y }, queue);
+    });
   }
 
   // ---- spawning ----------------------------------------------------------------------------------
@@ -206,10 +376,51 @@ export class Game {
     return this.addUnit(owner, type, x, y).id;
   }
 
+  /** Dev/test helper: place a finished building. Its tiles become blocked. */
+  debugBuilding(owner: PlayerId, type: string, x: number, y: number): EntityId {
+    const def = DATA.buildings[type];
+    if (!def) throw new Error(`Unknown building "${type}"`);
+    return this.addBuilding(owner, type, { x, y, w: def.footprint[0], h: def.footprint[1] }, true).id;
+  }
+
+  /** Dev/test helper: add resources to a player. */
+  debugGive(player: PlayerId, amounts: Partial<ResourceAmounts>): void {
+    const p = this.state.players.get(player);
+    if (!p) return;
+    for (const [r, v] of Object.entries(amounts)) p.resources[r as keyof ResourceAmounts] += v ?? 0;
+  }
+
   private addUnit(owner: PlayerId, type: UnitTypeId, x: number, y: number): Unit {
     const u = createUnit(this.state.nextId++, owner, type, x, y);
     this.state.units.set(u.id, u);
     return u;
+  }
+
+  private addBuilding(
+    owner: PlayerId,
+    type: string,
+    rect: { x: number; y: number; w: number; h: number },
+    block: boolean,
+  ): Building {
+    const def = DATA.buildings[type];
+    if (!def) throw new Error(`Unknown building "${type}"`);
+    const b: Building = {
+      id: this.state.nextId++,
+      owner,
+      type,
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: rect.h,
+      hp: def.hp,
+      maxHp: def.hp,
+      queue: [],
+      popBlocked: false,
+      rally: null,
+    };
+    this.state.buildings.set(b.id, b);
+    if (block) this.state.grid.block(b.x, b.y, b.w, b.h);
+    return b;
   }
 
   /** Place units on free passable tiles in rings around a footprint. */
@@ -239,7 +450,6 @@ export class Game {
   private spawnTestArmy(home: SpawnPoint, count: number): void {
     const cx = home.x + home.w / 2;
     const cy = home.y + home.h / 2;
-    // in front of the base, toward the map center
     const dx = this.width / 2 - cx;
     const dy = this.height / 2 - cy;
     const len = Math.hypot(dx, dy) || 1;

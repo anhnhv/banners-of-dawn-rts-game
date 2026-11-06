@@ -8,18 +8,14 @@
  */
 import * as THREE from 'three';
 import type { EntityId, PlayerId, PlayerView, UnitTypeId } from '../../shared';
-import { unitParts, type UnitModel, type UnitPartGeometry } from '../art/models';
+import { unitModel, unitParts, type UnitModel, type UnitPartGeometry } from '../art/models';
+import { VoxelBuilder } from '../art/VoxelBuilder';
+import { DATA } from '../data';
 import { resolveColor, type TeamName } from '../art/palette';
 import { voxelMaterial } from '../art/materials';
 
-const MODEL_FOR: Record<UnitTypeId, UnitModel> = {
-  worker: 'worker',
-  militia: 'militia',
-  archer: 'archer',
-  scout_rider: 'scoutRider',
-  knight: 'knight',
-  catapult: 'militia', // placeholder until the catapult model (M6)
-};
+/** Color of the bundle a unit carries on its back, per resource type. */
+const CARRY_COLOR: Record<string, string> = { food: '#d9413a', wood: '#8a5a32', gold: '#f6c945' };
 
 export const TEAM_OF: Record<PlayerId, TeamName> = { 0: 'blue', 1: 'red' };
 
@@ -48,6 +44,8 @@ const tmpQuat = new THREE.Quaternion();
 const tmpScale = new THREE.Vector3(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
+const tmpLean = new THREE.Matrix4();
+const tmpColor = new THREE.Color();
 
 /** All instanced meshes for one unit type of one team. */
 class UnitBatch {
@@ -151,14 +149,27 @@ export class UnitRenderer {
   private readonly anim = new Map<EntityId, Anim>();
   private rings: THREE.InstancedMesh;
   private ringCapacity = 64;
+  private carries: THREE.InstancedMesh;
+  private carryCapacity = 64;
+  private time = 0;
 
   constructor() {
     this.group.name = 'units';
     this.rings = this.makeRings(this.ringCapacity);
+    this.carries = this.makeCarries(this.carryCapacity);
   }
 
   update(view: PlayerView, alpha: number, dt: number, selected: ReadonlySet<EntityId>): void {
+    this.time += dt;
     for (const b of this.batches.values()) b.count = 0;
+    let carryCount = 0;
+    const carriers = view.units.reduce((n, u) => n + (u.carry && u.carry.amount > 0 ? 1 : 0), 0);
+    if (carriers > this.carryCapacity) {
+      while (this.carryCapacity < carriers) this.carryCapacity *= 2;
+      this.group.remove(this.carries);
+      this.carries.dispose();
+      this.carries = this.makeCarries(this.carryCapacity);
+    }
     this.states.length = 0;
     const seen = new Set<EntityId>();
     let ringCount = 0;
@@ -200,6 +211,12 @@ export class UnitRenderer {
       tmpPos.set(x, bob, z);
       tmpQuat.setFromAxisAngle(UP, a.facing);
       tmpMatrix.compose(tmpPos, tmpQuat, tmpScale);
+      if (u.activity === 'work') {
+        // the one shared "interacting" animation: a rhythmic lean into the work
+        const beat = Math.max(0, Math.sin(this.time * 7 + u.id * 1.7));
+        tmpLean.makeRotationAxis(X_AXIS, beat * beat * 0.32);
+        tmpMatrix.multiply(tmpLean);
+      }
       batch.body.setMatrixAt(i, tmpMatrix);
       batch.pivots.forEach((pivot, li) => {
         // people: left/right alternate; horses: diagonal pairs move together
@@ -209,6 +226,13 @@ export class UnitRenderer {
         tmpLeg.setPosition(pivot[0], pivot[1], pivot[2]);
         batch.legs.setMatrixAt(i * n + li, tmpLeg.premultiply(tmpMatrix));
       });
+
+      if (u.carry && u.carry.amount > 0) {
+        tmpLeg.makeTranslation(0, 0.34, -0.14);
+        this.carries.setMatrixAt(carryCount, tmpLeg.premultiply(tmpMatrix));
+        this.carries.setColorAt(carryCount, tmpColor.set(CARRY_COLOR[u.carry.resource] ?? '#ffffff'));
+        carryCount++;
+      }
 
       if (selected.has(u.id)) {
         const s = u.radius / 0.28;
@@ -221,6 +245,9 @@ export class UnitRenderer {
     for (const b of this.batches.values()) b.finish();
     this.rings.count = ringCount;
     this.rings.instanceMatrix.needsUpdate = true;
+    this.carries.count = carryCount;
+    this.carries.instanceMatrix.needsUpdate = true;
+    if (this.carries.instanceColor) this.carries.instanceColor.needsUpdate = true;
     for (const id of this.anim.keys()) if (!seen.has(id)) this.anim.delete(id);
   }
 
@@ -228,10 +255,26 @@ export class UnitRenderer {
     const key = `${type}:${owner}`;
     let b = this.batches.get(key);
     if (!b) {
-      b = new UnitBatch(this.group, MODEL_FOR[type], TEAM_OF[owner]);
+      b = new UnitBatch(this.group, unitModel(DATA.units[type]?.model ?? ''), TEAM_OF[owner]);
       this.batches.set(key, b);
     }
     return b;
+  }
+
+  private makeCarries(capacity: number): THREE.InstancedMesh {
+    const built = new VoxelBuilder().boxC(0, -0.07, 0, 0.15, 0.14, 0.1, 'planks', '#ffffff').build();
+    const mesh = new THREE.InstancedMesh(
+      built.geometry,
+      built.textures.map((t) => voxelMaterial(t)),
+      capacity,
+    );
+    mesh.setColorAt(0, tmpColor.set('#ffffff'));
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    mesh.castShadow = true;
+    mesh.renderOrder = 2;
+    this.group.add(mesh);
+    return mesh;
   }
 
   private makeRings(capacity: number): THREE.InstancedMesh {

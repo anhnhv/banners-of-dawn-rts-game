@@ -4,7 +4,7 @@
  * current tick, and lets the screen render with the interpolation alpha.
  * The machine player's controller joins here in M8.
  */
-import type { Command, CommandEnvelope, PlayerId } from '../shared';
+import type { Command, CommandEnvelope, GameEvent, PlayerId } from '../shared';
 import type { Game } from '../engine';
 import type { GameScreen } from '../ui';
 import { FixedStepClock } from './clock';
@@ -48,6 +48,7 @@ export class GameHost {
     const dtMs = this.last === 0 ? 0 : Math.min(now - this.last, 250);
     this.last = now;
     const { steps, alpha } = this.clock.advance(dtMs, this.paused ? 0 : this.speed);
+    const events: GameEvent[] = [];
     for (let i = 0; i < steps; i++) {
       while (this.incoming.length > 0) {
         const env: CommandEnvelope = {
@@ -58,12 +59,9 @@ export class GameHost {
         this.commandLog.push(env);
         this.game.enqueue(env);
       }
-      for (const ev of this.game.step()) {
-        if (ev.type === 'commandRejected' && ev.player === this.player)
-          console.info(`[game] command rejected: ${ev.reason}`);
-      }
+      events.push(...this.game.step());
     }
-    this.screen?.frame(dtMs / 1000, this.game.getView(this.player), alpha);
+    this.screen?.frame(dtMs / 1000, this.game.getView(this.player), alpha, events);
     this.rafId = requestAnimationFrame(this.frame);
   };
 }

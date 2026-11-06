@@ -1,0 +1,11 @@
+{
+  "note": "Global game rules. Pace is fixed here for now (no setup screen yet); 1.0 = Standard (PLAN §2.11).",
+  "startingResources": { "food": 200, "wood": 200, "gold": 100 },
+  "popCap": 100,
+  "pace": { "gatherRate": 1.0, "trainSpeed": 1.0, "buildSpeed": 1.0 },
+  "production": { "queueMax": 5 },
+  "gathering": {
+    "retargetRadius": 8,
+    "reach": 0.45
+  }
+}

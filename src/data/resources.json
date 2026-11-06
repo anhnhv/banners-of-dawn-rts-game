@@ -1,9 +1,46 @@
 {
-  "note": "Resource nodes placed by maps (PLAN §2.1). amount can be overridden per node in the map file.",
+  "note": "Resource types and the resource nodes maps can place (PLAN §2.1). A node's amount can be overridden per node in the map file. Which units can gather which node, and how fast, is configured on the unit (units.json → interactions.gather).",
+  "types": {
+    "food": { "name": "Food", "icon": "food" },
+    "wood": { "name": "Wood", "icon": "wood" },
+    "gold": { "name": "Gold", "icon": "gold" }
+  },
   "nodes": {
-    "tree": { "name": "Tree", "resource": "wood", "amount": 100 },
-    "pine": { "name": "Pine", "resource": "wood", "amount": 100 },
-    "berry_bush": { "name": "Berry bush", "resource": "food", "amount": 100 },
-    "gold_mine": { "name": "Gold mine", "resource": "gold", "amount": 800 }
+    "tree": {
+      "name": "Tree",
+      "description": "A source of wood.",
+      "resource": "wood",
+      "amount": 100,
+      "model": "tree",
+      "icon": "tree",
+      "panel": ["amount"]
+    },
+    "pine": {
+      "name": "Pine",
+      "description": "A source of wood.",
+      "resource": "wood",
+      "amount": 100,
+      "model": "pine",
+      "icon": "tree",
+      "panel": ["amount"]
+    },
+    "berry_bush": {
+      "name": "Berry Bush",
+      "description": "Quick food early in the game.",
+      "resource": "food",
+      "amount": 100,
+      "model": "berryBush",
+      "icon": "food",
+      "panel": ["amount"]
+    },
+    "gold_mine": {
+      "name": "Gold Mine",
+      "description": "Gold for advanced units and eras.",
+      "resource": "gold",
+      "amount": 800,
+      "model": "goldMine",
+      "icon": "gold",
+      "panel": ["amount"]
+    }
   }
 }

@@ -20,11 +20,32 @@ const INK: Record<string, string> = {
   T: '#7fb6ff',
   i: '#d9dee5',
   I: '#8a929e',
+  h: '#d9a95a',
+  p: '#b4553a',
+  e: '#4a8f3c',
+  E: '#7ab84c',
+  x: '#6f6b78',
+  X: '#d6d3db',
 };
 
-export type IconName = 'food' | 'wood' | 'gold' | 'pop' | 'spear' | 'hammer' | 'flag' | 'sword';
+export type IconName =
+  | 'food'
+  | 'wood'
+  | 'gold'
+  | 'pop'
+  | 'spear'
+  | 'hammer'
+  | 'flag'
+  | 'sword'
+  | 'worker'
+  | 'townHall'
+  | 'house'
+  | 'tree'
+  | 'bow'
+  | 'horse'
+  | 'stop';
 
-const ICONS: Record<IconName, string[]> = {
+const ICONS: Record<string, string[]> & Partial<Record<IconName, string[]>> = {
   food: [
     '......kk....',
     '.....kgk....',
@@ -139,13 +160,117 @@ const ICONS: Record<IconName, string[]> = {
   ],
 };
 
+ICONS.worker = [
+  '...hhhhhh...',
+  '..hhhhhhhh..',
+  '....kkkk....',
+  '...kssssk...',
+  '...ksksk.k..',
+  '...kssssk...',
+  '..kkTTTTkk..',
+  '.kTTTTTTTTk.',
+  '.kTkTTTTkTk.',
+  '.ks.kTTk.sk.',
+  '....kbbk....',
+  '....kkkk....',
+];
+ICONS.townHall = [
+  '.....tt.....',
+  '....kttk....',
+  '...kttttk...',
+  '..kkkkkkkk..',
+  '.kpppppppppk',
+  'kppppppppppk',
+  'kkkkkkkkkkkk',
+  '.kXXXXXXXXk.',
+  '.kXkkXXkkXk.',
+  '.kXkkXXnnXk.',
+  '.kXXXXXnnXk.',
+  'kkkkkkkkkkkk',
+];
+ICONS.house = [
+  '............',
+  '.....kk.....',
+  '....khhk....',
+  '...khhhhk...',
+  '..khhhhhhk..',
+  '.khhhhhhhhk.',
+  'kkkkkkkkkkkk',
+  '.kBBBBBBBBk.',
+  '.kBkkBBnnBk.',
+  '.kBkkBBnnBk.',
+  '.kBBBBBnnBk.',
+  '.kkkkkkkkkk.',
+];
+ICONS.tree = [
+  '....kkkk....',
+  '..kkEEEEkk..',
+  '.kEEeEEEEEk.',
+  '.kEeeeEEeEk.',
+  'kEEeEEEeeeEk',
+  'keeeEEEeeEek',
+  '.keeeeeeeek.',
+  '..kkkeekkk..',
+  '....kbbk....',
+  '....kbbk....',
+  '...kbbbbk...',
+  '...kkkkkk...',
+];
+ICONS.bow = [
+  '...kk.......',
+  '..kBk.k.....',
+  '..kBk..k....',
+  '.kBk....k...',
+  '.kBk.....k..',
+  '.kBk......k.',
+  '.kBk......k.',
+  '.kBk.....k..',
+  '.kBk....k...',
+  '..kBk..k....',
+  '..kBk.k.....',
+  '...kk.......',
+];
+ICONS.horse = [
+  '........kk..',
+  '.......kbbk.',
+  '......kbbbbk',
+  '.....kbbkbk.',
+  '.kkkkbbbk...',
+  'kbbbbbbbk...',
+  'kbttttbbk...',
+  'kbttttbk....',
+  '.kbbbbbk....',
+  '.kbk.kbk....',
+  '.kbk.kbk....',
+  '.kk..kk.....',
+];
+ICONS.stop = [
+  '...kkkkkk...',
+  '..krrrrrrk..',
+  '.krrrrrrrrk.',
+  'krrwwrrwwrrk',
+  'krrrwwwwrrrk',
+  'krrrrwwrrrrk',
+  'krrrwwwwrrrk',
+  'krrwwrrwwrrk',
+  '.krrrrrrrrk.',
+  '..krrrrrrk..',
+  '...kkkkkk...',
+  '............',
+];
+
 const cache = new Map<IconName, string>();
+
+/** Icon for a config icon name (falls back to a generic person icon). */
+export function iconFor(name: string): IconName {
+  return name in ICONS ? (name as IconName) : 'pop';
+}
 
 /** PNG data URL for an icon (native size; scale it up in CSS). */
 export function iconUrl(name: IconName): string {
   const cached = cache.get(name);
   if (cached) return cached;
-  const rows = ICONS[name];
+  const rows = ICONS[name] ?? ICONS.pop ?? [];
   const h = rows.length;
   const w = Math.max(...rows.map((r) => r.length));
   const canvas = document.createElement('canvas');

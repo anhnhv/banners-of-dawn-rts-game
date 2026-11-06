@@ -1,4 +1,4 @@
-import type { DecodedMap, TerrainType } from '../../src/shared';
+import type { DecodedMap, MapObject, TerrainType } from '../../src/shared';
 
 const CHARS: Record<string, TerrainType> = {
   '.': 'grass',
@@ -8,7 +8,7 @@ const CHARS: Record<string, TerrainType> = {
 };
 
 /** Build a small DecodedMap from ASCII rows ('.' grass, '#' rock, '~' shallow, 'W' water). No objects. */
-export function asciiMap(rows: string[]): DecodedMap {
+export function asciiMap(rows: string[], objects: MapObject[] = []): DecodedMap {
   const height = rows.length;
   const width = rows[0]?.length ?? 0;
   const terrain: TerrainType[] = [];
@@ -21,12 +21,26 @@ export function asciiMap(rows: string[]): DecodedMap {
     height,
     symmetry: 'none',
     terrain,
-    objects: [],
+    objects,
     startUnits: [],
   };
 }
 
 /** An open w×h grass map. */
-export function openMap(w: number, h: number): DecodedMap {
-  return asciiMap(Array.from({ length: h }, () => '.'.repeat(w)));
+export function openMap(w: number, h: number, objects: MapObject[] = []): DecodedMap {
+  return asciiMap(
+    Array.from({ length: h }, () => '.'.repeat(w)),
+    objects,
+  );
+}
+
+/** A 1×1 resource object (tree, pine, berry_bush) or a 2×2 gold mine for test maps. */
+export function node(
+  kind: 'tree' | 'pine' | 'berry_bush' | 'gold_mine',
+  x: number,
+  y: number,
+  amount?: number,
+): MapObject {
+  const size = kind === 'gold_mine' ? 2 : 1;
+  return { kind, x, y, w: size, h: size, ...(amount !== undefined ? { amount } : {}) };
 }

@@ -3,8 +3,9 @@
 3D voxel-style (low-poly with pixel textures) 1v1 real-time strategy game in the browser, played against a local
 machine player. The full design is in [PLAN.md](PLAN.md).
 
-Right now `npm run dev` shows **M2**: Green Valley in 3D with your starting units. Select units (click, box, double
-click, Ctrl/Alt+1-9 groups), right-click to move (Shift queues), W stops. `/?army=50` adds 50 test units.
+Right now `npm run dev` shows **M3**: a working economy. Select workers and right-click trees, berry bushes or gold
+to gather; they carry loads to the Town Hall. Select the Town Hall and press Q to train workers (Z sets the rally point).
+`.` selects an idle worker. Everything is driven by the JSON in `src/data/` (see PLAN.md §9). `/?army=50` adds test units.
 Open `/?preview` for the style-preview diorama (keys `1` `2` `3` switch views).
 Screenshots: [docs/preview/](docs/preview/) and [docs/milestones/](docs/milestones/).
 

@@ -193,6 +193,8 @@ Counter triangle, checked against the numbers above:
 - A **How to Play** screen with illustrated pages, plus optional first-match tips.
 
 ### 2.11 Match pace (configurable)
+> **Current decision (2026-11-06):** there is no pace selection UI yet. The pace multipliers are fixed in `src/data/game.json` → `pace` (gatherRate, trainSpeed, buildSpeed; 1.0 = Standard). The presets and the Match Setup choice below come later and only need to fill in the same values.
+
 Pace is chosen in Match Setup and **fixed for the whole match**. It is separate from **game speed** (1×, 1.5×, 2×), which is a time scale you can change at any moment during play.
 
 **Presets**
@@ -945,43 +947,68 @@ A map editor page (3D view, tile painting, symmetry mirroring, live validation, 
 
 ---
 
-## 9. Game Data Files
+## 9. Game Data Files (config first, no hard-coding)
 
-All **base** balance values live in `src/data/*.json`, validated at startup with **zod** schemas. `applyRules` turns them into the derived bundle for the match.
+> **Principle (user requirement, 2026-11-06):** behavior is described in config, not in code. Every entity type (unit, building, resource node) has a config entry that says what it can interact with, what its info panel shows, which buttons it has, what it can train or build, how long that takes and what it costs. Code only implements generic mechanics (gather, train, rally, …) that read this config. Adding a unit, a building or a resource should normally be a JSON change.
 
-Example `units.json` entry:
+### 9.1 Files
+| File | Contents |
+|---|---|
+| `src/data/game.json` | Global rules: starting resources, pop cap, **pace multipliers (fixed here for now)**, queue size, gathering reach and retarget radius |
+| `src/data/units.json` | Every unit: stats, cost, train time, pop, model, icon, **interactions**, **panel**, **actions** |
+| `src/data/buildings.json` | Every building: footprint, hp, pop provided, **dropSite**, cost, build time, model, icon, **panel**, **actions** |
+| `src/data/resources.json` | Resource types (food, wood, gold) and resource **nodes** (tree, pine, berry bush, gold mine): resource, amount, model, icon, panel |
+| `src/data/terrain.json` | Terrain rules (walkable, buildable, speed) |
+| `src/data/palette.json` | All colors and team color sets |
+
+All of them are validated at startup by `shared/gameData.ts` (zod). The check covers the shape and the **cross-references**: a train action naming an unknown unit, a gather target naming an unknown node, or a duplicate hotkey stops the game with a clear list of problems. `tests/shared/gameData.test.ts` covers this.
+
+### 9.2 Interactions (what a unit can do with other entities)
+Right-click sends one generic command, `interact {units, target}`. The engine looks up each unit's `interactions` to decide what to do with the target. Units that cannot do anything with it just walk next to it.
+
 ```jsonc
-{
-  "archer": {
-    "name": "Archer", "class": "ranged", "era": 2,
-    "trainedAt": "archery_range", "cost": { "wood": 30, "gold": 40 }, "trainTime": 18, "pop": 1,
-    "hp": 30, "armor": 0, "speed": 2.2, "sight": 6, "radius": 0.3,
-    "attack": { "damage": 4, "range": 5, "minRange": 0, "cooldown": 1.6, "projectile": "arrow" },
-    "sprite": "unit_archer", "icon": "icon_archer", "portrait": "portrait_archer",
-    "sounds": { "select": "select_soldier", "ack": "ack_soldier", "attack": "arrow" },
-    "description": "Ranged unit. Strong vs infantry, weak vs cavalry."
+"worker": {
+  "interactions": {
+    "gather": {
+      "carry": 10,
+      "targets": { "tree": 0.4, "pine": 0.4, "berry_bush": 0.45, "gold_mine": 0.35 }  // node kind → rate per second
+    }
+    // later: "build": { … }, "repair": { … }, "attack": { … }
   }
 }
 ```
+- What resource a node gives comes from the node config, `resources.json` → `nodes.<kind>.resource`.
+- Where it can be dropped off comes from the building config: `buildings.json` → `dropSite: ["food","wood","gold"]`.
+- Every kind of work uses **one shared "interacting" animation** (a rhythmic lean), plus a carried bundle tinted by resource type. No per-resource animation code.
 
-`pace.json`:
+### 9.3 Panel and actions (what clicking an entity shows)
 ```jsonc
-{
-  "startingResources": {
-    "low":      { "food": 100,  "wood": 100,  "gold": 0 },
-    "standard": { "food": 200,  "wood": 200,  "gold": 100 },
-    "high":     { "food": 500,  "wood": 500,  "gold": 300 },
-    "veryHigh": { "food": 1000, "wood": 1000, "gold": 600 }
-  },
-  "presets": {
-    "relaxed":  { "gatherRate": 0.8, "buildSpeed": 0.8, "trainSpeed": 0.8, "researchSpeed": 0.8, "eraCost": 1.0,  "startingResources": "standard", "popCap": 100, "targetMinutes": [20, 30] },
-    "standard": { "gatherRate": 1.0, "buildSpeed": 1.0, "trainSpeed": 1.0, "researchSpeed": 1.0, "eraCost": 1.0,  "startingResources": "standard", "popCap": 100, "targetMinutes": [12, 20] },
-    "fast":     { "gatherRate": 1.5, "buildSpeed": 1.5, "trainSpeed": 1.5, "researchSpeed": 1.5, "eraCost": 0.75, "startingResources": "high",     "popCap": 100, "targetMinutes": [8, 12] },
-    "blitz":    { "gatherRate": 2.0, "buildSpeed": 2.5, "trainSpeed": 2.0, "researchSpeed": 2.5, "eraCost": 0.5,  "startingResources": "veryHigh", "popCap": 125, "targetMinutes": [5, 8] }
-  }
+"town_hall": {
+  "panel": ["hp", "armor", "pop", "queue"],            // info fields, rendered generically
+  "actions": [
+    { "type": "train", "unit": "worker", "hotkey": "Q" },  // cost/time/pop come from units.json → worker
+    { "type": "setRally", "hotkey": "Z" }
+  ]
 }
 ```
-The engine, the AI and the UI all read the same derived data.
+- **Panel fields** (`PANEL_FIELDS` in `shared/gameData.ts`): `hp`, `armor`, `speed`, `sight`, `carry`, `task`, `pop`, `queue`, `amount`.
+- **Action types today:** `train`, `stop`, `setRally`. Coming next: `build` (M4), `research` (M6), plus attack-move and stance (M5).
+- The command grid, hotkeys, tooltips (cost and time) and affordability tinting are all generated from these lists.
+
+### 9.4 Example unit entry
+```jsonc
+"militia": {
+  "name": "Militia", "description": "Cheap spear infantry. Strong against cavalry.",
+  "model": "militia", "icon": "spear", "class": "infantry", "era": 1,
+  "cost": { "food": 35, "wood": 20 }, "trainTime": 15, "pop": 1,
+  "hp": 45, "armor": 1, "speed": 2.2, "sight": 4, "radius": 0.25,
+  "attack": { "damage": 4, "range": 0, "cooldown": 1.5 },
+  "interactions": {},
+  "panel": ["hp", "armor", "speed", "task"],
+  "actions": [{ "type": "stop", "hotkey": "W" }]
+}
+```
+The `model` and `icon` names are resolved by the UI (`ui/art/models.ts`, `ui/hud/pixelIcons.ts`), with a safe fallback for names that have no art yet.
 
 ---
 
@@ -1119,12 +1146,43 @@ Sizes: **S** ≈ small, **M** ≈ medium, **L** ≈ large (relative effort).
 - **Results:** 50 units around 130 draw calls including shadow passes. 87 tests, including a 50-unit group walking around a wall, determinism (same seed and commands give the same state hash) and command rejection for enemy units.
 - **Screenshots:** `docs/milestones/m2-*.png`.
 
-### M3: Economy (M)
-- [ ] Trees, berries, gold; the gather loop; drop sites; auto-retarget; work animations.
-- [ ] Town Hall trains Workers; production queue with costs and refunds; population.
-- [ ] `MatchRules` + `applyRules` + pace presets (data only at this point); top bar, message log, idle-worker button.
+### M3: Economy, data-driven (M) ✅ done 2026-11-06
+Everything here is driven by config (§9); no per-unit or per-building logic in code.
+- [x] Game data schema + validation with cross-references (`shared/gameData.ts`); `game.json`, `buildings.json`, extended `units.json` and `resources.json`.
+- [x] Engine entities: resource nodes and Town Halls (from map spawns); player stockpiles; population and pop cap from `popProvided`.
+- [x] Generic `interact` command; gather loop (to node → harvest → to drop site → repeat), auto-retarget, depletion unblocks tiles; deposit at a chosen drop site.
+- [x] Training from building `actions` (cost, time, pop from the unit config), queue max, cancel with refund, pop-cap stall, rally point (to a resource = start gathering).
+- [x] Pace multipliers fixed in `game.json` (no setup UI).
+- [x] UI: buildings drawn from the engine (model from config), resources disappear when used up, one shared work animation, carried bundles.
+- [x] UI: selecting buildings and resources; generic info panel from `panel`; command grid and hotkeys from `actions`; production queue (click to cancel); right-click interact and rally.
+- [x] HUD: resource bar, population, idle-worker button, message log.
 
-**Done when:** a 20-worker economy works, totals add up, and switching the pace preset in a dev setting visibly changes gather and train speed.
+**Done when:** workers gather all three resources and drop them off, the Town Hall trains workers from its config, and a new unit or building can be added through JSON alone.
+
+*Implementation notes:*
+- **Config files:** `src/data/game.json`, `buildings.json`, `units.json`, `resources.json` (§9), validated by `shared/gameData.ts`. The engine and the UI each parse the same JSON (`engine/data.ts`, `ui/data.ts`).
+- **Engine:**
+  - `systems/orders.ts`: the order state machines `move`, `gather` (phases toNode → harvest → toDrop, auto-retarget within `retargetRadius`) and `deposit`.
+  - `systems/production.ts`: training queue, population, rally points.
+  - `systems/reach.ts`: reach and approach-point helpers.
+  - Movement is now goal-based: orders set `unit.goal`, and movement sets `arrived`/`blocked`.
+  - Resource nodes and buildings are entities. A depleted node unblocks its tile and bumps `resourcesVersion`.
+- **Commands:** `interact` (generic right-click, resolved from the unit's `interactions`), `train`, `cancelTrain`, `setRally`, plus the existing `move` and `stop`. Rejections carry reasons (`NOT_ENOUGH_FOOD`, `QUEUE_FULL`, `NOT_AVAILABLE`, …) that the HUD shows as messages.
+- **PlayerView:** adds `self` (stockpile, pop, popCap), `buildings` (with queue progress and rally), live `resources` and `resourcesVersion`. Unit views carry `activity` (idle, walk or work), `task` text, `carry` and `hasOrders`.
+- **UI:**
+  - `hud/GameHud.ts` builds the info panel from `panel` and the command grid from `actions`; each button sits at the grid slot of its hotkey.
+  - Train buttons show cost and time from the unit config and are greyed out when unaffordable. The queue row cancels with a full refund.
+  - Resource bar (population turns red when full), idle-worker button and `.` hotkey, message log.
+  - `render/BuildingRenderer.ts` draws buildings with the model from config, a selection outline and the rally flag.
+  - `render/UnitRenderer.ts` gives every unit the one shared work animation, plus a carried bundle tinted by resource.
+  - Resources are picked by raycasting the instanced models (`mapScene.pickObject`), and used-up ones are hidden.
+- **Adding content through JSON:**
+  - A new unit: add it to `units.json` and reference it in a building's `actions` with `{ "type": "train", "unit": "<id>", "hotkey": "W" }`.
+  - A new resource node: add it to `resources.json` and to the gatherer's `interactions.gather.targets`.
+  - A model or icon name that has no art yet falls back to a default.
+- **Results:** 100 tests, including the full gather loop, retargeting, depletion, deposit, training (cost, time, queue max, cancel refund, pop-cap stall), rally-to-resource, and data cross-reference validation.
+- **Screenshots:** `docs/milestones/m3-*.png`.
+- **Not done yet (later milestones):** construction of new buildings (M4), Storehouse model, stumps for felled trees, custom tooltips (native `title` tooltips for now).
 
 ### M4: Construction & production (M)
 - [ ] Placement ghost (translucent model + green/red tiles), foundations, multi-builder construction, repair, construction-stage models.
@@ -1221,13 +1279,16 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Difficulties | Easy / Normal / Hard. No cheating level |
 | Language | English |
 | Name | **Banners of Dawn** |
-| Pace | Configurable: Relaxed / Standard / Fast / Blitz presets plus Custom sliders |
+| Pace | Configurable later (presets plus Custom). **For now fixed in `src/data/game.json`; no setup UI** (2026-11-06) |
+| Data-driven design | **Config first, no hard-coding** (2026-11-06): interactions, info panels, actions, train/build lists, costs and times all live in `src/data/*.json` (§9). One shared "interacting" animation for every unit |
+| Priorities | Game logic and units first; map polish later (2026-11-06) |
 
 ### Current status (updated 2026-11-06)
 | Milestone | State |
 |---|---|
 | M0 setup, M0.5 style preview, M1 maps, M2 units & movement | ✅ done and committed |
-| **Next: M3 Economy** | not started |
+| M3 Economy (data-driven) | ✅ done and committed |
+| **Next: M4 Construction** | not started |
 
 **How to resume:**
 1. `nvm use && npm install && npm run dev`, then open `/?army=50` to see the current state.
@@ -1237,11 +1298,10 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**M3 plan in short:**
-1. Resource nodes become engine entities, using `loadMap().resources`.
-2. Workers get a gather order: walk to the node, harvest, carry, drop at the Town Hall or a Storehouse, repeat. Then auto-retarget to the nearest node of the same type when one runs out.
-3. Right-clicking a resource with workers selected issues `gather`.
-4. Town Hall entities with a production queue train workers (cost, time, pop cap, refunds).
-5. `MatchRules` + `applyRules` + pace presets (`src/data/pace.json`).
-6. HUD: resource bar and idle-worker button.
-7. Renderer: trees disappear (become stumps) when they run out; work animation.
+**M4 plan in short (keep it config-first):**
+1. New action type `build` in `shared/gameData.ts` (`{ "type": "build", "building": "<id>", "hotkey": "Q" }`) on the Worker, with command grid pages (Economy / Military) also described in config.
+2. A `build` interaction on units (`interactions.build: { rate }`) so the engine knows who can construct and repair.
+3. Command `build {units, building, at}`: validate the footprint (buildable, explored, free), pay the cost, place a foundation entity.
+4. The order `construct`: builders walk to the foundation and add progress at `1 + 0.6·(n−1)` speed, using `buildTime` and `pace.buildSpeed`. Repair works the same way.
+5. UI: placement ghost (translucent model + green/red tiles), construction-stage models, House / Storehouse / Farm / Barracks usable.
+6. Farm as an infinite, walkable food node created by a building. Storehouse as a drop site (config only).
