@@ -539,3 +539,69 @@
   outline: 2px solid rgba(255, 90, 74, 0.35);
   outline-offset: -2px;
 }
+
+/* ---- machine player status + result screen ---- */
+.help-ai {
+  color: #ffb3a8;
+  max-width: 430px;
+  margin-left: auto;
+}
+
+.hud-result {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(12, 14, 22, 0.55);
+  z-index: 20;
+}
+
+.result-box {
+  min-width: 380px;
+  padding: 22px 30px;
+  text-align: center;
+}
+
+.result-title {
+  font-size: 52px;
+  font-weight: 700;
+  color: var(--brass-hi);
+  text-shadow: 3px 3px 0 #0f111a;
+}
+
+.result-box.lost .result-title {
+  color: #ff7a66;
+}
+
+.result-sub,
+.result-time {
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+.result-stats {
+  margin: 16px auto;
+  border-collapse: collapse;
+  font-size: 17px;
+}
+
+.result-stats th,
+.result-stats td {
+  padding: 3px 12px;
+  text-align: right;
+}
+
+.result-stats td:first-child {
+  text-align: left;
+  color: #cfc6b2;
+}
+
+.result-again {
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  color: #2a1a0c;
+  padding: 8px 22px;
+  font-family: inherit;
+  font-size: 20px;
+}

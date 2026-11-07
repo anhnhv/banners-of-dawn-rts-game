@@ -81,7 +81,6 @@ const common = {
 export const UnitDefSchema = z.object({
   ...common,
   class: z.string(),
-  era: z.number().int().min(1).max(3),
   cost,
   trainTime: z.number().positive(),
   pop: z.number().int().min(0),
@@ -182,6 +181,10 @@ export const GameConfigSchema = z.object({
     underAttackAlertSeconds: z.number().min(0),
   }),
   effects: z.object({ corpseSeconds: z.number().min(0), rubbleSeconds: z.number().min(0) }),
+  /** A player who owns none of these building types any more (sites count) is defeated. */
+  victory: z
+    .object({ defeatWhenLost: z.array(z.string()).min(1) })
+    .prefault({ defeatWhenLost: ['town_hall'] }),
 });
 export type GameConfig = z.infer<typeof GameConfigSchema>;
 
@@ -273,6 +276,8 @@ export function parseGameData(raw: RawGameData): GameData {
   for (const entry of game.buildMenu) {
     if (!buildings[entry.building]) issues.push(`game.buildMenu: unknown building "${entry.building}"`);
   }
+  for (const b of game.victory.defeatWhenLost)
+    if (!buildings[b]) issues.push(`game.victory.defeatWhenLost: unknown building "${b}"`);
   const menuKeys = game.buildMenu.map((e) => e.hotkey);
   const menuDup = menuKeys.find((k, i) => menuKeys.indexOf(k) !== i);
   if (menuDup) issues.push(`game.buildMenu: hotkey "${menuDup}" is used twice`);

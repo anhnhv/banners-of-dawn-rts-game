@@ -1,0 +1,61 @@
+{
+  "note": "Machine player mode 'normal': the logic Easy used before 2026-11-07 (a sensible, careful player). Every field is explained in docs/ai-modes.md (configuration table). Times in seconds, distances in tiles, chances 0..1.",
+  "name": "Normal",
+  "persona": "A careful player who counts before fighting: builds a full economy, keeps houses ahead, gathers its army before attacking, retreats when losing and always defends.",
+  "tempo": { "thinkSeconds": 1, "reactionSeconds": 1.5, "maxCommandsPerThink": 12, "daydreamChance": 0 },
+  "economy": {
+    "workerTarget": 16,
+    "minWorkers": 6,
+    "armyReserve": 300,
+    "workerQueue": 2,
+    "idleWorkersPerThink": 99,
+    "gatherRadius": 18,
+    "rebalanceSeconds": 12,
+    "plentyStock": 500
+  },
+  "buildings": {
+    "houseBuffer": 3,
+    "houseBufferPerProducer": 2,
+    "firstProducerAtWorkers": 6,
+    "maxProducersPerType": 2,
+    "extraProducerBank": 350,
+    "towers": 1,
+    "towerAfterSeconds": 300,
+    "houseDistance": [5, 10],
+    "militaryDistance": [7, 12],
+    "towerDistance": [5, 9]
+  },
+  "priorities": {
+    "defenceSoldier": 95,
+    "house": 90,
+    "worker": 80,
+    "firstProducer": 70,
+    "soldier": 60,
+    "extraProducer": 45,
+    "tower": 40
+  },
+  "army": {
+    "trainEverySeconds": 0,
+    "militaryQueue": 2,
+    "stagingDistance": 7,
+    "defenceHp": 150,
+    "reissueSeconds": 4
+  },
+  "attack": {
+    "earliestAttackSeconds": 300,
+    "minWavePop": 8,
+    "waveGrowth": 4,
+    "attackRatio": 1.6,
+    "stalledSeconds": 60,
+    "minStalledWavePop": 3,
+    "stalledAttackRatio": 1.0,
+    "desperationSeconds": 180,
+    "desperateRatio": 0.6,
+    "regroupSeconds": 25,
+    "regroupArrivedShare": 0.8,
+    "groupSize": 0,
+    "target": "townHall"
+  },
+  "retreat": { "retreatRatio": 0.6, "retreatCooldownSeconds": 40, "retreatGiveUpSeconds": 20 },
+  "defence": { "threatRadius": 12, "defendChance": 1, "homeRadius": 20, "raidShare": 0.3 }
+}

@@ -14,7 +14,10 @@ import {
   type DecodedMap,
   type EntityId,
   type MapObject,
+  type MatchResult,
   type PanelField,
+  type PlayerId,
+  type PlayerStats,
   type PlayerView,
   type ResourceView,
   type TerrainType,
@@ -79,6 +82,8 @@ export class GameHud {
   private readonly messages: HTMLElement;
   private readonly hover: HTMLElement;
   private readonly perf: HTMLElement;
+  private readonly opponent: HTMLElement;
+  private resultShown = false;
   private readonly portrait: HTMLElement;
   private readonly info: HTMLElement;
   private readonly grid: HTMLElement;
@@ -132,8 +137,9 @@ export class GameHud {
       el('div', '', 'Click / drag: select · Double click: same type · Ctrl/Alt+1-9: group'),
       el('div', '', 'Arrows / edge / middle-drag: pan · Wheel: zoom · .: idle worker'),
     );
+    this.opponent = el('div', 'help-ai', '');
     this.perf = el('div', 'help-perf', '');
-    help.append(this.perf);
+    help.append(this.opponent, this.perf);
     if (warnings.length > 0) warnings.forEach((w) => console.warn(`[map] ${w}`));
 
     this.hover = el('div', 'hud-hover panel', '');
@@ -235,6 +241,62 @@ export class GameHud {
 
   clearTile(): void {
     this.hover.style.display = 'none';
+  }
+
+  /** What the machine player is doing (one line in the info box). */
+  setOpponent(text: string): void {
+    if (this.opponent.textContent !== text) this.opponent.textContent = text;
+  }
+
+  /** The Victory / Defeat screen (once). */
+  showResult(result: MatchResult, me: PlayerId, tickRate: number): void {
+    if (this.resultShown) return;
+    this.resultShown = true;
+    const won = result.winner === me;
+    const title = result.winner === null ? 'Draw' : won ? 'Victory!' : 'Defeat';
+    const box = el('div', `result-box panel ${won ? 'won' : 'lost'}`);
+    const secs = Math.floor(result.tick / tickRate);
+    const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    box.append(
+      el('div', 'result-title', title),
+      el(
+        'div',
+        'result-sub',
+        result.winner === null
+          ? 'Both sides fell at once.'
+          : won
+            ? 'The enemy Town Hall has fallen.'
+            : 'Your Town Hall has fallen.',
+      ),
+      el('div', 'result-time', `Match time ${time}`),
+    );
+    const table = el('table', 'result-stats');
+    const head = el('tr');
+    head.append(el('th', '', ''), el('th', '', 'You'), el('th', '', 'Machine'));
+    table.append(head);
+    const other = result.stats.findIndex((_, i) => i !== me);
+    const rows: Array<[string, keyof PlayerStats]> = [
+      ['Units trained', 'unitsTrained'],
+      ['Units lost', 'unitsLost'],
+      ['Buildings built', 'buildingsBuilt'],
+      ['Buildings lost', 'buildingsLost'],
+    ];
+    for (const [label, key] of rows) {
+      const tr = el('tr');
+      tr.append(
+        el('td', '', label),
+        el('td', '', String(result.stats[me]?.[key] ?? 0)),
+        el('td', '', String(result.stats[other]?.[key] ?? 0)),
+      );
+      table.append(tr);
+    }
+    const again = el('button', 'px-btn result-again', 'Play again');
+    again.type = 'button';
+    again.addEventListener('click', () => window.location.reload());
+    box.append(table, again);
+    const overlay = el('div', 'hud-result');
+    overlay.append(box);
+    this.root.append(overlay);
   }
 
   setPerf(fps: number, drawCalls: number, triangles: number): void {

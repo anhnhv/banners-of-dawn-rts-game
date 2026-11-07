@@ -7,11 +7,19 @@
  */
 import {
   Rng,
+  TICK_RATE,
   type BuildingView,
   type Command,
   type CommandEnvelope,
   type DecodedMap,
   type MapScenario,
+  type MatchResult,
+  type ObservedBuilding,
+  type ObservedNode,
+  type ObservedUnit,
+  type Observation,
+  type StaticMapInfo,
+  type UnitOrderInfo,
   type EntityId,
   type GameEvent,
   type PlayerId,
@@ -41,6 +49,7 @@ import {
   inBuildMenu,
 } from './systems/construction';
 import { describeTask, orderSystem } from './systems/orders';
+import { victorySystem } from './systems/victory';
 import { canTrain, populationOf, productionSystem, shortOf, trainTicks } from './systems/production';
 
 export interface GameOptions {
@@ -85,12 +94,15 @@ export class Game {
       pathQueue: [],
       spatial: new SpatialHash<Unit>(1),
       events: [],
+      result: null,
     };
     for (const p of [0, 1] as const) {
       this.state.players.set(p, {
         id: p,
         resources: { ...DATA.game.startingResources },
         lastAlertTick: -Infinity,
+        stats: { unitsTrained: 0, unitsLost: 0, buildingsBuilt: 0, buildingsLost: 0 },
+        hadKeyBuilding: false,
       });
     }
     // Resource nodes (their tiles are already blocked by loadMap).
@@ -163,6 +175,7 @@ export class Game {
   step(): GameEvent[] {
     const s = this.state;
     s.events = [];
+    if (s.result) return s.events; // the match is over: frozen
     for (const u of s.units.values()) {
       u.prevX = u.x;
       u.prevY = u.y;
@@ -182,6 +195,8 @@ export class Game {
     separationSystem(s);
     projectileSystem(s);
     deathSystem(s);
+    this.countStats();
+    victorySystem(s);
     s.tick++;
     this.viewCache.clear();
     return s.events;
@@ -261,9 +276,126 @@ export class Game {
       projectiles,
       resources: s.nodeViews as ReadonlyMap<EntityId, ResourceView>,
       resourcesVersion: s.nodesVersion,
+      result: s.result,
     };
     this.viewCache.set(player, view);
     return view;
+  }
+
+  /** The match result once it is over (game.json → victory), else null. */
+  get result(): MatchResult | null {
+    return this.state.result;
+  }
+
+  /**
+   * What the machine player sees (shared/ai.ts). No fog of war (decision 2026-11-07), so it
+   * contains every entity; `events` are the ones the caller collected since the last observation.
+   */
+  observe(player: PlayerId, events: GameEvent[] = []): Observation {
+    const s = this.state;
+    const me = this.player(player);
+    const units: ObservedUnit[] = [];
+    for (const u of s.units.values()) {
+      units.push({
+        id: u.id,
+        owner: u.owner,
+        type: u.type,
+        x: u.x,
+        y: u.y,
+        hp: u.hp,
+        maxHp: u.maxHp,
+        stance: u.stance,
+        order: orderInfo(u),
+      });
+    }
+    const buildings: ObservedBuilding[] = [];
+    for (const b of s.buildings.values()) {
+      buildings.push({
+        id: b.id,
+        owner: b.owner,
+        type: b.type,
+        x: b.x,
+        y: b.y,
+        w: b.w,
+        h: b.h,
+        hp: b.hp,
+        maxHp: b.maxHp,
+        constructed: b.constructed,
+        queue: b.queue.map((q) => q.unit),
+        rally: b.rally ? { x: b.rally.x, y: b.rally.y } : null,
+      });
+    }
+    const nodes: ObservedNode[] = [];
+    for (const n of s.nodes.values()) {
+      nodes.push({
+        id: n.id,
+        kind: n.kind,
+        resource: n.resource,
+        x: n.x,
+        y: n.y,
+        w: n.w,
+        h: n.h,
+        amount: n.amount,
+      });
+    }
+    return {
+      tick: s.tick,
+      player,
+      resources: { ...me.resources },
+      ...populationOf(s, player),
+      units,
+      buildings,
+      nodes,
+      events,
+      over: s.result !== null,
+    };
+  }
+
+  /** Static map knowledge for the machine player: terrain and rocks, spawns, the game data. */
+  staticInfo(player: PlayerId): StaticMapInfo {
+    const { grid } = this.state;
+    const rocks = new Set<number>();
+    for (const o of this.loaded.map.objects) if (o.kind === 'stone') rocks.add(grid.index(o.x, o.y));
+    const buildable: number[] = [];
+    const passable: number[] = [];
+    for (let y = 0; y < grid.height; y++) {
+      for (let x = 0; x < grid.width; x++) {
+        const rule = grid.rule(x, y);
+        const rock = rocks.has(grid.index(x, y));
+        buildable.push(rule.buildable && !rock ? 1 : 0);
+        passable.push(rule.passable && !rock ? 1 : 0);
+      }
+    }
+    return {
+      player,
+      width: grid.width,
+      height: grid.height,
+      tickRate: TICK_RATE,
+      buildable,
+      passable,
+      spawns: this.loaded.spawns.map((sp) => ({ player: sp.player, x: sp.x, y: sp.y, w: sp.w, h: sp.h })),
+      data: DATA,
+    };
+  }
+
+  private countStats(): void {
+    const s = this.state;
+    const stats = (p: PlayerId): PlayerState['stats'] | undefined => s.players.get(p)?.stats;
+    for (const e of s.events) {
+      if (e.type === 'unitTrained') {
+        const st = stats(e.player);
+        if (st) st.unitsTrained++;
+      } else if (e.type === 'unitDied') {
+        const st = stats(e.owner);
+        if (st) st.unitsLost++;
+      } else if (e.type === 'buildingCompleted') {
+        const st = stats(e.player);
+        if (st) st.buildingsBuilt++;
+      } else if (e.type === 'buildingDestroyed') {
+        const st = stats(e.owner);
+        if (st) st.buildingsLost++;
+      }
+    }
   }
 
   /** Hash of the simulation state, for determinism tests. */
@@ -658,6 +790,21 @@ export class Game {
     };
     const slots = formationSlots(this.state.grid, center, count, 0.8);
     slots.forEach((p, i) => this.addUnit(1, TEST_ARMY_MIX[i % TEST_ARMY_MIX.length] ?? 'militia', p.x, p.y));
+  }
+}
+
+function orderInfo(u: Unit): UnitOrderInfo {
+  const o = u.orders[0];
+  if (!o) return { kind: 'idle' };
+  switch (o.kind) {
+    case 'move':
+      return { kind: 'move', x: o.x, y: o.y };
+    case 'attackMove':
+      return { kind: 'attackMove', x: o.x, y: o.y };
+    case 'gather':
+      return { kind: 'gather', node: o.target, resource: o.resource };
+    case 'attack':
+      return { kind: 'attack', target: o.target, auto: o.auto };
   }
 }
 

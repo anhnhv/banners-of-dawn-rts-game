@@ -1,0 +1,61 @@
+{
+  "note": "Machine player mode 'easy': plays like a primary-school child, so anyone can win. Every field is explained in docs/ai-modes.md (configuration table). Times in seconds, distances in tiles, chances 0..1.",
+  "name": "Easy",
+  "persona": "A primary-school child: slow and often distracted; few workers; forgets houses until it is full; one Barracks, no towers; does not count before fighting; attacks late, in small groups, running off one by one at the nearest building; never retreats; often does not notice when its base is attacked.",
+  "tempo": { "thinkSeconds": 2, "reactionSeconds": 3, "maxCommandsPerThink": 4, "daydreamChance": 0.3 },
+  "economy": {
+    "workerTarget": 8,
+    "minWorkers": 5,
+    "armyReserve": 150,
+    "workerQueue": 1,
+    "idleWorkersPerThink": 1,
+    "gatherRadius": 14,
+    "rebalanceSeconds": 0,
+    "plentyStock": 500
+  },
+  "buildings": {
+    "houseBuffer": 0,
+    "houseBufferPerProducer": 0,
+    "firstProducerAtWorkers": 8,
+    "maxProducersPerType": 1,
+    "extraProducerBank": 99999,
+    "towers": 0,
+    "towerAfterSeconds": 99999,
+    "houseDistance": [5, 10],
+    "militaryDistance": [7, 12],
+    "towerDistance": [5, 9]
+  },
+  "priorities": {
+    "defenceSoldier": 95,
+    "house": 90,
+    "worker": 80,
+    "firstProducer": 70,
+    "soldier": 60,
+    "extraProducer": 45,
+    "tower": 40
+  },
+  "army": {
+    "trainEverySeconds": 40,
+    "militaryQueue": 1,
+    "stagingDistance": 7,
+    "defenceHp": 150,
+    "reissueSeconds": 6
+  },
+  "attack": {
+    "earliestAttackSeconds": 360,
+    "minWavePop": 4,
+    "waveGrowth": 1,
+    "attackRatio": 0,
+    "stalledSeconds": 60,
+    "minStalledWavePop": 3,
+    "stalledAttackRatio": 0,
+    "desperationSeconds": 180,
+    "desperateRatio": 0,
+    "regroupSeconds": 0,
+    "regroupArrivedShare": 0.8,
+    "groupSize": 4,
+    "target": "nearestBuilding"
+  },
+  "retreat": { "retreatRatio": 0, "retreatCooldownSeconds": 60, "retreatGiveUpSeconds": 20 },
+  "defence": { "threatRadius": 6, "defendChance": 0.5, "homeRadius": 20, "raidShare": 0.3 }
+}

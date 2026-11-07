@@ -1,0 +1,96 @@
+/**
+ * Contracts between the host and the machine player (PLAN §6, docs/plans/m6-vs-machine.md).
+ * Everything here is plain data (arrays and objects only) so it can be posted to a Web Worker.
+ * Decision 2026-11-07: there is no fog of war, so the observation contains every entity.
+ */
+import type { Command } from './commands';
+import type { GameData, ResourceAmounts, ResourceType, Stance } from './gameData';
+import type { EntityId, PlayerId } from './ids';
+import type { BuildingTypeId, GameEvent, NodeKind, UnitTypeId } from './view';
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Sent once at the start: the map and the game rules. */
+export interface StaticMapInfo {
+  player: PlayerId;
+  width: number;
+  height: number;
+  tickRate: number;
+  /** Row-major, 1 = a building may stand here as far as terrain and static rocks go. */
+  buildable: number[];
+  /** Row-major, 1 = units can walk here as far as terrain and static rocks go. */
+  passable: number[];
+  spawns: Array<Rect & { player: PlayerId }>;
+  /** The full parsed game config (units, buildings, rules). */
+  data: GameData;
+}
+
+/** A unit's current order, summarized. */
+export type UnitOrderInfo =
+  | { kind: 'idle' }
+  | { kind: 'move'; x: number; y: number }
+  | { kind: 'attackMove'; x: number; y: number }
+  | { kind: 'gather'; node: EntityId; resource: ResourceType }
+  | { kind: 'attack'; target: EntityId; auto: boolean };
+
+export interface ObservedUnit {
+  id: EntityId;
+  owner: PlayerId;
+  type: UnitTypeId;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  stance: Stance;
+  order: UnitOrderInfo;
+}
+
+export interface ObservedBuilding extends Rect {
+  id: EntityId;
+  owner: PlayerId;
+  type: BuildingTypeId;
+  hp: number;
+  maxHp: number;
+  constructed: boolean;
+  /** Unit types waiting in the production queue (first = in production). */
+  queue: UnitTypeId[];
+  rally: { x: number; y: number } | null;
+}
+
+export interface ObservedNode extends Rect {
+  id: EntityId;
+  kind: NodeKind;
+  resource: ResourceType;
+  amount: number;
+}
+
+/** What the machine player sees each time it thinks. */
+export interface Observation {
+  tick: number;
+  player: PlayerId;
+  resources: ResourceAmounts;
+  pop: number;
+  popCap: number;
+  units: ObservedUnit[];
+  buildings: ObservedBuilding[];
+  /** Live resource nodes. */
+  nodes: ObservedNode[];
+  /** Events since the previous observation. */
+  events: GameEvent[];
+  over: boolean;
+}
+
+/** Messages to the AI worker. */
+export type ToAIMessage =
+  | { type: 'init'; info: StaticMapInfo; mode: string; seed: number }
+  | { type: 'observe'; obs: Observation }
+  | { type: 'dispose' };
+
+/** Messages from the AI worker. */
+export type FromAIMessage =
+  { type: 'commands'; forTick: number; commands: Command[] } | { type: 'debug'; text: string };

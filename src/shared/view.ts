@@ -1,6 +1,6 @@
 /**
  * PlayerView (PLAN §5.8): the read-only picture of the game that the UI draws.
- * Built by the engine once per tick. Fog of war filtering arrives in M7; until then it contains everything.
+ * Built by the engine once per tick. There is no fog of war: it contains everything (decision 2026-11-07).
  */
 import type { ResourceAmounts, ResourceType, Stance } from './gameData';
 import type { EntityId, PlayerId } from './ids';
@@ -116,7 +116,26 @@ export type GameEvent =
       h: number;
     }
   /** Throttled per player (game.json → combat.underAttackAlertSeconds). */
-  | { type: 'underAttack'; player: PlayerId; x: number; y: number };
+  | { type: 'underAttack'; player: PlayerId; x: number; y: number }
+  /** The match is over (game.json → victory). winner null = draw (both lost in the same tick). */
+  | { type: 'gameOver'; winner: PlayerId | null };
+
+/** Per-player match statistics (result screen). */
+export interface PlayerStats {
+  unitsTrained: number;
+  unitsLost: number;
+  buildingsBuilt: number;
+  buildingsLost: number;
+}
+
+export interface MatchResult {
+  /** null = draw. */
+  winner: PlayerId | null;
+  /** Tick at which the match ended. */
+  tick: number;
+  /** Indexed by player id. */
+  stats: PlayerStats[];
+}
 
 export interface PlayerView {
   tick: number;
@@ -129,4 +148,6 @@ export interface PlayerView {
   resources: ReadonlyMap<EntityId, ResourceView>;
   /** Increases whenever a node disappears, so the UI only re-checks nodes when needed. */
   resourcesVersion: number;
+  /** Set once the match is over; the simulation is frozen from then on. */
+  result: MatchResult | null;
 }

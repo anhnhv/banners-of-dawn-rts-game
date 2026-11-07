@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import {
+  TICK_RATE,
   costEntries,
   type Command,
   type DecodedMap,
@@ -186,10 +187,16 @@ export class GameScreen {
     });
   }
 
+  /** One line about the opponent (the machine player's current plan), shown in the info box. */
+  setOpponentStatus(text: string): void {
+    this.hud.setOpponent(text);
+  }
+
   /** Called by the host every animation frame. */
   frame(dtSeconds: number, view: PlayerView, alpha: number, events: readonly GameEvent[] = []): void {
     this.time += dtSeconds;
     this.lastView = view;
+    if (view.result) this.hud.showResult(view.result, view.player, TICK_RATE);
     this.syncResources(view);
     this.showEvents(events);
     this.camera.update(dtSeconds);

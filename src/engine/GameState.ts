@@ -1,5 +1,14 @@
 /** Everything the systems read and write during a tick. */
-import type { EntityId, GameEvent, PlayerId, ResourceAmounts, ResourceView, Rng } from '../shared';
+import type {
+  EntityId,
+  GameEvent,
+  MatchResult,
+  PlayerId,
+  PlayerStats,
+  ResourceAmounts,
+  ResourceView,
+  Rng,
+} from '../shared';
 import type { Building, ResourceNode } from './entities/Building';
 import type { Projectile } from './entities/Projectile';
 import type { Unit } from './entities/Unit';
@@ -12,6 +21,9 @@ export interface PlayerState {
   resources: ResourceAmounts;
   /** Last tick an `underAttack` event was sent to this player. */
   lastAlertTick: number;
+  stats: PlayerStats;
+  /** Has owned a game.json → victory.defeatWhenLost building (only such players can lose). */
+  hadKeyBuilding: boolean;
 }
 
 export interface GameState {
@@ -34,4 +46,6 @@ export interface GameState {
   spatial: SpatialHash<Unit>;
   /** Events produced during the current tick. */
   events: GameEvent[];
+  /** Set when the match ends (systems/victory.ts); the simulation is frozen from then on. */
+  result: MatchResult | null;
 }

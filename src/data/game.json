@@ -1,5 +1,5 @@
 {
-  "note": "Global game rules. Pace is fixed here for now (no setup screen yet); 1.0 = Standard (PLAN §2.11). buildMenu: buildings the player can place from the Build button, each at the command-grid slot of its hotkey. combat: global combat rules (PLAN §9.5); targetPriority is by target class, lower = attacked first. effects: how long corpses and rubble stay (seconds).",
+  "note": "Global game rules. Pace is fixed here for now (no setup screen yet); 1.0 = Standard (PLAN §2.11). buildMenu: buildings the player can place from the Build button, each at the command-grid slot of its hotkey. combat: global combat rules (PLAN §9.5); targetPriority is by target class, lower = attacked first. effects: how long corpses and rubble stay (seconds). victory: a player who owns none of these buildings any more (construction sites count) is defeated.",
   "startingResources": { "food": 200, "wood": 200, "gold": 100 },
   "popCap": 100,
   "pace": { "gatherRate": 1.0, "trainSpeed": 1.0, "buildSpeed": 1.0 },
@@ -34,5 +34,6 @@
     "retaliateSeconds": 2,
     "underAttackAlertSeconds": 10
   },
-  "effects": { "corpseSeconds": 5, "rubbleSeconds": 30 }
+  "effects": { "corpseSeconds": 5, "rubbleSeconds": 30 },
+  "victory": { "defeatWhenLost": ["town_hall"] }
 }

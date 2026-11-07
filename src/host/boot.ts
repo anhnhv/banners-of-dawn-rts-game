@@ -5,6 +5,8 @@
 import { decodeMap, MapFormatError } from '../shared';
 import { createGame, validateMap } from '../engine';
 import { createGameScreen, showFatalError } from '../ui';
+import { DEFAULT_AI_MODE, type AIMode } from '../ai';
+import { WorkerAIController } from './aiController';
 import { GameHost } from './GameHost';
 import { loadMapFile, loadMapIndex } from './loaders';
 
@@ -16,6 +18,8 @@ export interface BootOptions {
   testEnemy?: number;
   /** Use the map's ready-made scenario start if it has one (default true; `?setup=standard` = off). */
   scenario?: boolean;
+  /** Machine player mode for player 2 (`?ai=easy|normal`, default easy); null = an idle opponent (`?ai=off`). */
+  ai?: AIMode | null;
   seed?: number;
 }
 
@@ -48,6 +52,9 @@ export async function bootGame(container: HTMLElement, options: BootOptions = {}
       warnings: result.warnings,
     });
     host.attach(screen);
+    const mode = options.ai === undefined ? DEFAULT_AI_MODE : options.ai;
+    if (mode) host.attachAI(new WorkerAIController(game, 1, mode, host.aiSink, options.seed ?? 1));
+    else screen.setOpponentStatus('Opponent: idle (?ai=off)');
     host.start();
   } catch (err) {
     if (err instanceof MapFormatError) {

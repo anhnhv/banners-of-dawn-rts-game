@@ -12,3 +12,5 @@ export * from './rng';
 export * from './commands';
 export * from './view';
 export * from './gameData';
+export * from './ai';
+export * from './aiProfile';

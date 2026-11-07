@@ -94,7 +94,9 @@ Multiplayer, campaign, multiple factions, naval units, garrisoning, trading, alt
 - Town Hall gives +5, House +5, Castle +10. The **cap is 100** at Standard pace (configurable, §2.11).
 - If a unit would go over the cap, training pauses and the HUD shows "Need more houses".
 
-### 2.3 Eras (3)
+### 2.3 Eras (3): **dropped 2026-11-07, there is a single era**
+> Decision (2026-11-07): no eras. Every unit, building and tech is available once its production building exists. The table below is kept only as history; the `era` field and all era rules are removed in M6 (see `docs/plans/m6-vs-machine.md`).
+
 | Era | Cost | Research time | Requirement | Unlocks |
 |---|---|---|---|---|
 | **I. Settlement** | (start) | — | — | Worker, Militia. Town Hall\*, House, Storehouse, Farm, Barracks |
@@ -572,6 +574,7 @@ export interface Game {
 ---
 
 ## 6. Machine Player (AI): separate module
+> **2026-11-07:** this section is the original long-term design (with eras, fog and three difficulties). What is actually built (Easy only, no eras, no fog, situation-driven instead of build orders) is described in `docs/plans/m6-vs-machine.md`; how the machine plays in each mode is in `docs/ai-modes.md`. The isolation rules in §6.1–6.2 apply unchanged.
 
 ### 6.1 Isolation guarantees
 - **It lives only in `src/ai/`.** Lint stops it from importing the engine, UI or host.
@@ -1319,7 +1322,17 @@ Everything below is **config first**: who can attack what, how hard, how far, wi
 - **Screenshots:** `docs/milestones/m5-*.png`.
 - **Not done yet:** Catapult model (falls back to the militia model), era gating of the Watch Tower (M6), upgrades in the damage formula (M6 Blacksmith), victory (M7), fog (M7).
 
-### M6: Full content (L)
+### M6: Play against the machine (L) ✅ done 2026-11-07, details in `docs/plans/m6-vs-machine.md`
+User decisions (2026-11-07): the machine plays by default and decides from the current situation (no scripted build order); no new units or buildings; full vision for both (no fog); **losing the Town Hall loses the game**; one difficulty, Easy, hard-coded. Eras are dropped.
+- [x] Victory (`game.json → victory.defeatWhenLost`), match stats, frozen simulation after game over, result screen (Victory / Defeat / Draw, stats, Play again).
+- [x] `game.observe()` and `game.staticInfo()`; shared contracts in `src/shared/ai.ts`.
+- [x] `src/ai/`: situation analysis → army posture (build / stage / attack / retreat / defend) → prioritized budget (workers, houses, Barracks, tower, soldiers) → worker assignment by need, only to safe nodes; placement with a free ring.
+- [x] Host: Web Worker controller (default), inline controller (tests), `?ai=off`; the AI's status line in the info box.
+- [x] Tests: victory, observation, budget, placement, headless matches (economy, safe gathering, wins against an idle opponent from both starts, defends a raid, determinism).
+
+**Known limit:** food is finite (berries only, about 700 per side), so long games stall once both sides have spent it. A Farm or more berries would fix it (user decision).
+
+### Later: Remaining content (was M6)
 - [ ] Eras and all techs.
 - [ ] Archery Range, Stable, Blacksmith, Siege Workshop, Castle; Archer, Scout Rider, Knight, Catapult.
 - [ ] Wall drag along the grid axes with auto-joining wall models (posts, corners, T-joins); owner-only gates with 2 orientations.
@@ -1407,6 +1420,8 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Gathering | **No carrying or drop sites**: harvested resources go straight to the stockpile (2026-11-06) |
 | Work animation | Gentle side-to-side sway and swinging arms, not a strong forward/back lean (2026-11-06) |
 | Combat config | Every entity is configurable (2026-11-07): attacks, bonuses, projectiles, behavior near enemies, target priority and combat rules live in `src/data/*.json` (§9.5); code stays generic |
+| Eras | **None, a single era** (2026-11-07). Everything is available once its production building exists |
+| Machine player | Plays by default, decides from the current situation (no scripted build order); full vision, no fog; **losing the Town Hall loses** (2026-11-07). **Each mode has its own config file** `src/ai/profiles/<mode>.json` (2026-11-07): Easy = a primary-school child anyone can beat (default), Normal = the earlier careful logic. Rules and the configuration table: `docs/ai-modes.md` |
 | Default start for testing | The map's `scenario` (§8.1) is the default start (2026-11-07): built-up bases, gathering workers, an army each; the enemy army stands away from its base so it can be fought without base fire. `/?setup=standard` = plain start |
 
 ### Current status (updated 2026-11-07)
@@ -1417,7 +1432,8 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | M4 Construction without workers + economy changes | ✅ done (2026-11-07) |
 | M5 Combat | ✅ done (2026-11-07) |
 | Test scenario start (map `scenario`, §8.1) | ✅ done (2026-11-07) |
-| **M6 Full content** | next |
+| M6 Play against the machine (Easy) | ✅ done (2026-11-07) |
+| **Next** | user's choice: e.g. a Farm for infinite food, more difficulties, fog, menus |
 
 **How to resume:**
 1. `nvm use && npm install && npm run dev`, then open `/`: it starts from Green Valley's ready-made scenario (built bases, gathering workers, an army each; the enemy army waits mid-map). `/?setup=standard` = plain start; `/?army=20&enemy=20` adds extra test units.
@@ -1428,4 +1444,6 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**Next (M6 Full content):** eras and techs (`research` action type, Blacksmith upgrades feeding the damage formula), the remaining buildings and units with models (Catapult, Archery Range, Stable, …), walls and gates. Keep it config first (§9).
+**Where we are (2026-11-07):** a match against the machine works from `/` (scenario start) and `/?setup=standard`. Modes: `/?ai=easy` (default, a child anyone can beat), `/?ai=normal`, `/?ai=off` (idle). Each mode's numbers are in `src/ai/profiles/<mode>.json`; `docs/ai-modes.md` explains the logic and has the configuration table.
+
+**Next:** ask the user. Open points: food runs out (berries only, so long games stall; a Farm would fix it); Normal/Hard profiles; fog; menus. No eras (decision 2026-11-07).
