@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import buildings from '../../src/data/buildings.json';
 import game from '../../src/data/game.json';
+import projectiles from '../../src/data/projectiles.json';
 import resources from '../../src/data/resources.json';
 import units from '../../src/data/units.json';
 import { type GameDataError, parseGameData, type RawGameData } from '../../src/shared';
@@ -11,6 +12,7 @@ const raw = (): RawGameData =>
     buildings: buildings.buildings,
     nodes: resources.nodes,
     resources: resources.types,
+    projectiles: projectiles.projectiles,
     game,
   });
 
@@ -48,5 +50,39 @@ describe('game data', () => {
     const r = raw() as { units: Record<string, { speed: number }> };
     r.units.worker!.speed = -1;
     expect(() => parseGameData(r as unknown as RawGameData)).toThrow(/units\.worker\.speed/);
+  });
+
+  it('checks combat config: bonus classes, projectiles, priorities, ranged attacks', () => {
+    const r = raw() as unknown as {
+      units: Record<string, { attack: Record<string, unknown> }>;
+      buildings: Record<string, { attack?: Record<string, unknown> }>;
+      game: { combat: { targetPriority: Record<string, number> } };
+    };
+    r.units.militia!.attack.bonus = { dragons: 5 };
+    r.units.archer!.attack.projectile = 'laser';
+    r.buildings.house!.attack = { damage: 1, range: 4, cooldown: 1 };
+    r.game.combat.targetPriority['ghost'] = 9;
+    try {
+      parseGameData(r as unknown as RawGameData);
+      expect.unreachable();
+    } catch (e) {
+      const issues = (e as GameDataError).issues.join('\n');
+      expect(issues).toContain('units.militia.attack.bonus: unknown class "dragons"');
+      expect(issues).toContain('units.archer.attack: unknown projectile "laser"');
+      expect(issues).toContain('buildings.house.attack: a ranged attack needs a projectile');
+      expect(issues).toContain('targetPriority: unknown class "ghost"');
+    }
+  });
+
+  it('gives units sensible combat defaults', () => {
+    const data = parseGameData(raw());
+    expect(data.units.worker?.combat).toMatchObject({ autoAttack: false, fleeWhenHit: 4 });
+    expect(data.units.militia?.combat).toMatchObject({
+      autoAttack: true,
+      stance: 'aggressive',
+      fleeWhenHit: 0,
+    });
+    expect(data.buildings.house?.class).toBe('building');
+    expect(data.buildings.watch_tower?.attack?.targets).toEqual(['unit']);
   });
 });

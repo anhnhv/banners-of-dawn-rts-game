@@ -6,12 +6,17 @@
  *   gather:   toNode → harvest. Every whole unit harvested goes straight into the owner's stockpile
  *             (no carrying, no drop sites). When the node runs out, retarget the nearest node of
  *             the same resource within `retargetRadius`.
+ *   attack:   chase → in range → strike whenever the cooldown allows → target dead: done.
+ *             Auto-acquired attacks give up beyond `combat.leash` from where they started (and go
+ *             back there, or resume the attack-move); hold-stance units never chase them.
+ *   attackMove: walk there; the targeting system inserts attacks for enemies met on the way.
  */
 import { TICK_RATE, type ResourceType } from '../../shared';
 import { DATA } from '../data';
 import type { ResourceNode } from '../entities/Building';
 import { gatherRate, type Order, type Unit } from '../entities/Unit';
 import type { GameState } from '../GameState';
+import { attackOf, centerOf, combatant, gap, inAttackRange, isUnit, strike } from './combat';
 import { clearGoal, setGoal } from './movement';
 import { approachPoint, inReach } from './reach';
 
@@ -25,9 +30,12 @@ export function orderSystem(state: GameState): void {
       if (u.goal) clearGoal(u);
       continue;
     }
-    if (order.kind === 'move') {
+    if (u.hp <= 0) continue;
+    if (order.kind === 'move' || order.kind === 'attackMove') {
       setGoal(state, u, order);
       if (u.arrived) finish(u);
+    } else if (order.kind === 'attack') {
+      attack(state, u, order);
     } else {
       gather(state, u, order);
     }
@@ -38,6 +46,57 @@ function finish(u: Unit): void {
   u.orders.shift();
   u.workProgress = 0;
   clearGoal(u);
+}
+
+function attack(state: GameState, u: Unit, o: Extract<Order, { kind: 'attack' }>): void {
+  const target = combatant(state, o.target);
+  const def = attackOf(u);
+  if (!target || !def) {
+    finish(u);
+    return;
+  }
+  if (o.auto && Math.hypot(u.x - o.homeX, u.y - o.homeY) > DATA.game.combat.leash) {
+    // leash: give up the chase; resume the attack-move, or walk back to where it started
+    finish(u);
+    if (u.orders[0]?.kind !== 'attackMove') u.orders = [{ kind: 'move', x: o.homeX, y: o.homeY }];
+    return;
+  }
+  const c = centerOf(target);
+  if (inAttackRange(u, target, def)) {
+    clearGoal(u);
+    u.activity = 'attack';
+    u.facing = Math.atan2(c.x - u.x, c.y - u.y);
+    if (u.cooldown <= 0) strike(state, u, target, def);
+    return;
+  }
+  if (o.auto && u.stance === 'hold') {
+    finish(u); // hold: never chase
+    return;
+  }
+  const minRange = def.minRange ?? 0;
+  if (minRange > 0 && gap(u, target) < minRange) {
+    // too close for this weapon: step back
+    const dx = u.x - c.x;
+    const dy = u.y - c.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const back = minRange + 0.5;
+    setGoal(state, u, { x: c.x + (dx / len) * back, y: c.y + (dy / len) * back });
+  } else if (isUnit(target)) {
+    // chase; re-path only when the target has moved away from the current goal
+    if (!u.goal || Math.hypot(u.goal.x - target.x, u.goal.y - target.y) > 0.75) setGoal(state, u, c);
+  } else if (!u.goal) {
+    const spot = approachPoint(state.grid, target, u);
+    if (!spot) {
+      finish(u);
+      return;
+    }
+    setGoal(state, u, spot);
+  }
+  if (u.arrived) {
+    if (u.blocked)
+      finish(u); // unreachable
+    else clearGoal(u); // arrived but not in range yet (target moved): pick a new goal next tick
+  }
 }
 
 function gather(state: GameState, u: Unit, o: Extract<Order, { kind: 'gather' }>): void {
@@ -132,6 +191,8 @@ export function describeTask(u: Unit): string {
   const o = u.orders[0];
   if (!o) return 'Idle';
   if (o.kind === 'move') return 'Moving';
+  if (o.kind === 'attackMove') return 'Attack-moving';
+  if (o.kind === 'attack') return 'Attacking';
   const name = DATA.resources[o.resource]?.name.toLowerCase() ?? o.resource;
   return o.phase === 'harvest' ? `Gathering ${name}` : `Going to gather ${name}`;
 }

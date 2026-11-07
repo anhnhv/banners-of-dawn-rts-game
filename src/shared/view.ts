@@ -2,7 +2,7 @@
  * PlayerView (PLAN §5.8): the read-only picture of the game that the UI draws.
  * Built by the engine once per tick. Fog of war filtering arrives in M7; until then it contains everything.
  */
-import type { ResourceAmounts, ResourceType } from './gameData';
+import type { ResourceAmounts, ResourceType, Stance } from './gameData';
 import type { EntityId, PlayerId } from './ids';
 
 /** Unit type id: a key of src/data/units.json. */
@@ -13,7 +13,7 @@ export type BuildingTypeId = string;
 export type NodeKind = string;
 
 /** What a unit is doing, for animation and the info panel. */
-export type UnitActivity = 'idle' | 'walk' | 'work';
+export type UnitActivity = 'idle' | 'walk' | 'work' | 'attack';
 
 export interface UnitView {
   id: EntityId;
@@ -34,6 +34,9 @@ export interface UnitView {
   radius: number;
   hp: number;
   maxHp: number;
+  stance: Stance;
+  /** Tick of the last strike (melee hit or shot), -1 if none: drives the strike animation. */
+  strikeTick: number;
 }
 
 export interface QueueItemView {
@@ -62,6 +65,20 @@ export interface BuildingView {
   rally: { x: number; y: number; target?: EntityId } | null;
 }
 
+/** A projectile in flight (grid space; z = height above the ground). */
+export interface ProjectileView {
+  id: EntityId;
+  /** projectiles.json key. */
+  kind: string;
+  owner: PlayerId;
+  x: number;
+  y: number;
+  z: number;
+  prevX: number;
+  prevY: number;
+  prevZ: number;
+}
+
 export interface ResourceView {
   id: EntityId;
   kind: NodeKind;
@@ -78,7 +95,28 @@ export type GameEvent =
   | { type: 'unitTrained'; player: PlayerId; unit: EntityId; unitType: UnitTypeId }
   | { type: 'popCapped'; player: PlayerId; building: EntityId }
   | { type: 'buildingCompleted'; player: PlayerId; building: EntityId; buildingType: BuildingTypeId }
-  | { type: 'resourceDepleted'; node: EntityId };
+  | { type: 'resourceDepleted'; node: EntityId }
+  | {
+      type: 'unitDied';
+      unit: EntityId;
+      unitType: UnitTypeId;
+      owner: PlayerId;
+      x: number;
+      y: number;
+      facing: number;
+    }
+  | {
+      type: 'buildingDestroyed';
+      building: EntityId;
+      buildingType: BuildingTypeId;
+      owner: PlayerId;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }
+  /** Throttled per player (game.json → combat.underAttackAlertSeconds). */
+  | { type: 'underAttack'; player: PlayerId; x: number; y: number };
 
 export interface PlayerView {
   tick: number;
@@ -86,6 +124,7 @@ export interface PlayerView {
   self: { resources: ResourceAmounts; pop: number; popCap: number };
   units: readonly UnitView[];
   buildings: readonly BuildingView[];
+  projectiles: readonly ProjectileView[];
   /** Live resource nodes by id (shared with the engine; read only). */
   resources: ReadonlyMap<EntityId, ResourceView>;
   /** Increases whenever a node disappears, so the UI only re-checks nodes when needed. */

@@ -2,7 +2,8 @@
  * The authoritative game (PLAN §5). Fixed 20 Hz ticks, deterministic for a given map, seed and
  * command log. The host feeds it commands and calls step(); the UI reads getView().
  *
- * Tick pipeline: commands → production → orders → pathfinding → movement → separation.
+ * Tick pipeline: commands → construction → production → targeting → combat (cooldowns, towers)
+ * → orders (incl. unit strikes) → pathfinding → movement → separation → projectiles → deaths.
  */
 import {
   Rng,
@@ -14,6 +15,7 @@ import {
   type GameEvent,
   type PlayerId,
   type PlayerView,
+  type ProjectileView,
   type ResourceAmounts,
   type ResourceView,
   type UnitTypeId,
@@ -27,6 +29,8 @@ import { loadMap, type LoadedMap, type SpawnPoint } from './map/loadMap';
 import { PathFinder } from './path/astar';
 import { assignSlots, formationSlots } from './path/groupMove';
 import { SpatialHash } from './spatial/SpatialHash';
+import { bestTarget, targetingSystem } from './systems/targeting';
+import { attackOf, combatant, combatSystem, deathSystem, isUnit, projectileSystem } from './systems/combat';
 import { clearGoal, movementSystem, pathfindingSystem, separationSystem } from './systems/movement';
 import {
   buildTicks,
@@ -42,6 +46,8 @@ export interface GameOptions {
   seed: number;
   /** Dev/testing: spawn this many extra units for the human player in front of their base. */
   testArmy?: number;
+  /** Dev/testing: spawn this many enemy units between the bases. */
+  testEnemy?: number;
 }
 
 const TEST_ARMY_MIX: UnitTypeId[] = ['militia', 'militia', 'archer', 'knight', 'worker', 'scout_rider'];
@@ -64,6 +70,7 @@ export class Game {
       players: new Map(),
       units: new Map(),
       buildings: new Map(),
+      projectiles: new Map(),
       nodes: new Map(),
       nodeViews: new Map(),
       nodesVersion: 0,
@@ -74,7 +81,11 @@ export class Game {
       events: [],
     };
     for (const p of [0, 1] as const) {
-      this.state.players.set(p, { id: p, resources: { ...DATA.game.startingResources } });
+      this.state.players.set(p, {
+        id: p,
+        resources: { ...DATA.game.startingResources },
+        lastAlertTick: -Infinity,
+      });
     }
     // Resource nodes (their tiles are already blocked by loadMap).
     for (const r of this.loaded.resources) {
@@ -99,6 +110,7 @@ export class Game {
     }
     const home = this.loaded.spawns.find((s) => s.player === 0);
     if (home && options.testArmy) this.spawnTestArmy(home, options.testArmy);
+    if (options.testEnemy) this.spawnTestEnemy(options.testEnemy);
   }
 
   get tick(): number {
@@ -152,10 +164,14 @@ export class Game {
     }
     constructionSystem(s);
     productionSystem(s, (owner, type, x, y) => this.addUnit(owner, type, x, y));
+    targetingSystem(s);
+    combatSystem(s, (b, attack) => bestTarget(s, b, attack, attack.range));
     orderSystem(s);
     pathfindingSystem(s);
     movementSystem(s);
     separationSystem(s);
+    projectileSystem(s);
+    deathSystem(s);
     s.tick++;
     this.viewCache.clear();
     return s.events;
@@ -183,6 +199,8 @@ export class Game {
         radius: u.radius,
         hp: u.hp,
         maxHp: u.maxHp,
+        stance: u.stance,
+        strikeTick: u.strikeTick,
       });
     }
     const buildings: BuildingView[] = [];
@@ -204,6 +222,20 @@ export class Game {
         rally: b.rally ? { ...b.rally } : null,
       });
     }
+    const projectiles: ProjectileView[] = [];
+    for (const p of s.projectiles.values()) {
+      projectiles.push({
+        id: p.id,
+        kind: p.kind,
+        owner: p.owner,
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        prevX: p.prevX,
+        prevY: p.prevY,
+        prevZ: p.prevZ,
+      });
+    }
     const me = this.player(player);
     const resources: ResourceAmounts = {
       food: Math.floor(me.resources.food),
@@ -216,6 +248,7 @@ export class Game {
       self: { resources, ...populationOf(s, player) },
       units,
       buildings,
+      projectiles,
       resources: s.nodeViews as ReadonlyMap<EntityId, ResourceView>,
       resourcesVersion: s.nodesVersion,
     };
@@ -235,6 +268,16 @@ export class Game {
       mix(u.y);
       mix(u.orders.length);
       mix(u.workProgress);
+      mix(u.hp);
+      mix(u.cooldown);
+    }
+    for (const b of this.state.buildings.values()) {
+      mix(b.id);
+      mix(b.hp);
+    }
+    for (const p of this.state.projectiles.values()) {
+      mix(p.x);
+      mix(p.y);
     }
     for (const p of this.state.players.values()) {
       mix(p.resources.food);
@@ -273,9 +316,23 @@ export class Game {
         if (units.length === 0) return reject('NO_UNITS');
         const node = s.nodes.get(cmd.target);
         const building = s.buildings.get(cmd.target);
+        const enemy = combatant(s, cmd.target);
         const movers: Unit[] = [];
         for (const u of units) {
-          if (node && gatherRate(u.type, node.kind) > 0) {
+          // right-click on an enemy attacks it if units.json → interactions.attack.targets allows
+          const kinds = DATA.units[u.type]?.interactions.attack?.targets ?? [];
+          if (
+            enemy &&
+            attackOf(u) &&
+            enemy.owner !== u.owner &&
+            kinds.includes(isUnit(enemy) ? 'unit' : 'building')
+          ) {
+            this.giveOrder(
+              u,
+              { kind: 'attack', target: enemy.id, auto: false, homeX: u.x, homeY: u.y },
+              cmd.queue ?? false,
+            );
+          } else if (node && gatherRate(u.type, node.kind) > 0) {
             this.giveOrder(
               u,
               {
@@ -294,9 +351,34 @@ export class Game {
         }
         // units that cannot do anything with the target just walk next to it
         const rect = node ?? building;
-        if (movers.length > 0 && rect)
-          this.orderMove(movers, { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }, cmd.queue ?? false);
-        if (!rect) return reject('BAD_TARGET');
+        const unitTarget = s.units.get(cmd.target);
+        const spot = rect ? { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 } : unitTarget;
+        if (!spot) return reject('BAD_TARGET');
+        if (movers.length > 0) this.orderMove(movers, { x: spot.x, y: spot.y }, cmd.queue ?? false);
+        return;
+      }
+      case 'attackMove': {
+        const units = ownUnits(cmd.units);
+        if (units.length === 0) return reject('NO_UNITS');
+        if (!Number.isFinite(cmd.to.x) || !Number.isFinite(cmd.to.y)) return reject('BAD_TARGET');
+        // units without an attack simply move
+        const fighters = units.filter((u) => attackOf(u));
+        const others = units.filter((u) => !attackOf(u));
+        if (others.length > 0) this.orderMove(others, cmd.to, cmd.queue ?? false);
+        if (fighters.length > 0) {
+          this.orderMove(fighters, cmd.to, cmd.queue ?? false);
+          for (const u of fighters) {
+            const last = u.orders[u.orders.length - 1];
+            if (last?.kind === 'move')
+              u.orders[u.orders.length - 1] = { kind: 'attackMove', x: last.x, y: last.y };
+          }
+        }
+        return;
+      }
+      case 'setStance': {
+        const units = ownUnits(cmd.units).filter((u) => attackOf(u));
+        if (units.length === 0) return reject('NOT_AVAILABLE');
+        for (const u of units) u.stance = cmd.stance;
         return;
       }
       case 'stop': {
@@ -454,6 +536,9 @@ export class Game {
       queue: [],
       popBlocked: false,
       rally: null,
+      cooldown: 0,
+      target: null,
+      strikeTick: -1,
     };
     this.state.buildings.set(b.id, b);
     if (block) this.state.grid.block(b.x, b.y, b.w, b.h);
@@ -493,6 +578,19 @@ export class Game {
     const center = { x: cx + (dx / len) * 8, y: cy + (dy / len) * 8 };
     const slots = formationSlots(this.state.grid, center, count, 0.8);
     slots.forEach((p, i) => this.addUnit(0, TEST_ARMY_MIX[i % TEST_ARMY_MIX.length] ?? 'militia', p.x, p.y));
+  }
+
+  private spawnTestEnemy(count: number): void {
+    const home = this.loaded.spawns.find((sp) => sp.player === 0);
+    const enemy = this.loaded.spawns.find((sp) => sp.player === 1);
+    if (!home || !enemy) return;
+    // two thirds of the way from the enemy base toward ours
+    const center = {
+      x: enemy.x + enemy.w / 2 + (home.x - enemy.x) * 0.45,
+      y: enemy.y + enemy.h / 2 + (home.y - enemy.y) * 0.45,
+    };
+    const slots = formationSlots(this.state.grid, center, count, 0.8);
+    slots.forEach((p, i) => this.addUnit(1, TEST_ARMY_MIX[i % TEST_ARMY_MIX.length] ?? 'militia', p.x, p.y));
   }
 }
 

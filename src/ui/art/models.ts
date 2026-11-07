@@ -486,3 +486,43 @@ export function constructionCoreGeometry(w: number, h: number): BuiltGeometry {
   b.box(0.25, 0, 0.25, w - 0.5, 1, h - 0.5, 'planks', 'wood-light', { top: 'planks', topColor: 'straw' });
   return b.build();
 }
+
+// ---- Projectiles (projectiles.json → model) and rubble ----------------------------------------
+
+/** Projectile pointing along +z, centered on its origin. Unknown names fall back to the arrow. */
+export function projectileGeometry(model: string): BuiltGeometry {
+  const b = builder('blue');
+  if (model === 'stone') {
+    b.boxC(0, -0.08, 0, 0.16, 0.16, 0.16, 'rock', 'stone');
+    b.boxC(0.03, -0.04, 0.02, 0.1, 0.1, 0.1, 'rock', 'stone-light');
+  } else {
+    b.boxC(0, -0.012, -0.03, 0.025, 0.025, 0.42, 'bark', 'wood-light'); // shaft
+    b.boxC(0, -0.02, 0.2, 0.04, 0.04, 0.07, 'plain', 'iron'); // tip
+    b.boxC(0, -0.02, -0.22, 0.05, 0.04, 0.08, 'cloth', 'plaster'); // fletching
+  }
+  return b.build();
+}
+
+/**
+ * Rubble left by ANY destroyed building (one generic look, sized from the footprint): scorched
+ * ground, broken stones and charred beams.
+ */
+export function rubbleGeometry(w: number, h: number): BuiltGeometry {
+  const b = builder('blue');
+  b.box(0.05, 0, 0.05, w - 0.1, 0.05, h - 0.1, 'soil', 'dirt');
+  let seed = w * 31 + h * 17;
+  const rnd = (): number => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  const pieces = Math.round(w * h * 3);
+  for (let i = 0; i < pieces; i++) {
+    const s = 0.12 + rnd() * 0.22;
+    const x = 0.1 + rnd() * (w - 0.2 - s);
+    const z = 0.1 + rnd() * (h - 0.2 - s);
+    const beam = rnd() < 0.3;
+    if (beam) b.box(x, 0.05, z, s * 2.2, 0.08, 0.08, 'planks', 'wood-dark');
+    else b.box(x, 0.05, z, s, s * (0.4 + rnd() * 0.5), s, 'rock', rnd() < 0.5 ? 'stone' : 'stone-dark');
+  }
+  return b.build();
+}

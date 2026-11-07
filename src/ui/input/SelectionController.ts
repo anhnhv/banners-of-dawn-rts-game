@@ -4,9 +4,11 @@
  *                    or a resource
  *  left drag         box select own units (shift: add)
  *  double click      select all own units of that type on screen
- *  right click       with own units: on a resource/building → interact (the engine decides from the
- *                    unit config: gather, drop off, …); on the ground → move (shift: queue)
- *                    with an own building selected → set its rally point
+ *  right click       with own units: on an enemy, a resource or a building → interact (the engine
+ *                    decides from the unit config: attack, gather, …); on the ground → move
+ *                    (shift: queue). With an own building selected → set its rally point
+ *  targeting modes   rally point (building button) and attack-move (unit button): the next left
+ *                    click gives the point; right click or Esc cancels
  *  Ctrl/Alt + 1..9   assign control group; 1..9 select it; press twice to center the camera on it
  *  Esc               cancel placement / targeting / the build menu, then clear the selection
  * While placing a building (build menu): left click places it (shift: place more), right click
@@ -34,6 +36,8 @@ export interface SelectionOptions {
   canRally: (id: EntityId) => boolean;
   /** True if `id` is a resource node. */
   isResource: (id: EntityId) => boolean;
+  /** True if `id` is an enemy unit or building. */
+  isEnemy: (id: EntityId) => boolean;
   onCommand: (cmd: Command) => void;
   onMoveMarker: (x: number, z: number, color?: string) => void;
   onChange: () => void;
@@ -52,8 +56,9 @@ export class SelectionController {
   private dragStart: { x: number; y: number; shift: boolean } | null = null;
   private dragging = false;
   private lastGroupTap = { group: -1, time: 0 };
-  /** Waiting for a click to place this building's rally point. */
-  private rallyFor: EntityId | null = null;
+  /** Waiting for a click: a building's rally point, or an attack-move destination. */
+  private targeting:
+    { kind: 'rally'; building: EntityId } | { kind: 'attackMove'; units: EntityId[] } | null = null;
   private readonly cleanups: Array<() => void> = [];
   private readonly v = new THREE.Vector3();
 
@@ -71,8 +76,14 @@ export class SelectionController {
 
   /** Start "click to set the rally point" mode for a building. */
   beginRally(building: EntityId): void {
-    this.rallyFor = building;
+    this.targeting = { kind: 'rally', building };
     this.o.canvas.classList.add('targeting');
+  }
+
+  /** Start "click where to attack-move" mode for these units. */
+  beginAttackMove(units: EntityId[]): void {
+    this.targeting = { kind: 'attackMove', units };
+    this.o.canvas.classList.add('targeting', 'attacking');
   }
 
   /** Replace the selection (e.g. idle worker button). */
@@ -113,16 +124,18 @@ export class SelectionController {
       return;
     }
     if (e.button === 0) {
-      if (this.rallyFor !== null) {
-        this.placeRally(this.rallyFor, e.clientX, e.clientY);
-        this.endRally();
+      const t = this.targeting;
+      if (t) {
+        if (t.kind === 'rally') this.placeRally(t.building, e.clientX, e.clientY);
+        else this.attackMove(t.units, e.clientX, e.clientY, e.shiftKey);
+        this.endTargeting();
         return;
       }
       this.dragStart = { x: e.clientX, y: e.clientY, shift: e.shiftKey };
       this.dragging = false;
     } else if (e.button === 2) {
-      if (this.rallyFor !== null) {
-        this.endRally();
+      if (this.targeting) {
+        this.endTargeting();
         return;
       }
       this.rightClick(e.clientX, e.clientY, e.shiftKey);
@@ -190,7 +203,7 @@ export class SelectionController {
     if (e.repeat) return;
     if (e.code === 'Escape') {
       if (this.o.placement.active) this.o.placement.cancel();
-      else if (this.rallyFor !== null) this.endRally();
+      else if (this.targeting) this.endTargeting();
       else if (!this.o.onEscape()) this.select([]);
       return;
     }
@@ -230,10 +243,10 @@ export class SelectionController {
     const ground = this.groundAt(clientX, clientY);
     const units = this.ownSelection();
     if (units.length > 0) {
-      const target = this.o.pickOther(clientX, clientY);
+      const target = this.targetAt(clientX, clientY);
       if (target !== null) {
         this.o.onCommand({ type: 'interact', units, target, queue });
-        if (ground) this.o.onMoveMarker(ground.x, ground.z, '#ffd75a');
+        if (ground) this.o.onMoveMarker(ground.x, ground.z, this.o.isEnemy(target) ? '#ff5a4a' : '#ffd75a');
       } else if (ground) {
         this.o.onCommand({ type: 'move', units, to: { x: ground.x, y: ground.z }, queue });
         this.o.onMoveMarker(ground.x, ground.z);
@@ -258,9 +271,32 @@ export class SelectionController {
     this.o.onMoveMarker(ground.x, ground.z, '#7dff6a');
   }
 
-  private endRally(): void {
-    this.rallyFor = null;
-    this.o.canvas.classList.remove('targeting');
+  private attackMove(units: EntityId[], clientX: number, clientY: number, queue: boolean): void {
+    const alive = new Set(this.o.units().map((u) => u.id));
+    const ids = units.filter((id) => alive.has(id));
+    if (ids.length === 0) return;
+    const target = this.targetAt(clientX, clientY);
+    if (target !== null && this.o.isEnemy(target)) {
+      this.o.onCommand({ type: 'interact', units: ids, target, queue });
+    } else {
+      const ground = this.groundAt(clientX, clientY);
+      if (!ground) return;
+      this.o.onCommand({ type: 'attackMove', units: ids, to: { x: ground.x, y: ground.z }, queue });
+      this.o.onMoveMarker(ground.x, ground.z, '#ff5a4a');
+    }
+  }
+
+  /** Enemy unit under the cursor first, then a building or resource. */
+  private targetAt(clientX: number, clientY: number): EntityId | null {
+    const rect = this.o.canvas.getBoundingClientRect();
+    const hit = pickAt(this.screenUnits(), clientX - rect.left, clientY - rect.top, this.o.player, 'enemy');
+    if (hit && hit.owner !== this.o.player) return hit.id;
+    return this.o.pickOther(clientX, clientY);
+  }
+
+  private endTargeting(): void {
+    this.targeting = null;
+    this.o.canvas.classList.remove('targeting', 'attacking');
   }
 
   private groundAt(clientX: number, clientY: number): THREE.Vector3 | null {

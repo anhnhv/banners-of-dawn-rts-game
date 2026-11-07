@@ -4,20 +4,26 @@
  *   without a model yet get a plain footprint block.
  * - Construction sites use ONE generic look for every building type (scaffold + rising block +
  *   progress bar), generated from the footprint size.
+ * - Damage: HP bar when damaged or selected, sparks on hits, fire and smoke below 50% HP.
+ * - Destroyed buildings leave ONE generic rubble pile (sized from the footprint) with a dust
+ *   cloud, for game.json → effects.rubbleSeconds.
  * Also draws the selection outline and the rally flag, and supports picking by ray.
  */
 import * as THREE from 'three';
-import type { BuildingView, EntityId, PlayerView } from '../../shared';
+import type { BuildingView, EntityId, GameEvent, PlayerView } from '../../shared';
 import {
   buildingGeometry,
   buildingModel,
   constructionCoreGeometry,
   constructionSiteGeometry,
   meshFrom,
+  rubbleGeometry,
 } from '../art/models';
 import { resolveColor } from '../art/palette';
 import { VoxelBuilder } from '../art/VoxelBuilder';
 import { DATA } from '../data';
+import type { Effects } from './Effects';
+import type { HealthBars } from './HealthBars';
 import { TEAM_OF } from './UnitRenderer';
 
 const SITE_HEIGHT = 1.1;
@@ -27,6 +33,9 @@ const CAMERA_YAW = Math.PI / 4;
 interface Drawn {
   object: THREE.Object3D;
   constructed: boolean;
+  /** Height of the model's top (HP bar, fire). */
+  top: number;
+  lastHp: number;
   core?: THREE.Mesh;
   barFill?: THREE.Mesh;
 }
@@ -52,15 +61,32 @@ export class BuildingRenderer {
     { site: THREE.BufferGeometry; core: THREE.BufferGeometry; mats: THREE.Material[][] }
   >();
   private outlineFor = -1;
+  private readonly rubble: Array<{ mesh: THREE.Mesh; age: number }> = [];
 
-  constructor() {
+  constructor(
+    private readonly effects: Effects,
+    private readonly bars: HealthBars,
+  ) {
     this.group.name = 'buildings';
     this.flag = this.makeFlag();
     this.outline = new THREE.Group();
     this.group.add(this.flag, this.outline);
   }
 
-  update(view: PlayerView, selected: ReadonlySet<EntityId>): void {
+  /** Destroyed buildings leave rubble and a dust cloud. */
+  onEvents(events: readonly GameEvent[]): void {
+    for (const e of events) {
+      if (e.type !== 'buildingDestroyed') continue;
+      const mesh = meshFrom(rubbleGeometry(e.w, e.h));
+      mesh.position.set(e.x, 0, e.y);
+      this.group.add(mesh);
+      this.rubble.push({ mesh, age: 0 });
+      this.effects.dust(e.x + e.w / 2, e.y + e.h / 2, Math.max(e.w, e.h) * 0.6, 24 + e.w * e.h * 3);
+    }
+  }
+
+  update(view: PlayerView, selected: ReadonlySet<EntityId>, dt: number): void {
+    this.updateRubble(dt);
     const seen = new Set<EntityId>();
     let rallyShown = false;
     let outlined: BuildingView | null = null;
@@ -75,6 +101,24 @@ export class BuildingRenderer {
       if (!b.constructed && d.core && d.barFill) {
         d.core.scale.y = Math.max(0.04, b.buildProgress) * SITE_HEIGHT;
         d.barFill.scale.x = Math.max(0.001, b.buildProgress);
+      }
+      if (b.hp < d.lastHp) this.effects.sparks(b.x + b.w / 2, d.top * 0.6, b.y + b.h / 2, 5);
+      d.lastHp = b.hp;
+      const frac = b.hp / b.maxHp;
+      if (b.constructed && frac < 0.5) {
+        // burning: flames on two spots of the roof, stronger the lower the HP
+        const intensity = 1 + (0.5 - frac) * 4;
+        this.effects.fire(b.x + b.w * 0.35, d.top * 0.85, b.y + b.h * 0.4, dt, intensity);
+        if (b.w * b.h > 1) this.effects.fire(b.x + b.w * 0.65, d.top * 0.7, b.y + b.h * 0.65, dt, intensity);
+      }
+      if (selected.has(b.id) || b.hp < b.maxHp) {
+        this.bars.add(
+          b.x + b.w / 2,
+          d.top + 0.3,
+          b.y + b.h / 2,
+          Math.min(2.2, Math.max(0.8, b.w * 0.6)),
+          frac,
+        );
       }
       if (selected.has(b.id)) outlined = b;
       if (selected.has(b.id) && b.owner === view.player && b.rally) {
@@ -110,7 +154,7 @@ export class BuildingRenderer {
     mesh.userData.entityId = b.id;
     mesh.name = `building:${b.type}:${b.id}`;
     this.group.add(mesh);
-    return { object: mesh, constructed: true };
+    return { object: mesh, constructed: true, top: topOf(mesh), lastHp: b.hp };
   }
 
   /** The generic construction site, sized from the footprint. */
@@ -157,7 +201,21 @@ export class BuildingRenderer {
     group.add(bar);
 
     this.group.add(group);
-    return { object: group, constructed: false, core, barFill: fill };
+    return { object: group, constructed: false, top: SITE_HEIGHT, lastHp: b.hp, core, barFill: fill };
+  }
+
+  private updateRubble(dt: number): void {
+    const stay = DATA.game.effects.rubbleSeconds;
+    for (let i = this.rubble.length - 1; i >= 0; i--) {
+      const r = this.rubble[i] as { mesh: THREE.Mesh; age: number };
+      r.age += dt;
+      r.mesh.position.y = -Math.max(0, r.age - (stay - 2)) * 0.15;
+      if (r.age >= stay) {
+        this.group.remove(r.mesh);
+        r.mesh.geometry.dispose();
+        this.rubble.splice(i, 1);
+      }
+    }
   }
 
   /** Footprint outline around the selected building (green own, red enemy). */
@@ -194,4 +252,8 @@ export class BuildingRenderer {
     g.visible = false;
     return g;
   }
+}
+
+function topOf(o: THREE.Object3D): number {
+  return new THREE.Box3().setFromObject(o).max.y;
 }

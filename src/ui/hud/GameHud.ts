@@ -8,6 +8,7 @@
 import {
   costEntries,
   type ActionDef,
+  type AttackDef,
   type BuildingView,
   type Command,
   type DecodedMap,
@@ -39,6 +40,8 @@ export interface HudCallbacks {
   onCommand(cmd: Command): void;
   onSelectIdleWorker(): void;
   onBeginRally(building: EntityId): void;
+  /** Attack-move button: the next click on the map gives the destination. */
+  onBeginAttackMove(units: EntityId[]): void;
   /** A building was picked from the build menu: start placing it. */
   onStartPlacement(building: string): void;
 }
@@ -288,7 +291,7 @@ export class GameHud {
 
     const actions =
       sel.kind === 'units' && sel.own
-        ? commonUnitActions(sel.units)
+        ? unitActions(sel.units)
         : sel.kind === 'building' && sel.own
           ? (DATA.buildings[sel.building.type]?.actions ?? [])
           : [];
@@ -464,13 +467,30 @@ export class GameHud {
     } else if (a.type === 'stop' && sel?.kind === 'units') {
       button.title = `Stop (${a.hotkey})`;
       button.append(iconImg('stop'));
-      const ids = sel.units.map((u) => u.id);
+      const ids = users(sel.units, a).map((u) => u.id);
       run = () => this.cb.onCommand({ type: 'stop', units: ids });
     } else if (a.type === 'setRally' && sel?.kind === 'building') {
       button.title = `Set rally point (${a.hotkey})\nThen click the ground or a resource.`;
       button.append(iconImg('flag'));
       const building = sel.building.id;
       run = () => this.cb.onBeginRally(building);
+    } else if (a.type === 'attackMove' && sel?.kind === 'units') {
+      button.title = `Attack-move (${a.hotkey})\nThen click the map: walk there and fight every enemy on the way.`;
+      button.append(iconImg('sword'));
+      const ids = users(sel.units, a).map((u) => u.id);
+      run = () => this.cb.onBeginAttackMove(ids);
+    } else if (a.type === 'stance' && sel?.kind === 'units') {
+      const label = a.stance === 'hold' ? 'Hold ground' : 'Aggressive';
+      const help =
+        a.stance === 'hold'
+          ? 'Never move; only hit enemies in reach.'
+          : 'Attack enemies in sight; chase them a little.';
+      button.title = `${label} (${a.hotkey})\n${help}`;
+      button.append(iconImg(a.stance === 'hold' ? 'shield' : 'spear'));
+      const own = users(sel.units, a);
+      if (own.every((u) => u.stance === a.stance)) button.classList.add('active');
+      const ids = own.map((u) => u.id);
+      run = () => this.cb.onCommand({ type: 'setStance', units: ids, stance: a.stance });
     }
     button.append(el('span', 'hotkey', a.hotkey));
     button.addEventListener('click', () => {
@@ -508,11 +528,22 @@ function resolveBuilding(view: PlayerView, id: EntityId): BuildingView | null {
 }
 
 /** Actions shared by every selected unit type (same type and hotkey). */
-function commonUnitActions(units: UnitView[]): ActionDef[] {
-  const types = [...new Set(units.map((u) => u.type))];
-  const first = DATA.units[types[0] ?? '']?.actions ?? [];
-  return first.filter((a) =>
-    types.every((t) => DATA.units[t]?.actions.some((b) => b.type === a.type && b.hotkey === a.hotkey)),
+/**
+ * Buttons for a unit selection: every action any selected type has (first one wins a hotkey).
+ * Each button then acts on the selected units whose config has that action (see `users`).
+ */
+function unitActions(units: UnitView[]): ActionDef[] {
+  const out: ActionDef[] = [];
+  for (const t of new Set(units.map((u) => u.type))) {
+    for (const a of DATA.units[t]?.actions ?? []) if (!out.some((b) => b.hotkey === a.hotkey)) out.push(a);
+  }
+  return out;
+}
+
+/** Selected units whose own config has this action. */
+function users(units: UnitView[], a: ActionDef): UnitView[] {
+  return units.filter((u) =>
+    DATA.units[u.type]?.actions.some((b) => b.type === a.type && b.hotkey === a.hotkey),
   );
 }
 
@@ -541,6 +572,10 @@ function fieldText(f: PanelField, e: UnitView | BuildingView | ResourceView, vie
       }
       case 'task':
         return e.task;
+      case 'attack':
+        return attackText(def?.attack);
+      case 'stance':
+        return `Stance: ${e.stance === 'hold' ? 'Hold ground' : 'Aggressive'}`;
       default:
         return '';
     }
@@ -549,6 +584,8 @@ function fieldText(f: PanelField, e: UnitView | BuildingView | ResourceView, vie
   switch (f) {
     case 'armor':
       return `Armor ${def?.armor ?? 0}`;
+    case 'attack':
+      return attackText(def?.attack);
     case 'pop':
       return `Population ${view.self.pop}/${view.self.popCap} (+${def?.popProvided ?? 0} here)`;
     default:
@@ -559,7 +596,7 @@ function fieldText(f: PanelField, e: UnitView | BuildingView | ResourceView, vie
 /** Changes whenever the panel/grid needs a rebuild (selection, queue length, affordability, …). */
 function signature(view: PlayerView, sel: Selected): string {
   if (!sel) return 'none';
-  if (sel.kind === 'units') return `u:${sel.units.map((u) => u.id).join(',')}`;
+  if (sel.kind === 'units') return `u:${sel.units.map((u) => `${u.id}${u.stance[0]}`).join(',')}`;
   if (sel.kind === 'resource') return `r:${sel.resource.id}`;
   const b = sel.building;
   if (!b.constructed) return `site:${b.id}`;
@@ -584,4 +621,14 @@ function menuAffordability(view: PlayerView): string {
         : 0,
     )
     .join('');
+}
+
+/** "Attack 4 (+8 vs cavalry) · range 5 · every 1.5 s" from an attack config. */
+function attackText(a: AttackDef | undefined): string {
+  if (!a) return '';
+  const bonus = Object.entries(a.bonus)
+    .map(([c, n]) => `${n > 0 ? '+' : ''}${n} vs ${c}`)
+    .join(', ');
+  const range = a.range > 0 ? `range ${a.minRange ? `${a.minRange}-` : ''}${a.range}` : 'melee';
+  return `Attack ${a.damage}${bonus ? ` (${bonus})` : ''} · ${range} · every ${a.cooldown}s`;
 }

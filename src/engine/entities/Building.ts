@@ -30,6 +30,11 @@ export interface Building extends Rect {
   /** First queue item is done but there is no population room yet. */
   popBlocked: boolean;
   rally: { x: number; y: number; target?: EntityId } | null;
+  // ---- combat (buildings with an `attack` in buildings.json) ----
+  cooldown: number;
+  /** Current target of its own attack. */
+  target: EntityId | null;
+  strikeTick: number;
 }
 
 export interface ResourceNode extends Rect {

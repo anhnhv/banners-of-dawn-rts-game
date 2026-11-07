@@ -1,5 +1,5 @@
 {
-  "note": "Global game rules. Pace is fixed here for now (no setup screen yet); 1.0 = Standard (PLAN §2.11). buildMenu: buildings the player can place from the Build button, each at the command-grid slot of its hotkey.",
+  "note": "Global game rules. Pace is fixed here for now (no setup screen yet); 1.0 = Standard (PLAN §2.11). buildMenu: buildings the player can place from the Build button, each at the command-grid slot of its hotkey. combat: global combat rules (PLAN §9.5); targetPriority is by target class, lower = attacked first. effects: how long corpses and rubble stay (seconds).",
   "startingResources": { "food": 200, "wood": 200, "gold": 100 },
   "popCap": 100,
   "pace": { "gatherRate": 1.0, "trainSpeed": 1.0, "buildSpeed": 1.0 },
@@ -11,7 +11,28 @@
   "buildMenu": [
     { "building": "house", "hotkey": "Q" },
     { "building": "barracks", "hotkey": "W" },
-    { "building": "town_hall", "hotkey": "E" }
+    { "building": "town_hall", "hotkey": "E" },
+    { "building": "watch_tower", "hotkey": "R" }
   ],
-  "construction": { "startHpFraction": 0.1 }
+  "construction": { "startHpFraction": 0.1 },
+  "combat": {
+    "minDamage": 1,
+    "meleeReach": 0.3,
+    "acquireEveryTicks": 4,
+    "leash": 12,
+    "attackerPriority": 0,
+    "targetPriority": {
+      "infantry": 1,
+      "ranged": 1,
+      "cavalry": 1,
+      "siege": 1,
+      "worker": 2,
+      "tower": 3,
+      "building": 4
+    },
+    "defaultPriority": 5,
+    "retaliateSeconds": 2,
+    "underAttackAlertSeconds": 10
+  },
+  "effects": { "corpseSeconds": 5, "rubbleSeconds": 30 }
 }

@@ -1,5 +1,5 @@
 /** Unit entity (PLAN §5.2). Plain data; systems mutate it once per tick. Stats come from units.json. */
-import type { EntityId, PlayerId, ResourceType, UnitActivity, UnitTypeId } from '../../shared';
+import type { EntityId, PlayerId, ResourceType, Stance, UnitActivity, UnitTypeId } from '../../shared';
 import { DATA } from '../data';
 import type { Point } from '../path/smoothing';
 
@@ -15,7 +15,14 @@ export type Order =
       phase: GatherPhase;
       lastX: number;
       lastY: number;
-    };
+    }
+  /**
+   * Attack `target` (unit or building) until it dies. `auto` = picked by the targeting system:
+   * such a chase gives up beyond combat.leash from (homeX, homeY), and hold-stance units never chase.
+   */
+  | { kind: 'attack'; target: EntityId; auto: boolean; homeX: number; homeY: number }
+  /** Walk to (x, y) and fight every enemy met on the way (the targeting system inserts attacks). */
+  | { kind: 'attackMove'; x: number; y: number };
 
 export interface Unit {
   id: EntityId;
@@ -37,6 +44,16 @@ export interface Unit {
   activity: UnitActivity;
   /** Fractional harvest progress toward the next whole resource unit. */
   workProgress: number;
+
+  // ---- combat (stats from units.json → attack / combat) ----
+  stance: Stance;
+  /** Ticks until the next strike is possible. */
+  cooldown: number;
+  /** Tick of the last strike, -1 if none (for the strike animation). */
+  strikeTick: number;
+  /** Who hit this unit last, and when (retaliation / target priority). */
+  lastHitBy: EntityId | null;
+  lastHitTick: number;
 
   // ---- movement (driven by the current order through `goal`) ----
   goal: Point | null;
@@ -74,6 +91,11 @@ export function createUnit(id: EntityId, owner: PlayerId, type: UnitTypeId, x: n
     orders: [],
     activity: 'idle',
     workProgress: 0,
+    stance: def.combat.stance,
+    cooldown: 0,
+    strikeTick: -1,
+    lastHitBy: null,
+    lastHitTick: -1,
     goal: null,
     path: null,
     pathIndex: 0,

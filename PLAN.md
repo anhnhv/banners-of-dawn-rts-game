@@ -795,7 +795,8 @@ The strategy is chosen at random (seeded) from those available, unless one is se
 |---|---|
 | **Build menu** (Build button / B, any time) | One button per entry of `game.json → buildMenu`, at the slot of its hotkey (Q House, W Barracks, E Town Hall, …). Esc or the Back button closes it |
 | Worker | W Stop (gathering is right-click) |
-| Military units | Q Attack-move, W Stop, E Hold, R Aggressive · V Delete |
+| Military units | Q Attack-move, W Stop, E Hold, R Aggressive (from each unit's `actions`) · V Delete (later) |
+| Mixed selection | Every action any selected type has; each button acts only on the units whose config has it |
 | Town Hall | Q Worker, W Advance Era · Z Set rally |
 | Barracks / Range / Stable / Workshop | Q, W units · Z Set rally |
 | Storehouse / Blacksmith | Q W E R techs |
@@ -958,6 +959,7 @@ A map editor page (3D view, tile painting, symmetry mirroring, live validation, 
 | `src/data/units.json` | Every unit: stats, cost, train time, pop, model, icon, **interactions**, **panel**, **actions** |
 | `src/data/buildings.json` | Every building: footprint, hp, pop provided, cost, build time, model, icon, **panel**, **actions** |
 | `src/data/resources.json` | Resource types (food, wood, gold) and resource **nodes** (tree, pine, berry bush, gold mine): resource, amount, model, icon, panel |
+| `src/data/projectiles.json` | Projectile types (arrow, stone): speed, arc, homing, model, launch height (M5) |
 | `src/data/terrain.json` | Terrain rules (walkable, buildable, speed) |
 | `src/data/palette.json` | All colors and team color sets |
 
@@ -1005,8 +1007,8 @@ Right-click sends one generic command, `interact {units, target}`. The engine lo
   ]
 }
 ```
-- **Panel fields** (`PANEL_FIELDS` in `shared/gameData.ts`): `hp`, `armor`, `speed`, `sight`, `gatherRate`, `task`, `pop`, `queue`, `amount`, `construction`.
-- **Action types today:** `train`, `stop`, `setRally`. Building is not a unit action; it is the global build menu (§9.2b). Coming later: `research` (M6), plus attack-move and stance (M5).
+- **Panel fields** (`PANEL_FIELDS` in `shared/gameData.ts`): `hp`, `armor`, `speed`, `sight`, `gatherRate`, `task`, `pop`, `queue`, `amount`, `construction`, `attack`, `stance`.
+- **Action types today:** `train`, `stop`, `setRally`, `attackMove`, `stance` (M5). Building is not a unit action; it is the global build menu (§9.2b). Coming later: `research` (M6).
 - The command grid, hotkeys, tooltips (cost and time) and affordability tinting are all generated from these lists.
 
 ### 9.4 Example unit entry
@@ -1023,6 +1025,53 @@ Right-click sends one generic command, `interact {units, target}`. The engine lo
 }
 ```
 The `model` and `icon` names are resolved by the UI (`ui/art/models.ts`, `ui/hud/pixelIcons.ts`), with a safe fallback for names that have no art yet.
+
+### 9.5 Combat config (M5)
+```jsonc
+// units.json → militia
+"attack": {
+  "damage": 4, "range": 0, "cooldown": 1.5,   // range 0 = melee (game.json → combat.meleeReach)
+  "bonus": { "cavalry": 8 },                  // extra damage by TARGET class (unit or building class)
+  "projectile": "arrow",                      // optional: ranged attacks fly a projectile from projectiles.json
+  "minRange": 2,                              // optional: cannot hit closer than this
+  "splash": { "radius": 1, "edge": 0.5 }      // optional: area damage, 50% at the edge
+},
+"combat": {
+  "autoAttack": true,          // acquires targets by itself (worker: false)
+  "stance": "aggressive",      // starting stance: aggressive | hold
+  "fleeWhenHit": 0             // tiles to run away when hit while idle (worker: 4)
+},
+"interactions": { "attack": { "targets": ["unit", "building"] } },   // right-click on an enemy
+"actions": [
+  { "type": "attackMove", "hotkey": "Q" },
+  { "type": "stop", "hotkey": "W" },
+  { "type": "stance", "stance": "hold", "hotkey": "E" },
+  { "type": "stance", "stance": "aggressive", "hotkey": "R" }
+]
+
+// buildings.json → town_hall (any building may have an attack; construction sites never shoot)
+"class": "building", "sight": 7,
+"attack": { "damage": 4, "range": 6, "cooldown": 2, "projectile": "arrow", "launchHeight": 2.2 }
+
+// projectiles.json
+"arrow": { "speed": 11, "arc": 0.18, "homing": true,  "model": "arrow", "launchHeight": 0.5 },
+"stone": { "speed": 7,  "arc": 0.4,  "homing": false, "model": "stone", "launchHeight": 0.6 }
+
+// game.json
+"combat": {
+  "minDamage": 1, "meleeReach": 0.3, "acquireEveryTicks": 4, "leash": 12,
+  "attackerPriority": 0,
+  "targetPriority": { "infantry": 1, "ranged": 1, "cavalry": 1, "siege": 1, "worker": 2, "tower": 3, "building": 4 },
+  "defaultPriority": 5,
+  "retaliateSeconds": 2,          // an idle unit hit this recently goes for its attacker
+  "underAttackAlertSeconds": 10
+},
+"effects": { "corpseSeconds": 5, "rubbleSeconds": 30 }
+```
+- **Classes** are free names. Unit `class` and building `class` (default `building`) are what `bonus` and `targetPriority` refer to; the validator rejects a bonus or priority naming a class no entity has.
+- **Panel fields** added: `attack` (damage, bonuses, range, rate) and `stance`.
+- **Action types** added: `attackMove`, `stance` (with `stance`).
+- Adding a new ranged unit, a new tower or a new projectile is a JSON change.
 
 ---
 
@@ -1225,12 +1274,33 @@ User decisions of 2026-11-06 (replacing the original worker-built design):
 - **Screenshots:** `docs/milestones/m4-*.png`.
 - **Not done yet:** a site under attack (M5 combat), the AI using `build` (M8), custom tooltips.
 
-### M5: Combat (M)
-- [ ] Attack, attack-move, stances, targeting, leash.
-- [ ] Melee, arcing arrows, attack and death animations, HP bars, hit flash and sparks.
-- [ ] Town Hall arrows, Watch Tower, damage formula and bonuses.
+### M5: Combat (M) ✅ done 2026-11-07
+Everything below is **config first**: who can attack what, how hard, how far, with which projectile, how a unit behaves when it sees or is hit by an enemy, and which buttons it shows all live in `src/data/*.json` (§9.5). Code only implements generic mechanics.
 
-**Done when:** the counter scenario tests pass (for example, 3 Militia beat 1 Knight) and fights are readable on screen.
+- [x] **Data:** `attack` block on units AND buildings (damage, range, minRange, cooldown, bonus per target class, projectile, splash); `combat` behavior block on units (autoAttack, stance, fleeWhenHit); `interactions.attack.targets`; building `class` and `sight`; new `src/data/projectiles.json`; `game.json → combat` (min damage, melee reach, acquire interval, leash, target priority by class, alert throttle) and `game.json → effects` (corpse and rubble times). All validated with cross-references.
+- [x] **Commands:** right-click an enemy (`interact`) = attack when the unit's `interactions.attack.targets` allow it; new `attackMove {units, to, queue}` and `setStance {units, stance}`.
+- [x] **Orders:** `attack {target, auto, homeX, homeY}` (chase → in range → strike on cooldown; auto-acquired chases obey the leash) and `attackMove {x, y}` (move; engage enemies met on the way; resume).
+- [x] **Targeting** (every `acquireEveryTicks`, staggered by id): idle aggressive units scan their sight, hold units scan their range, attack-movers scan their sight; buildings with an `attack` scan their range. Pick by priority (`attacker` first, then `targetPriority[class]`), then distance, then id.
+- [x] **Damage formula** (§2.4): `max(minDamage, damage + bonus[target.class] − target.armor)`. Melee hits at once; ranged spawns a projectile from `projectiles.json` (homing arrows always hit; non-homing stones land on a point and deal splash with edge falloff).
+- [x] **Death:** units and buildings at 0 HP are removed (building tiles freed); events `unitDied`, `buildingDestroyed`, `underAttack` (throttled per player).
+- [x] **Workers** never auto-attack (config) and flee `fleeWhenHit` tiles when hit while idle; they can still attack on an explicit right-click.
+- [x] **Town Hall arrows and Watch Tower** (new building, model `tower`, in the build menu) come from their `attack` config; construction sites never shoot.
+- [x] **UI:** red ring for selected enemies, red attack marker, Attack-move button (targeting mode, then click), Hold/Aggressive buttons with the active one highlighted, `attack` and `stance` panel fields, HP bars over damaged or selected units and buildings, arcing arrow and stone projectiles, ONE shared strike animation (arms chop, body lunges; mounted units lunge), hit flash and sparks, death animation (topple and sink), dust and rubble for destroyed buildings, fire on buildings below 50% HP, "You are under attack!" message and a minimap ping.
+- [x] **Dev:** `/?enemy=N` spawns N enemy units between the bases for testing fights.
+
+**Done when:** the counter scenario tests pass (3 Militia beat 1 Knight, 1 Militia beats 1 Scout Rider, Archers beat Militia, a Scout Rider beats an Archer, a Catapult wrecks a building), plus targeting, leash, hold, attack-move, worker flee, tower/Town Hall arrows, death and determinism tests; and fights are readable on screen.
+
+**Implementation notes (M5):**
+- **Engine files:** `systems/combat.ts` (combatant helpers, edge-to-edge `gap`, damage formula, `strike`, `applyDamage`, tower/Town Hall fire in `combatSystem`, `projectileSystem`, `deathSystem`), `systems/targeting.ts` (`targetingSystem`, `bestTarget`), `entities/Projectile.ts`; orders `attack` and `attackMove` in `systems/orders.ts`. Tick order: commands → construction → production → targeting → combat → orders → pathfinding → movement → separation → projectiles → deaths.
+- **Config added** (all validated, see §9.5): unit `attack` (now optional; `targets`, `bonus`, `projectile`, `minRange`, `splash`, `launchHeight`), unit `combat` (`autoAttack`, `stance`, `fleeWhenHit`), `interactions.attack.targets`, building `class`/`sight`/`attack`, `projectiles.json`, `game.json → combat` (incl. `retaliateSeconds`) and `effects`. Town Hall shoots arrows (`targets: ["unit"]`); new **Watch Tower** (`watch_tower`, build menu R; era gating comes with M6).
+- **Rules as built:** an idle aggressive unit scans its sight (hold: its reach); an idle unit hit within `retaliateSeconds` goes for its attacker; attack-movers scan their sight and insert an auto attack; auto chases give up beyond `leash` and walk back (or resume the attack-move); hold-stance units never chase. Ranged units step back when a target is inside their `minRange`. Homing arrows whose target dies land harmlessly. Construction sites can be attacked but never shoot or burn.
+- **Commands:** `interact` on an enemy = attack (per `interactions.attack.targets`); `attackMove` (units without an attack just move); `setStance`.
+- **View/events:** `UnitView.stance`, `UnitView.strikeTick`, `PlayerView.projectiles`; events `unitDied`, `buildingDestroyed`, `underAttack`. `stateHash` now includes HP, cooldowns and projectiles.
+- **UI:** `render/HealthBars.ts` (shared instanced bars), `render/Effects.ts` (sparks, dust, fire/smoke particles), `render/ProjectileRenderer.ts` (models from `projectiles.json → model`, `art/models.ts → projectileGeometry`), `art/models.ts → rubbleGeometry` (ONE rubble look for every building). `UnitRenderer`: shared strike animation timed from `strikeTick`, white hit flash, corpses that topple and sink, red rings for enemies. `BuildingRenderer`: HP bar, sparks, fire below 50% HP (finished buildings only), rubble + dust. `SelectionController`: right-click prefers the enemy unit under the cursor (red marker); attack-move targeting mode. `GameHud`: Attack-move / Hold (new shield icon) / Aggressive buttons with the active stance highlighted, `attack` and `stance` panel fields; a mixed selection now shows every action any selected type has, and each button only affects the units whose config has it. Messages and a red minimap ping on `underAttack`.
+- **Dev:** `/?enemy=N` spawns N enemy units between the bases (`GameOptions.testEnemy`).
+- **Results:** 128 tests (new `tests/engine/combat.test.ts`: damage formula and floor, 3 Militia beat 1 Knight, Knight beats 1 Militia, Militia beats Scout, Archers beat Militia, Scout beats Archer, Catapult destroys a house and respects its min range, projectile flight time, sight-limited auto-acquire, target priority, hold, leash, attack-move, explicit attack without leash, worker no-auto-attack + flee + explicit attack, Town Hall arrows, sites do not shoot, Watch Tower, building death frees tiles and pop, unit death events and throttled alert, determinism of a 32-unit battle; plus combat config validation in `gameData.test.ts`). Checked in the browser: a 20 vs 20 attack-move battle and a 31-unit siege of the enemy Town Hall (arrows, HP bars, strikes, corpses, smoke, rubble).
+- **Screenshots:** `docs/milestones/m5-*.png`.
+- **Not done yet:** Catapult model (falls back to the militia model), era gating of the Watch Tower (M6), upgrades in the damage formula (M6 Blacksmith), victory (M7), fog (M7).
 
 ### M6: Full content (L)
 - [ ] Eras and all techs.
@@ -1319,6 +1389,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Construction | **No workers needed**: Build button → build menu from `game.json` → place → the site builds itself; one generic construction-site visual for all buildings (2026-11-06) |
 | Gathering | **No carrying or drop sites**: harvested resources go straight to the stockpile (2026-11-06) |
 | Work animation | Gentle side-to-side sway and swinging arms, not a strong forward/back lean (2026-11-06) |
+| Combat config | Every entity is configurable (2026-11-07): attacks, bonuses, projectiles, behavior near enemies, target priority and combat rules live in `src/data/*.json` (§9.5); code stays generic |
 
 ### Current status (updated 2026-11-07)
 | Milestone | State |
@@ -1326,10 +1397,11 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | M0 setup, M0.5 style preview, M1 maps, M2 units & movement | ✅ done and committed |
 | M3 Economy (data-driven) | ✅ done and committed |
 | M4 Construction without workers + economy changes | ✅ done (2026-11-07) |
-| **M5 Combat** | next |
+| M5 Combat | ✅ done (2026-11-07) |
+| **M6 Full content** | next |
 
 **How to resume:**
-1. `nvm use && npm install && npm run dev`, then open `/?army=50` to see the current state.
+1. `nvm use && npm install && npm run dev`, then open `/?army=50` to see the current state (`/?army=20&enemy=20` for a battle).
 2. `npm run check` must stay green (typecheck, lint with module boundaries, map validation, tests).
 3. Continue with the first unchecked milestone in §12.
 4. After each milestone: tick its checklist, add implementation notes under it, update this table, commit.
@@ -1337,8 +1409,4 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**M4 in short:** see the M4 checklist in §12 (user decisions of 2026-11-06):
-1. build from a global Build button, no workers;
-2. no carrying or drop-off, resources go straight to the stockpile;
-3. a gentle side-to-side work animation with swinging arms;
-4. one generic construction-site visual for every building.
+**Next (M6 Full content):** eras and techs (`research` action type, Blacksmith upgrades feeding the damage formula), the remaining buildings and units with models (Catapult, Archery Range, Stable, …), walls and gates. Keep it config first (§9).

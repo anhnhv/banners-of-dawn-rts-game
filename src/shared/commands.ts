@@ -3,8 +3,9 @@
  * Positions are grid space (tile units, floats).
  *
  * `interact` is the generic right-click: the engine decides from the game data what each unit can
- * do with the target (gather a resource, drop off at a building, … attack/build in later milestones).
+ * do with the target (gather a resource, attack an enemy unit or building, …).
  */
+import type { Stance } from './gameData';
 import type { EntityId, PlayerId } from './ids';
 
 export interface WorldPos {
@@ -16,6 +17,9 @@ export type Command =
   | { type: 'move'; units: EntityId[]; to: WorldPos; queue?: boolean }
   | { type: 'interact'; units: EntityId[]; target: EntityId; queue?: boolean }
   | { type: 'stop'; units: EntityId[] }
+  /** Move, but fight every enemy met on the way, then continue. */
+  | { type: 'attackMove'; units: EntityId[]; to: WorldPos; queue?: boolean }
+  | { type: 'setStance'; units: EntityId[]; stance: Stance }
   | { type: 'train'; building: EntityId; unit: string }
   | { type: 'cancelTrain'; building: EntityId; index: number }
   | { type: 'setRally'; building: EntityId; to: WorldPos; target?: EntityId }

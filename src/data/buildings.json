@@ -1,5 +1,5 @@
 {
-  "note": "Building definitions (PLAN §2.5). 'actions' drive the command grid of a finished building (what it trains, with hotkeys); costs and times of trained units come from units.json. 'panel' lists the info fields shown when selected. Which buildings the player can place is listed in game.json → buildMenu; construction takes buildTime seconds (× pace.buildSpeed) and needs no workers.",
+  "note": "Building definitions (PLAN §2.5). 'actions' drive the command grid of a finished building (what it trains, with hotkeys); costs and times of trained units come from units.json. 'panel' lists the info fields shown when selected. Which buildings the player can place is listed in game.json → buildMenu; construction takes buildTime seconds (× pace.buildSpeed) and needs no workers. 'class' is used by damage bonuses and target priority; a finished building with an 'attack' shoots enemies in range by itself (PLAN §9.5).",
   "buildings": {
     "town_hall": {
       "name": "Town Hall",
@@ -12,7 +12,17 @@
       "popProvided": 5,
       "cost": { "wood": 300, "gold": 150 },
       "buildTime": 90,
-      "panel": ["hp", "armor", "pop", "queue"],
+      "class": "building",
+      "sight": 7,
+      "attack": {
+        "damage": 4,
+        "range": 6,
+        "cooldown": 2,
+        "projectile": "arrow",
+        "launchHeight": 2.3,
+        "targets": ["unit"]
+      },
+      "panel": ["hp", "armor", "attack", "pop", "queue"],
       "actions": [
         { "type": "train", "unit": "worker", "hotkey": "Q" },
         { "type": "setRally", "hotkey": "Z" }
@@ -48,6 +58,30 @@
         { "type": "train", "unit": "militia", "hotkey": "Q" },
         { "type": "setRally", "hotkey": "Z" }
       ]
+    },
+    "watch_tower": {
+      "name": "Watch Tower",
+      "description": "Sees far and shoots arrows at enemies in range.",
+      "model": "tower",
+      "icon": "bow",
+      "footprint": [1, 1],
+      "hp": 500,
+      "armor": 1,
+      "popProvided": 0,
+      "cost": { "wood": 125, "gold": 50 },
+      "buildTime": 35,
+      "class": "tower",
+      "sight": 9,
+      "attack": {
+        "damage": 6,
+        "range": 7,
+        "cooldown": 2,
+        "projectile": "arrow",
+        "launchHeight": 2.4,
+        "targets": ["unit"]
+      },
+      "panel": ["hp", "armor", "attack"],
+      "actions": []
     }
   }
 }

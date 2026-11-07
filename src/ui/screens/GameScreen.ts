@@ -23,6 +23,9 @@ import { CameraController } from '../input/CameraController';
 import { PlacementController } from '../input/PlacementController';
 import { SelectionController } from '../input/SelectionController';
 import { BuildingRenderer } from '../render/BuildingRenderer';
+import { Effects } from '../render/Effects';
+import { HealthBars } from '../render/HealthBars';
+import { ProjectileRenderer } from '../render/ProjectileRenderer';
 import { MoveMarkers } from '../render/MoveMarkers';
 import { UnitRenderer } from '../render/UnitRenderer';
 import { TileCursor } from '../three/TileCursor';
@@ -62,8 +65,11 @@ export class GameScreen {
   private readonly cursor = new TileCursor();
   private readonly minimap: Minimap;
   private readonly hud: GameHud;
-  private readonly units = new UnitRenderer();
-  private readonly buildings = new BuildingRenderer();
+  private readonly effects = new Effects();
+  private readonly bars = new HealthBars();
+  private readonly units = new UnitRenderer(this.effects, this.bars);
+  private readonly buildings = new BuildingRenderer(this.effects, this.bars);
+  private readonly projectiles = new ProjectileRenderer();
   private readonly markers = new MoveMarkers();
   private readonly selection: SelectionController;
   private readonly placement: PlacementController;
@@ -91,6 +97,9 @@ export class GameScreen {
       this.cursor.object,
       this.units.group,
       this.markers.group,
+      this.projectiles.group,
+      this.effects.group,
+      this.bars.group,
     );
     this.placement = new PlacementController({
       player: options.player,
@@ -128,6 +137,7 @@ export class GameScreen {
       onSelectIdleWorker: () => this.selectIdleWorker(),
       onBeginRally: (id) => this.selection.beginRally(id),
       onStartPlacement: (type) => this.placement.begin(type),
+      onBeginAttackMove: (ids) => this.selection.beginAttackMove(ids),
     });
     this.selection = new SelectionController({
       container,
@@ -145,6 +155,12 @@ export class GameScreen {
         );
       },
       isResource: (id) => !!this.lastView?.resources.has(id),
+      isEnemy: (id) => {
+        const v = this.lastView;
+        const owner =
+          v?.units.find((u) => u.id === id)?.owner ?? v?.buildings.find((b) => b.id === id)?.owner;
+        return owner !== undefined && owner !== options.player;
+      },
       onCommand: options.onCommand,
       onMoveMarker: (x, z, color) => this.markers.spawn(x, z, color),
       onChange: () => {},
@@ -177,8 +193,14 @@ export class GameScreen {
     this.syncResources(view);
     this.showEvents(events);
     this.camera.update(dtSeconds);
+    this.units.onEvents(events);
+    this.buildings.onEvents(events);
+    this.bars.begin();
     this.units.update(view, alpha, dtSeconds, this.selection.selected);
-    this.buildings.update(view, this.selection.selected);
+    this.buildings.update(view, this.selection.selected, dtSeconds);
+    this.projectiles.update(view, alpha);
+    this.effects.update(dtSeconds);
+    this.bars.end(this.world.rig.camera);
     this.selection.prune(
       (id) =>
         view.units.some((u) => u.id === id) ||
@@ -236,6 +258,16 @@ export class GameScreen {
         this.hud.message(`${displayName(e.unitType)} ready`);
       else if (e.type === 'buildingCompleted' && e.player === me)
         this.hud.message(`${displayName(e.buildingType)} finished`);
+      else if (e.type === 'underAttack' && e.player === me) {
+        this.hud.message('You are under attack!', 'warn');
+        this.minimap.ping(e.x, e.y);
+      } else if (e.type === 'buildingDestroyed')
+        this.hud.message(
+          e.owner === me
+            ? `Your ${displayName(e.buildingType)} was destroyed`
+            : `Enemy ${displayName(e.buildingType)} destroyed`,
+          e.owner === me ? 'warn' : 'info',
+        );
     }
   }
 

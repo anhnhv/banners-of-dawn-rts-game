@@ -18,19 +18,24 @@ export interface ScreenUnit {
   pickRadius: number;
 }
 
-/** The unit under the cursor: own units win over enemy units, then the nearest one. */
+/**
+ * The unit under the cursor, then the nearest one. `prefer` decides who wins an overlap: own units
+ * for selecting (default), enemy units for right-click orders.
+ */
 export function pickAt(
   units: readonly ScreenUnit[],
   x: number,
   y: number,
   player: PlayerId,
+  prefer: 'own' | 'enemy' = 'own',
 ): ScreenUnit | null {
   let best: ScreenUnit | null = null;
   let bestScore = Infinity;
   for (const u of units) {
     const d = Math.hypot(u.sx - x, u.sy - y);
     if (d > u.pickRadius) continue;
-    const score = d + (u.owner === player ? 0 : 1000);
+    const own = u.owner === player;
+    const score = d + ((prefer === 'own' ? !own : own) ? 1000 : 0);
     if (score < bestScore) {
       bestScore = score;
       best = u;

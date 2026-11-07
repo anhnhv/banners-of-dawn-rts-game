@@ -43,7 +43,8 @@ export type IconName =
   | 'tree'
   | 'bow'
   | 'horse'
-  | 'stop';
+  | 'stop'
+  | 'shield';
 
 const ICONS: Record<string, string[]> & Partial<Record<IconName, string[]>> = {
   food: [
@@ -257,6 +258,22 @@ ICONS.stop = [
   '..krrrrrrk..',
   '...kkkkkk...',
   '............',
+];
+
+/** Hold-ground stance. */
+ICONS.shield = [
+  '.kkkkkkkkkk.',
+  'kttttkkttttk',
+  'kttTtkytttTk',
+  'kttttkkttttk',
+  'kkkkkyykkkkk',
+  'ktttkyyktttk',
+  'kttTtkkttTtk',
+  '.ktttkkttTk.',
+  '.kttttttttk.',
+  '..kttttttk..',
+  '...kttttk...',
+  '....kkkk....',
 ];
 
 const cache = new Map<IconName, string>();

@@ -12,6 +12,8 @@ export interface BootOptions {
   mapId?: string | null;
   /** Dev: extra units for the human player (`?army=50`). */
   testArmy?: number;
+  /** Dev: enemy units between the bases (`?enemy=20`). */
+  testEnemy?: number;
   seed?: number;
 }
 
@@ -31,7 +33,11 @@ export async function bootGame(container: HTMLElement, options: BootOptions = {}
       showFatalError(container, `Map "${map.name}" is not valid`, result.errors);
       return;
     }
-    const game = createGame(map, { seed: options.seed ?? 1, testArmy: options.testArmy });
+    const game = createGame(map, {
+      seed: options.seed ?? 1,
+      testArmy: options.testArmy,
+      testEnemy: options.testEnemy,
+    });
     const host = new GameHost(game, 0);
     const screen = createGameScreen(container, map, {
       player: 0,

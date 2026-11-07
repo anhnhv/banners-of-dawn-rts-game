@@ -21,6 +21,8 @@ const TERRAIN_COLOR: Record<TerrainType, string> = {
   rock: 'stone-dark',
 };
 
+const PING_MS = 2500;
+
 export class Minimap {
   readonly element: HTMLCanvasElement;
   readonly projection: MinimapProjection;
@@ -30,6 +32,8 @@ export class Minimap {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly base: HTMLCanvasElement;
   private readonly dpr: number;
+  /** Alert pings (grid position, start time in ms). */
+  private pings: Array<{ x: number; z: number; t: number }> = [];
 
   constructor(
     private readonly map: DecodedMap,
@@ -51,6 +55,11 @@ export class Minimap {
     this.bindInput();
   }
 
+  /** Show a red expanding ping at a grid position (e.g. "under attack"). */
+  ping(x: number, z: number): void {
+    this.pings.push({ x, z, t: performance.now() });
+  }
+
   /** Redraw with the camera's ground footprint (4 grid points) and unit dots. */
   draw(
     cameraQuad: Array<{ x: number; z: number }> | null,
@@ -69,6 +78,21 @@ export class Minimap {
       const { u: mx, v: my } = gridToMinimap(p, u.x, u.z);
       ctx.fillStyle = u.owner === 1 ? '#ff5a4a' : '#7fb6ff';
       ctx.fillRect(Math.round(mx) - 1, Math.round(my) - 1, 2, 2);
+    }
+
+    const now = performance.now();
+    this.pings = this.pings.filter((pg) => now - pg.t < PING_MS);
+    for (const pg of this.pings) {
+      const k = (now - pg.t) / PING_MS;
+      const { u, v } = gridToMinimap(p, pg.x, pg.z);
+      for (const ring of [0, 0.35]) {
+        const r = ((k + ring) % 1) * 14 + 2;
+        ctx.beginPath();
+        ctx.arc(u, v, r, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(255, 70, 50, ${1 - ((k + ring) % 1)})`;
+        ctx.stroke();
+      }
     }
 
     if (cameraQuad && cameraQuad.length === 4) {
