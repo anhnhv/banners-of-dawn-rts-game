@@ -4,7 +4,13 @@
  * Coordinates are grid space: x to the right, y "down" (the renderer maps y to world z).
  */
 import type { PlayerId } from './ids';
-import { MapFileSchema, type MapFile, type MapObjectName, type TerrainType } from './mapSchema';
+import {
+  MapFileSchema,
+  type MapFile,
+  type MapObjectName,
+  type MapScenario,
+  type TerrainType,
+} from './mapSchema';
 
 export type MapObjectKind = 'tree' | 'pine' | 'gold_mine' | 'berry_bush' | 'stone' | 'spawn';
 
@@ -32,6 +38,8 @@ export interface DecodedMap {
   terrain: TerrainType[];
   objects: MapObject[];
   startUnits: Array<[string, number]>;
+  /** Ready-made start from the map file, if it has one (used when the game options ask for it). */
+  scenario: MapScenario | null;
 }
 
 /** Footprint (w, h) of each object kind. A spawn marks the Town Hall (3×3). */
@@ -124,6 +132,7 @@ export function decodeMap(raw: unknown): DecodedMap {
     terrain,
     objects,
     startUnits: file.start.units,
+    scenario: file.scenario ?? null,
   };
 }
 

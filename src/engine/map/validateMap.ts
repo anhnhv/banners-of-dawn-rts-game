@@ -3,6 +3,7 @@
  * Returns errors (the map must not be used) and warnings (worth a look, still playable).
  */
 import { objectCenter, type DecodedMap, type MapObject } from '../../shared';
+import { DATA } from '../data';
 import { TERRAIN_RULES } from './Grid';
 import { isResourceKind, loadMap, type LoadedMap, type ResourceNodeSpawn, type SpawnPoint } from './loadMap';
 
@@ -111,11 +112,62 @@ export function validateMap(map: DecodedMap): ValidationResult {
   }
 
   if (map.symmetry === 'rotate180') checkSymmetry(map, errors);
+  if (map.scenario) checkScenario(map, loaded, errors, warnings);
 
   return { errors, warnings, summary };
 }
 
 // ---- helpers --------------------------------------------------------------------------------------
+
+/** The optional ready-made start: types exist, footprints fit, gatherers have something to gather. */
+function checkScenario(map: DecodedMap, loaded: LoadedMap, errors: string[], warnings: string[]): void {
+  const { grid, resources } = loaded;
+  const seen = new Set<number>();
+  for (const setup of map.scenario?.players ?? []) {
+    const who = `scenario player ${setup.player}`;
+    if (seen.has(setup.player)) errors.push(`${who} is listed twice`);
+    seen.add(setup.player);
+    for (const r of Object.keys(setup.resources))
+      if (!(r in DATA.resources)) errors.push(`${who}: unknown resource "${r}"`);
+    let popCap = DATA.buildings.town_hall?.popProvided ?? 0;
+    for (const b of setup.buildings) {
+      const def = DATA.buildings[b.type];
+      const where = `${who}: ${b.type} at ${b.at[0]},${b.at[1]}`;
+      if (!def) {
+        errors.push(`${who}: unknown building "${b.type}"`);
+        continue;
+      }
+      const [w, h] = def.footprint;
+      if (!grid.isAreaBuildable(b.at[0], b.at[1], w, h)) {
+        errors.push(`${where} does not fit (outside the map, unbuildable or occupied)`);
+        continue;
+      }
+      grid.block(b.at[0], b.at[1], w, h); // later entries must not overlap it
+      if (b.constructed) popCap += def.popProvided;
+    }
+    let pop = 0;
+    for (const g of setup.units) {
+      const def = DATA.units[g.type];
+      const where = `${who}: ${g.type} at ${g.at[0]},${g.at[1]}`;
+      if (!def) {
+        errors.push(`${who}: unknown unit "${g.type}"`);
+        continue;
+      }
+      pop += def.pop * g.count;
+      if (!grid.inBounds(g.at[0], g.at[1])) errors.push(`${where} is outside the map`);
+      if (g.stance && !def.attack) errors.push(`${where}: a stance needs an attack`);
+      if (g.gather !== undefined) {
+        const kinds = Object.entries(def.interactions.gather?.targets ?? {})
+          .filter(([, rate]) => rate > 0)
+          .map(([kind]) => kind);
+        if (!resources.some((n) => n.resource === g.gather && kinds.includes(n.kind)))
+          errors.push(`${where} cannot gather "${g.gather}" on this map`);
+      }
+    }
+    if (pop > Math.min(popCap, DATA.game.popCap))
+      warnings.push(`${who}: ${pop} population but only room for ${Math.min(popCap, DATA.game.popCap)}`);
+  }
+}
 
 function checkOverlaps(map: DecodedMap, errors: string[]): void {
   const owner = new Int32Array(map.width * map.height).fill(-1);

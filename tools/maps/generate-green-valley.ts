@@ -180,6 +180,60 @@ for (const o of objects) {
   row[o.x] = OBJECT_CHAR[o.name];
 }
 
+/**
+ * Ready-made start used by default while testing (PLAN §8.1): both bases already built up with
+ * workers gathering; the enemy army waits in the middle of the map, well outside the range of its
+ * Town Hall and Watch Tower, so it can be fought without base fire. `?setup=standard` skips it.
+ */
+const SCENARIO: NonNullable<MapFileInput['scenario']> = {
+  name: 'Skirmish test',
+  description: 'Built-up bases, gathering workers and an army each; the enemy army waits mid-map.',
+  players: [
+    {
+      player: 1,
+      resources: { food: 600, wood: 600, gold: 400 },
+      buildings: [
+        { type: 'house', at: [64, 57] },
+        { type: 'house', at: [56, 62] },
+        { type: 'house', at: [59, 63] },
+        { type: 'house', at: [57, 65] },
+        { type: 'house', at: [52, 61] },
+        { type: 'barracks', at: [55, 53] },
+        { type: 'watch_tower', at: [52, 57] },
+      ],
+      units: [
+        { type: 'worker', at: [65, 61], count: 4, gather: 'wood' },
+        { type: 'worker', at: [57, 58], count: 3, gather: 'food' },
+        { type: 'worker', at: [62, 55], count: 3, gather: 'gold' },
+        { type: 'militia', at: [49, 54], count: 6 },
+        { type: 'archer', at: [48, 56], count: 4 },
+        { type: 'knight', at: [50, 52], count: 2 },
+        { type: 'scout_rider', at: [51, 50], count: 2 },
+      ],
+    },
+    {
+      player: 2,
+      buildings: [
+        { type: 'house', at: [15, 17] },
+        { type: 'house', at: [22, 16] },
+        { type: 'house', at: [18, 23] },
+        { type: 'house', at: [14, 23] },
+        { type: 'barracks', at: [26, 15] },
+        { type: 'watch_tower', at: [24, 24] },
+      ],
+      units: [
+        { type: 'worker', at: [14, 20], count: 4, gather: 'wood' },
+        { type: 'worker', at: [23, 20], count: 3, gather: 'food' },
+        { type: 'worker', at: [18, 25], count: 3, gather: 'gold' },
+        { type: 'militia', at: [39, 34], count: 6 },
+        { type: 'archer', at: [38, 36], count: 4 },
+        { type: 'knight', at: [41, 35], count: 2 },
+        { type: 'scout_rider', at: [41, 33], count: 1 },
+      ],
+    },
+  ],
+};
+
 const file: MapFileInput = {
   id: 'green_valley',
   name: 'Green Valley',
@@ -210,6 +264,7 @@ const file: MapFileInput = {
       ['scout_rider', 1],
     ],
   },
+  scenario: SCENARIO,
 };
 
 const decoded = decodeMap(file);

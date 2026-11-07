@@ -23,6 +23,7 @@ export function asciiMap(rows: string[], objects: MapObject[] = []): DecodedMap 
     terrain,
     objects,
     startUnits: [],
+    scenario: null,
   };
 }
 

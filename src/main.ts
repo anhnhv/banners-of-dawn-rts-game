@@ -2,6 +2,8 @@
  * Browser entry point. It wires modules together and contains no game logic.
  *   /             → the game
  *   /?map=<id>    → a specific map from maps/index.json
+ *                   (the map's ready-made `scenario` start is used when it has one)
+ *   /?setup=standard → the standard start instead (Town Hall + map start.units only)
  *   /?army=<n>    → dev: give the human player n extra units to test movement
  *   /?enemy=<n>   → dev: n enemy units between the bases, to test combat
  *   /?preview     → the style-preview diorama (keys 1 2 3 switch views)
@@ -21,5 +23,6 @@ else {
     mapId: params.get('map'),
     testArmy: Number.isFinite(army) ? Math.min(400, Math.max(0, army)) : 0,
     testEnemy: Number.isFinite(enemy) ? Math.min(400, Math.max(0, enemy)) : 0,
+    scenario: params.get('setup') !== 'standard',
   });
 }

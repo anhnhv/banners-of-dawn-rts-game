@@ -11,6 +11,7 @@ import {
   type Command,
   type CommandEnvelope,
   type DecodedMap,
+  type MapScenario,
   type EntityId,
   type GameEvent,
   type PlayerId,
@@ -48,6 +49,11 @@ export interface GameOptions {
   testArmy?: number;
   /** Dev/testing: spawn this many enemy units between the bases. */
   testEnemy?: number;
+  /**
+   * Use the map's ready-made `scenario` (buildings, armies, gathering workers) instead of the
+   * standard start. Ignored when the map has none. Off unless asked for.
+   */
+  scenario?: boolean;
 }
 
 const TEST_ARMY_MIX: UnitTypeId[] = ['militia', 'militia', 'archer', 'knight', 'worker', 'scout_rider'];
@@ -105,8 +111,12 @@ export class Game {
     // Town Halls at the spawns (tiles already blocked by loadMap), then starting units.
     for (const spawn of this.loaded.spawns)
       this.addBuilding(spawn.player, SPAWN_BUILDING, spawn, false, true);
-    for (const spawn of this.loaded.spawns) {
-      for (const [type, count] of map.startUnits) if (DATA.units[type]) this.spawnAround(spawn, type, count);
+    if (options.scenario && map.scenario) this.applyScenario(map.scenario);
+    else {
+      for (const spawn of this.loaded.spawns) {
+        for (const [type, count] of map.startUnits)
+          if (DATA.units[type]) this.spawnAround(spawn, type, count);
+      }
     }
     const home = this.loaded.spawns.find((s) => s.player === 0);
     if (home && options.testArmy) this.spawnTestArmy(home, options.testArmy);
@@ -567,6 +577,63 @@ export class Game {
         }
       }
     }
+  }
+
+  /**
+   * Ready-made start from the map file (PLAN §8.1). Entries the validator would reject (unknown
+   * types, blocked footprints) are skipped. Workers with `gather` get a gather command for tick 0,
+   * spread over the nearest nodes of that resource, so they go through the normal command path.
+   */
+  private applyScenario(scenario: MapScenario): void {
+    const { grid } = this.state;
+    for (const setup of scenario.players) {
+      const owner: PlayerId = setup.player === 1 ? 0 : 1;
+      const player = this.state.players.get(owner);
+      if (!player) continue;
+      for (const [r, v] of Object.entries(setup.resources))
+        if (r in player.resources) player.resources[r as keyof ResourceAmounts] = v;
+      for (const b of setup.buildings) {
+        const def = DATA.buildings[b.type];
+        if (!def) continue;
+        const rect = { x: b.at[0], y: b.at[1], w: def.footprint[0], h: def.footprint[1] };
+        if (!canPlace(this.state, rect)) continue;
+        this.addBuilding(owner, b.type, rect, true, b.constructed);
+      }
+      const assigned = new Map<EntityId, number>();
+      for (const group of setup.units) {
+        const def = DATA.units[group.type];
+        if (!def) continue;
+        const center = { x: group.at[0] + 0.5, y: group.at[1] + 0.5 };
+        for (const p of formationSlots(grid, center, group.count, 0.8)) {
+          const u = this.addUnit(owner, group.type, p.x, p.y);
+          if (group.stance && def.attack) u.stance = group.stance;
+          const node = group.gather ? this.nodeToGather(u, group.gather, assigned) : null;
+          if (node)
+            this.enqueue({
+              player: owner,
+              tick: 0,
+              cmd: { type: 'interact', units: [u.id], target: node.id },
+            });
+        }
+      }
+    }
+  }
+
+  /** Nearest node of `resource` this unit can gather, preferring nodes with fewer workers sent. */
+  private nodeToGather(u: Unit, resource: string, assigned: Map<EntityId, number>): ResourceNode | null {
+    let best: ResourceNode | null = null;
+    let bestScore = Infinity;
+    for (const n of this.state.nodes.values()) {
+      if (n.resource !== resource || n.amount <= 0 || gatherRate(u.type, n.kind) <= 0) continue;
+      const d = Math.hypot(n.x + n.w / 2 - u.x, n.y + n.h / 2 - u.y);
+      const score = d + 3 * (assigned.get(n.id) ?? 0);
+      if (score < bestScore - 1e-9 || (Math.abs(score - bestScore) <= 1e-9 && best && n.id < best.id)) {
+        best = n;
+        bestScore = score;
+      }
+    }
+    if (best) assigned.set(best.id, (assigned.get(best.id) ?? 0) + 1);
+    return best;
   }
 
   private spawnTestArmy(home: SpawnPoint, count: number): void {

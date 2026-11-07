@@ -14,6 +14,8 @@ export interface BootOptions {
   testArmy?: number;
   /** Dev: enemy units between the bases (`?enemy=20`). */
   testEnemy?: number;
+  /** Use the map's ready-made scenario start if it has one (default true; `?setup=standard` = off). */
+  scenario?: boolean;
   seed?: number;
 }
 
@@ -37,6 +39,7 @@ export async function bootGame(container: HTMLElement, options: BootOptions = {}
       seed: options.seed ?? 1,
       testArmy: options.testArmy,
       testEnemy: options.testEnemy,
+      scenario: options.scenario ?? true,
     });
     const host = new GameHost(game, 0);
     const screen = createGameScreen(container, map, {

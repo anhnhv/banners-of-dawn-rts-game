@@ -21,6 +21,52 @@ export type MapObjectName = (typeof MAP_OBJECT_NAMES)[number];
 
 const gridRows = z.array(z.string()).min(1);
 const legendChar = z.string().length(1);
+const tile = z.tuple([z.number().int(), z.number().int()]);
+
+/**
+ * Optional ready-made start (PLAN §8.1): extra buildings, units and resources per player, so a
+ * match can begin mid-game (used as the default setup while testing). When it is used it replaces
+ * `start.units`; the Town Halls at the spawns always stay. Coordinates are tiles (x, y).
+ */
+export const MapScenarioSchema = z.object({
+  name: z.string().default('Scenario'),
+  description: z.string().default(''),
+  players: z
+    .array(
+      z.object({
+        /** 1 = spawn_p1 (human), 2 = spawn_p2 (machine). */
+        player: z.union([z.literal(1), z.literal(2)]),
+        /** Replaces game.json → startingResources for the listed resources. */
+        resources: z.record(z.string(), z.number().int().min(0)).default({}),
+        buildings: z
+          .array(
+            z.object({
+              type: z.string(),
+              /** Top-left tile of the footprint. */
+              at: tile,
+              /** false = an unfinished construction site. */
+              constructed: z.boolean().default(true),
+            }),
+          )
+          .default([]),
+        units: z
+          .array(
+            z.object({
+              type: z.string(),
+              /** The group stands in formation around this tile (nearest free tiles). */
+              at: tile,
+              count: z.number().int().positive().default(1),
+              /** Start gathering this resource (food, wood, gold) at the nearest nodes. */
+              gather: z.string().optional(),
+              stance: z.enum(['aggressive', 'hold']).optional(),
+            }),
+          )
+          .default([]),
+      }),
+    )
+    .default([]),
+});
+export type MapScenario = z.infer<typeof MapScenarioSchema>;
 
 export const MapFileSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/, 'id must be lower_snake_case'),
@@ -44,6 +90,7 @@ export const MapFileSchema = z.object({
   start: z
     .object({ units: z.array(z.tuple([z.string(), z.number().int().positive()])) })
     .default({ units: [] }),
+  scenario: MapScenarioSchema.optional(),
 });
 
 export type MapFile = z.infer<typeof MapFileSchema>;

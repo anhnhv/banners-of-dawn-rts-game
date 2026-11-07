@@ -919,6 +919,22 @@ Maps are stored in **grid space** as character grids (grid x → world x, grid y
 - A spawn marker is the top-left (grid) tile of that player's 3×3 Town Hall. A `G` marker is the top-left tile of a 2×2 gold mine.
 - `maps/index.json` lists the maps in menu order.
 - **Rotate-180 symmetry** means the two bases mirror each other. The player always starts at the spawn nearer the camera (bottom of the screen), and the camera centers on it.
+- **`scenario`** (optional, added 2026-11-07): a ready-made start so testing does not begin from an empty base. **It is the default start in the browser**; `/?setup=standard` gives the plain start (Town Hall + `start.units`). In the engine it is opt-in (`GameOptions.scenario`), so tests get the standard start unless they ask. When used, it replaces `start.units` (the Town Halls at the spawns always stay). Per player:
+  ```jsonc
+  "scenario": {
+    "name": "Skirmish test",
+    "players": [{
+      "player": 1,                                   // 1 = spawn_p1 (human), 2 = spawn_p2 (machine)
+      "resources": { "food": 600, "wood": 600, "gold": 400 },   // replaces startingResources
+      "buildings": [{ "type": "house", "at": [64, 57] }, { "type": "barracks", "at": [55, 53], "constructed": true }],
+      "units": [
+        { "type": "worker", "at": [65, 61], "count": 4, "gather": "wood" },  // starts gathering at once
+        { "type": "militia", "at": [49, 54], "count": 6, "stance": "aggressive" }
+      ]
+    }]
+  }
+  ```
+  `at` is a tile: the top-left of a building footprint, or the center of a unit group's formation. Gatherers get a normal `interact` command on tick 0, spread over the nearest nodes of that resource. Green Valley's scenario is written by `tools/maps/generate-green-valley.ts` (edit it there, then `npm run maps:generate`): both bases have 4–5 Houses, a Barracks and a Watch Tower, 10 workers gathering food/wood/gold, and an army (6 Militia, 4 Archers, 2 Knights, 1–2 Scout Riders). The enemy army waits in the middle of the map (around 39,35), about 20 tiles from its Town Hall and well outside its Town Hall and tower range, so it can be fought without base fire.
 
 ### 8.2 Map validator (`engine/map/validateMap.ts`, run by `tools/validate-maps.ts`)
 1. The grid sizes match `size`, and every character is in the legend.
@@ -932,6 +948,7 @@ Maps are stored in **grid space** as character grids (grid x → world x, grid y
 5. The symmetry claim holds (decor may differ).
 6. Unreachable resources are reported as warnings.
 7. The spawn distance is ≥ 40 tiles.
+8. `scenario` (if present): unit, building and resource names exist; every footprint is inside the map, buildable and free (also of earlier scenario buildings); unit groups are inside the map; `gather` names a resource the unit can gather on this map; a stance needs an attack; population above the room the scenario gives is a warning.
 
 ### 8.3 Starter maps
 | Map | Size | Layout | Feel |
@@ -1390,6 +1407,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Gathering | **No carrying or drop sites**: harvested resources go straight to the stockpile (2026-11-06) |
 | Work animation | Gentle side-to-side sway and swinging arms, not a strong forward/back lean (2026-11-06) |
 | Combat config | Every entity is configurable (2026-11-07): attacks, bonuses, projectiles, behavior near enemies, target priority and combat rules live in `src/data/*.json` (§9.5); code stays generic |
+| Default start for testing | The map's `scenario` (§8.1) is the default start (2026-11-07): built-up bases, gathering workers, an army each; the enemy army stands away from its base so it can be fought without base fire. `/?setup=standard` = plain start |
 
 ### Current status (updated 2026-11-07)
 | Milestone | State |
@@ -1398,10 +1416,11 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | M3 Economy (data-driven) | ✅ done and committed |
 | M4 Construction without workers + economy changes | ✅ done (2026-11-07) |
 | M5 Combat | ✅ done (2026-11-07) |
+| Test scenario start (map `scenario`, §8.1) | ✅ done (2026-11-07) |
 | **M6 Full content** | next |
 
 **How to resume:**
-1. `nvm use && npm install && npm run dev`, then open `/?army=50` to see the current state (`/?army=20&enemy=20` for a battle).
+1. `nvm use && npm install && npm run dev`, then open `/`: it starts from Green Valley's ready-made scenario (built bases, gathering workers, an army each; the enemy army waits mid-map). `/?setup=standard` = plain start; `/?army=20&enemy=20` adds extra test units.
 2. `npm run check` must stay green (typecheck, lint with module boundaries, map validation, tests).
 3. Continue with the first unchecked milestone in §12.
 4. After each milestone: tick its checklist, add implementation notes under it, update this table, commit.
