@@ -21,6 +21,11 @@ export interface Building extends Rect {
   type: BuildingTypeId;
   hp: number;
   maxHp: number;
+  /** False while it is a construction site. */
+  constructed: boolean;
+  /** Construction ticks done and needed. */
+  buildProgress: number;
+  buildTotal: number;
   queue: QueueItem[];
   /** First queue item is done but there is no population room yet. */
   popBlocked: boolean;

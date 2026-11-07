@@ -18,7 +18,11 @@ export type Command =
   | { type: 'stop'; units: EntityId[] }
   | { type: 'train'; building: EntityId; unit: string }
   | { type: 'cancelTrain'; building: EntityId; index: number }
-  | { type: 'setRally'; building: EntityId; to: WorldPos; target?: EntityId };
+  | { type: 'setRally'; building: EntityId; to: WorldPos; target?: EntityId }
+  /** Place a construction site (top-left tile `at`). No workers needed: it builds itself. */
+  | { type: 'build'; building: string; at: { x: number; y: number } }
+  /** Cancel a construction site for a full refund. */
+  | { type: 'cancelBuild'; building: EntityId };
 
 export type CommandType = Command['type'];
 
@@ -38,4 +42,5 @@ export type RejectReason =
   | 'QUEUE_FULL'
   | 'NOT_ENOUGH_FOOD'
   | 'NOT_ENOUGH_WOOD'
-  | 'NOT_ENOUGH_GOLD';
+  | 'NOT_ENOUGH_GOLD'
+  | 'BAD_PLACEMENT';

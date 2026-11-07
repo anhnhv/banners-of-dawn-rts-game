@@ -1,5 +1,5 @@
 {
-  "note": "Unit definitions (PLAN §2.4). Times in seconds, speed in tiles/second, radius in tiles. 'interactions' say what the unit can do with other entities (right-click): gather lists the node kinds it can harvest and the rate per second. 'actions' drive the command grid; 'panel' lists info fields shown when selected. Combat fields are used from M5.",
+  "note": "Unit definitions (PLAN §2.4). Times in seconds, speed in tiles/second, radius in tiles. 'interactions' say what the unit can do with other entities (right-click): gather lists the node kinds it can harvest and the rate per second (harvested resources go straight to the stockpile). 'actions' drive the command grid; 'panel' lists info fields shown when selected. Combat fields are used from M5.",
   "units": {
     "worker": {
       "name": "Worker",
@@ -19,11 +19,10 @@
       "attack": { "damage": 3, "range": 0, "cooldown": 1.5 },
       "interactions": {
         "gather": {
-          "carry": 10,
           "targets": { "tree": 0.4, "pine": 0.4, "berry_bush": 0.45, "gold_mine": 0.35 }
         }
       },
-      "panel": ["hp", "armor", "speed", "carry", "task"],
+      "panel": ["hp", "armor", "speed", "gatherRate", "task"],
       "actions": [{ "type": "stop", "hotkey": "W" }]
     },
     "militia": {

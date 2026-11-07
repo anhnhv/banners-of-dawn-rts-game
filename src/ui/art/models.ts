@@ -304,6 +304,17 @@ export interface LegPart {
 export interface UnitPartGeometry {
   body: BuiltGeometry;
   legs: LegPart[];
+  /** Left and right arm (people only), pivoting at the shoulder. Tools are part of the arm. */
+  arms: LegPart[];
+}
+
+/** One arm hanging from the shoulder pivot (x, y, 0), with the hand and an optional tool. */
+function arm(team: TeamName, color: string, x: number, y: number, tool?: (b: VoxelBuilder) => void): LegPart {
+  const b = builder(team);
+  b.boxC(0, -0.17, 0, 0.07, 0.17, 0.09, 'cloth', color);
+  b.boxC(0, -0.2, 0, 0.065, 0.04, 0.085, 'plain', 'skin');
+  tool?.(b);
+  return { geometry: b.build(), pivot: [x, y, 0] };
 }
 
 /** A unit as a scene-graph group (used by the style preview). */
@@ -312,13 +323,10 @@ export interface UnitParts {
   legs: THREE.Object3D[];
 }
 
-function humanoid(b: VoxelBuilder, y0: number, torso: string, arms: string): void {
+/** Torso and head of a person. Arms are separate parts (see arm()) so they can swing. */
+function humanoid(b: VoxelBuilder, y0: number, torso: string): void {
   b.boxC(0, y0, 0, 0.26, 0.2, 0.16, 'cloth', torso);
   b.boxC(0, y0 + 0.03, 0, 0.27, 0.035, 0.17, 'plain', 'leather');
-  b.boxC(0.165, y0 + 0.03, 0, 0.07, 0.17, 0.09, 'cloth', arms);
-  b.boxC(-0.165, y0 + 0.03, 0, 0.07, 0.17, 0.09, 'cloth', arms);
-  b.boxC(0.165, y0, 0, 0.065, 0.04, 0.085, 'plain', 'skin');
-  b.boxC(-0.165, y0, 0, 0.065, 0.04, 0.085, 'plain', 'skin');
   b.boxC(0, y0 + 0.2, 0, 0.21, 0.2, 0.2, 'plain', 'skin');
   b.boxC(0.05, y0 + 0.28, 0.1, 0.035, 0.045, 0.01, 'plain', 'ink');
   b.boxC(-0.05, y0 + 0.28, 0.1, 0.035, 0.045, 0.01, 'plain', 'ink');
@@ -358,6 +366,7 @@ function horse(b: VoxelBuilder, team: TeamName, coat: string, dark: string, legs
 export function unitParts(model: UnitModel, team: TeamName): UnitPartGeometry {
   const b = builder(team);
   const legs: LegPart[] = [];
+  const arms: LegPart[] = [];
   const hip = 0.17;
 
   if (model === 'knight') {
@@ -386,12 +395,18 @@ export function unitParts(model: UnitModel, team: TeamName): UnitPartGeometry {
     b.boxC(0.2, 0.545, 0.42, 0.05, 0.05, 0.08, 'plain', 'iron');
   } else {
     const torso = model === 'worker' ? 'team-light' : 'team';
-    humanoid(b, hip, torso, model === 'worker' ? 'cloth' : 'team-dark');
+    humanoid(b, hip, torso);
+    const sleeve = model === 'worker' ? 'cloth' : 'team-dark';
+    const shoulder = hip + 0.2;
+    const axe = (a: VoxelBuilder): void => {
+      a.boxC(0.035, -0.22, 0.07, 0.03, 0.3, 0.03, 'bark', 'wood'); // handle
+      a.boxC(0.035, 0.02, 0.11, 0.03, 0.08, 0.08, 'plain', 'iron'); // head
+    };
+    arms.push(arm(team, sleeve, -0.165, shoulder));
+    arms.push(arm(team, sleeve, 0.165, shoulder, model === 'worker' ? axe : undefined));
     if (model === 'worker') {
       b.boxC(0, hip + 0.4, 0, 0.32, 0.035, 0.32, 'thatch', 'straw');
       b.boxC(0, hip + 0.435, 0, 0.17, 0.06, 0.17, 'thatch', 'straw');
-      b.boxC(0.2, hip - 0.02, 0.07, 0.03, 0.3, 0.03, 'bark', 'wood'); // axe handle
-      b.boxC(0.2, hip + 0.22, 0.11, 0.03, 0.08, 0.08, 'plain', 'iron');
     } else if (model === 'militia') {
       b.boxC(0, hip + 0.37, 0, 0.23, 0.09, 0.23, 'plain', 'iron');
       b.boxC(0, hip + 0.33, 0, 0.26, 0.03, 0.26, 'plain', 'iron-dark');
@@ -413,19 +428,61 @@ export function unitParts(model: UnitModel, team: TeamName): UnitPartGeometry {
     legs.push(leg(team, legColor, 0.09, hip, 0.1, 0.065, hip, 0));
     legs.push(leg(team, legColor, 0.09, hip, 0.1, -0.065, hip, 0));
   }
-  return { body: b.build(), legs };
+  return { body: b.build(), legs, arms };
 }
 
 /** Unit as a scene-graph group with separate leg meshes (style preview). */
 export function buildUnit(model: UnitModel, team: TeamName): UnitParts {
   const parts = unitParts(model, team);
   const group = new THREE.Group();
-  const legs = parts.legs.map((l) => {
+  const part = (l: LegPart): THREE.Mesh => {
     const mesh = meshFrom(l.geometry);
     mesh.position.set(...l.pivot);
     return mesh;
-  });
-  group.add(meshFrom(parts.body), ...legs);
+  };
+  const legs = parts.legs.map(part);
+  group.add(meshFrom(parts.body), ...legs, ...parts.arms.map(part));
   group.name = `${team}:${model}`;
   return { group, legs };
+}
+
+// ---- Construction site (one generic look for every building) --------------------------------
+
+/**
+ * Static part of a construction site for a w×h footprint: a dirt-and-plank foundation, scaffold
+ * posts at the corners (and along long sides) and rails at two heights. Used for EVERY building
+ * type while it is being built.
+ */
+export function constructionSiteGeometry(w: number, h: number, height: number): BuiltGeometry {
+  const b = builder('blue');
+  b.box(0.05, 0, 0.05, w - 0.1, 0.08, h - 0.1, 'soil', 'dirt', { top: 'planks', topColor: 'wood-light' });
+  const posts: Array<[number, number]> = [];
+  for (let x = 0; x <= w; x += Math.max(1, w / Math.ceil(w / 1.5))) {
+    posts.push([x, 0], [x, h]);
+  }
+  for (let z = 0; z <= h; z += Math.max(1, h / Math.ceil(h / 1.5))) {
+    posts.push([0, z], [w, z]);
+  }
+  for (const [px, pz] of posts) {
+    const x = Math.min(w - 0.12, Math.max(0.04, px - 0.04));
+    const z = Math.min(h - 0.12, Math.max(0.04, pz - 0.04));
+    b.box(x, 0.08, z, 0.08, height, 0.08, 'planks', 'wood');
+  }
+  for (const y of [height * 0.45, height]) {
+    b.box(0.04, y, 0.04, w - 0.08, 0.06, 0.06, 'planks', 'wood-dark');
+    b.box(0.04, y, h - 0.1, w - 0.08, 0.06, 0.06, 'planks', 'wood-dark');
+    b.box(0.04, y, 0.04, 0.06, 0.06, h - 0.08, 'planks', 'wood-dark');
+    b.box(w - 0.1, y, 0.04, 0.06, 0.06, h - 0.08, 'planks', 'wood-dark');
+  }
+  // a few stacked planks and stones as building material
+  b.box(0.2, 0.08, 0.2, Math.min(0.7, w * 0.3), 0.12, 0.25, 'planks', 'wood-light');
+  b.box(w - 0.55, 0.08, h - 0.5, 0.35, 0.18, 0.3, 'rock', 'stone');
+  return b.build();
+}
+
+/** The part that grows with progress: a unit-height block (scaled in y by the renderer). */
+export function constructionCoreGeometry(w: number, h: number): BuiltGeometry {
+  const b = builder('blue');
+  b.box(0.25, 0, 0.25, w - 0.5, 1, h - 0.5, 'planks', 'wood-light', { top: 'planks', topColor: 'straw' });
+  return b.build();
 }

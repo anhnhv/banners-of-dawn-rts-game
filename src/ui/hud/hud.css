@@ -504,3 +504,32 @@
 .world-canvas.targeting {
   cursor: crosshair;
 }
+
+/* Build button (B): opens game.json → buildMenu in the command grid. */
+.hud-build {
+  position: absolute;
+  top: 300px;
+  left: 12px;
+  width: 64px;
+  height: 64px;
+}
+
+.px-btn.active {
+  box-shadow:
+    inset 4px 4px 0 var(--brass-lo),
+    inset -4px -4px 0 var(--brass-hi),
+    0 0 0 3px #ffe9a8;
+}
+
+/* construction progress (generic for every building type) */
+.hp-bar.build-bar {
+  background: #2a2416;
+}
+
+.hp-bar.build-bar > div {
+  background: linear-gradient(#ffe08a 0 50%, #e0a93a 50% 100%);
+}
+
+.world-canvas.placing {
+  cursor: copy;
+}

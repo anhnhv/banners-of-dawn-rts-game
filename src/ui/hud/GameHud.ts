@@ -39,6 +39,8 @@ export interface HudCallbacks {
   onCommand(cmd: Command): void;
   onSelectIdleWorker(): void;
   onBeginRally(building: EntityId): void;
+  /** A building was picked from the build menu: start placing it. */
+  onStartPlacement(building: string): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -81,6 +83,13 @@ export class GameHud {
   /** Elements updated every frame without a rebuild. */
   private live: Array<(view: PlayerView, sel: Selected) => void> = [];
   private actions: Array<{ key: string; run: () => void; enabled: () => boolean }> = [];
+  /** The Build button's menu is shown in the command grid (game.json → buildMenu). */
+  private buildMenuOpen = false;
+  /** Last frame's view and selection, so a toggle can rebuild at once (hotkeys right after B). */
+  private last: { view: PlayerView; selected: ReadonlySet<EntityId> } | null = null;
+  /** Selection when the build menu was opened; selecting something else closes the menu. */
+  private menuSelection = '';
+  private readonly buildBtn: HTMLButtonElement;
 
   constructor(
     container: HTMLElement,
@@ -116,7 +125,7 @@ export class GameHud {
 
     const help = el('div', 'hud-help panel');
     help.append(
-      el('div', '', `${map.name} · Right click: move / gather / rally`),
+      el('div', '', `${map.name} · Right click: move / gather / rally · B: build`),
       el('div', '', 'Click / drag: select · Double click: same type · Ctrl/Alt+1-9: group'),
       el('div', '', 'Arrows / edge / middle-drag: pan · Wheel: zoom · .: idle worker'),
     );
@@ -132,7 +141,14 @@ export class GameHud {
     this.grid = el('div', 'cmd-grid');
     bottom.append(this.portrait, this.info, this.grid);
 
-    this.root.append(bar, mapPanel, this.idleBtn, this.messages, help, this.hover, bottom);
+    this.buildBtn = el('button', 'px-btn hud-build');
+    this.buildBtn.type = 'button';
+    this.buildBtn.title =
+      'Build (B)\nChoose a building, then click on the map to place it. No workers needed.';
+    this.buildBtn.append(iconImg('hammer'), el('span', 'hotkey', 'B'));
+    this.buildBtn.addEventListener('click', () => this.toggleBuildMenu());
+
+    this.root.append(bar, mapPanel, this.idleBtn, this.buildBtn, this.messages, help, this.hover, bottom);
     container.append(this.root);
   }
 
@@ -149,8 +165,10 @@ export class GameHud {
     this.idleCount.textContent = String(idle);
     this.idleBtn.classList.toggle('empty', idle === 0);
 
+    this.last = { view, selected };
+    if (this.buildMenuOpen && [...selected].join(',') !== this.menuSelection) this.toggleBuildMenu(false);
     const sel = resolveSelection(view, selected);
-    const sig = signature(view, sel);
+    const sig = `${this.buildMenuOpen ? `menu:${menuAffordability(view)}` : ''}|${signature(view, sel)}`;
     if (sig !== this.signature) {
       this.signature = sig;
       this.rebuild(view, sel);
@@ -163,9 +181,26 @@ export class GameHud {
     }
   }
 
+  /** Open/close the build menu (Build button or B). */
+  toggleBuildMenu(open = !this.buildMenuOpen): void {
+    this.buildMenuOpen = open;
+    this.menuSelection = this.last ? [...this.last.selected].join(',') : '';
+    this.buildBtn.classList.toggle('active', open);
+    this.signature = ''; // force a rebuild
+    if (this.last) this.update(this.last.view, this.last.selected);
+  }
+
+  get isBuildMenuOpen(): boolean {
+    return this.buildMenuOpen;
+  }
+
   /** Command hotkeys of the current selection. Returns true if the key was used. */
   handleKey(e: KeyboardEvent): boolean {
     if (e.ctrlKey || e.altKey || e.metaKey) return false;
+    if (e.code === 'KeyB') {
+      this.toggleBuildMenu();
+      return true;
+    }
     const m = /^Key([A-Z])$/.exec(e.code);
     if (!m) return false;
     const action = this.actions.find((a) => a.key === m[1]);
@@ -211,6 +246,10 @@ export class GameHud {
     this.grid.replaceChildren();
     this.live = [];
     this.actions = [];
+    if (this.buildMenuOpen) {
+      this.buildMenu(view);
+      return;
+    }
     if (!sel) {
       this.info.append(el('div', 'sel-hint', 'Select a unit or building'));
       this.fillGrid([]);
@@ -230,6 +269,13 @@ export class GameHud {
       const b = sel.building;
       const def = DATA.buildings[b.type];
       this.portrait.append(iconImg(iconFor(def?.icon ?? '')));
+      if (!b.constructed) {
+        // Generic construction-site panel (the same for every building type).
+        this.header(def?.name ?? b.type, sel.own ? 'Under construction' : 'Enemy');
+        this.fields(['hp', 'construction'], view, (v) => v.buildings.find((x) => x.id === b.id) ?? null);
+        this.fillGrid(sel.own ? [this.cancelBuildButton(b.id)] : []);
+        return;
+      }
       this.header(def?.name ?? b.type, sel.own ? '' : 'Enemy');
       this.fields(def?.panel ?? [], view, (v) => v.buildings.find((x) => x.id === b.id) ?? null);
     } else {
@@ -247,6 +293,48 @@ export class GameHud {
           ? (DATA.buildings[sel.building.type]?.actions ?? [])
           : [];
     this.fillGrid(actions.map((a) => this.actionButton(a, view, sel)));
+  }
+
+  /** The build menu: one button per game.json → buildMenu entry, at the slot of its hotkey. */
+  private buildMenu(view: PlayerView): void {
+    this.portrait.append(iconImg('hammer'));
+    this.header('Build', 'Pick a building, then click the map (Esc: cancel)');
+    const list = el('div', 'sel-stats');
+    list.append(el('span', 'stat', 'Buildings construct themselves; no workers needed.'));
+    this.info.append(list);
+    const buttons = DATA.game.buildMenu.map((entry) => {
+      const def = DATA.buildings[entry.building];
+      const cost = costEntries(def?.cost ?? {});
+      const button = el('button', 'px-btn');
+      button.type = 'button';
+      button.title = `Build ${def?.name ?? entry.building} (${entry.hotkey})\n${cost
+        .map(([r, n]) => `${n} ${r}`)
+        .join(', ')} · ${def?.buildTime ?? 0}s\n${def?.description ?? ''}`;
+      button.append(iconImg(iconFor(def?.icon ?? '')), el('span', 'hotkey', entry.hotkey));
+      const enabled = (): boolean => cost.every(([r, n]) => view.self.resources[r] >= n);
+      if (!enabled()) button.classList.add('disabled');
+      const run = (): void => {
+        this.toggleBuildMenu(false);
+        this.cb.onStartPlacement(entry.building);
+      };
+      button.addEventListener('click', () => {
+        if (enabled()) run();
+      });
+      this.actions.push({ key: entry.hotkey, run, enabled });
+      return { key: entry.hotkey, button };
+    });
+    this.fillGrid(buttons);
+  }
+
+  private cancelBuildButton(building: EntityId): { key: string; button: HTMLButtonElement } {
+    const button = el('button', 'px-btn');
+    button.type = 'button';
+    button.title = 'Cancel construction (C)\nFull refund.';
+    button.append(iconImg('stop'), el('span', 'hotkey', 'C'));
+    const run = (): void => this.cb.onCommand({ type: 'cancelBuild', building });
+    button.addEventListener('click', run);
+    this.actions.push({ key: 'C', run, enabled: () => true });
+    return { key: 'C', button };
   }
 
   private header(name: string, sub: string): void {
@@ -290,6 +378,22 @@ export class GameHud {
           if (!e || !('hp' in e)) return;
           fill.style.width = `${(100 * e.hp) / e.maxHp}%`;
           label.textContent = `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
+        });
+      } else if (f === 'construction') {
+        // generic for every building type: progress bar + percent + time left
+        const bar = el('div', 'hp-bar build-bar');
+        const fill = el('div');
+        bar.append(fill);
+        const label = el('span', 'stat', '');
+        this.info.insertBefore(bar, stats);
+        stats.append(label);
+        this.live.push((v) => {
+          const e = current(v);
+          if (!e || !('buildProgress' in e)) return;
+          fill.style.width = `${Math.round(e.buildProgress * 100)}%`;
+          const total = (DATA.buildings[e.type]?.buildTime ?? 0) / DATA.game.pace.buildSpeed;
+          const left = Math.ceil((1 - e.buildProgress) * total);
+          label.textContent = `Building ${Math.floor(e.buildProgress * 100)}% · ${left}s left`;
         });
       } else if (f === 'queue') {
         const row = el('div', 'queue');
@@ -426,9 +530,14 @@ function fieldText(f: PanelField, e: UnitView | BuildingView | ResourceView, vie
         return `Speed ${def?.speed ?? 0}`;
       case 'sight':
         return `Sight ${def?.sight ?? 0}`;
-      case 'carry': {
-        const cap = def?.interactions.gather?.carry ?? 0;
-        return e.carry ? `Carrying ${e.carry.amount}/${cap} ${e.carry.resource}` : `Carries ${cap}`;
+      case 'gatherRate': {
+        // best rate per resource type, from interactions.gather.targets
+        const best = new Map<string, number>();
+        for (const [kind, rate] of Object.entries(def?.interactions.gather?.targets ?? {})) {
+          const r = DATA.nodes[kind]?.resource;
+          if (r) best.set(r, Math.max(best.get(r) ?? 0, rate));
+        }
+        return [...best].map(([r, rate]) => `${r} ${rate}/s`).join(' · ');
       }
       case 'task':
         return e.task;
@@ -453,6 +562,7 @@ function signature(view: PlayerView, sel: Selected): string {
   if (sel.kind === 'units') return `u:${sel.units.map((u) => u.id).join(',')}`;
   if (sel.kind === 'resource') return `r:${sel.resource.id}`;
   const b = sel.building;
+  if (!b.constructed) return `site:${b.id}`;
   const afford = (DATA.buildings[b.type]?.actions ?? [])
     .map((a) =>
       a.type === 'train'
@@ -463,4 +573,15 @@ function signature(view: PlayerView, sel: Selected): string {
     )
     .join('');
   return `b:${b.id}:${b.queue.map((q) => q.unit).join(',')}:${b.popBlocked}:${afford}`;
+}
+
+/** Which build-menu entries are affordable (changes → the menu is rebuilt). */
+function menuAffordability(view: PlayerView): string {
+  return DATA.game.buildMenu
+    .map((e) =>
+      costEntries(DATA.buildings[e.building]?.cost ?? {}).every(([r, n]) => view.self.resources[r] >= n)
+        ? 1
+        : 0,
+    )
+    .join('');
 }

@@ -3,11 +3,11 @@ import type { EntityId, PlayerId, ResourceType, UnitActivity, UnitTypeId } from 
 import { DATA } from '../data';
 import type { Point } from '../path/smoothing';
 
-export type GatherPhase = 'toNode' | 'harvest' | 'toDrop';
+export type GatherPhase = 'toNode' | 'harvest';
 
 export type Order =
   | { kind: 'move'; x: number; y: number }
-  /** Harvest `target`, carry to the nearest drop site, repeat; retargets nodes of the same resource. */
+  /** Harvest `target` straight into the stockpile; retargets nodes of the same resource when it runs out. */
   | {
       kind: 'gather';
       target: EntityId;
@@ -15,9 +15,7 @@ export type Order =
       phase: GatherPhase;
       lastX: number;
       lastY: number;
-    }
-  /** Drop off what is carried at a specific building, then stop. */
-  | { kind: 'deposit'; target: EntityId };
+    };
 
 export interface Unit {
   id: EntityId;
@@ -37,7 +35,6 @@ export interface Unit {
   /** orders[0] is the current order; the rest were queued with shift. */
   orders: Order[];
   activity: UnitActivity;
-  carry: { resource: ResourceType; amount: number } | null;
   /** Fractional harvest progress toward the next whole resource unit. */
   workProgress: number;
 
@@ -76,7 +73,6 @@ export function createUnit(id: EntityId, owner: PlayerId, type: UnitTypeId, x: n
     pop: def.pop,
     orders: [],
     activity: 'idle',
-    carry: null,
     workProgress: 0,
     goal: null,
     path: null,
@@ -103,8 +99,4 @@ export function clearPath(u: Unit): void {
 /** Gather rate (per second) of this unit type for a node kind, or 0 if it cannot gather it. */
 export function gatherRate(type: UnitTypeId, nodeKind: string): number {
   return DATA.units[type]?.interactions.gather?.targets[nodeKind] ?? 0;
-}
-
-export function carryCapacity(type: UnitTypeId): number {
-  return DATA.units[type]?.interactions.gather?.carry ?? 0;
 }

@@ -31,7 +31,6 @@ export interface UnitView {
   /** Short description of the current order, e.g. "Gathering wood". */
   task: string;
   hasOrders: boolean;
-  carry: { resource: ResourceType; amount: number } | null;
   radius: number;
   hp: number;
   maxHp: number;
@@ -53,6 +52,10 @@ export interface BuildingView {
   h: number;
   hp: number;
   maxHp: number;
+  /** False while it is still a construction site. */
+  constructed: boolean;
+  /** Construction progress 0..1 (1 when finished). */
+  buildProgress: number;
   queue: readonly QueueItemView[];
   /** True while the first queue item is finished but waiting for population room. */
   popBlocked: boolean;
@@ -74,6 +77,7 @@ export type GameEvent =
   | { type: 'commandRejected'; player: PlayerId; reason: string }
   | { type: 'unitTrained'; player: PlayerId; unit: EntityId; unitType: UnitTypeId }
   | { type: 'popCapped'; player: PlayerId; building: EntityId }
+  | { type: 'buildingCompleted'; player: PlayerId; building: EntityId; buildingType: BuildingTypeId }
   | { type: 'resourceDepleted'; node: EntityId };
 
 export interface PlayerView {

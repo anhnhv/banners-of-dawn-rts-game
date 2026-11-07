@@ -18,11 +18,12 @@ export const PANEL_FIELDS = [
   'armor',
   'speed',
   'sight',
-  'carry',
+  'gatherRate',
   'task',
   'pop',
   'queue',
   'amount',
+  'construction',
 ] as const;
 export type PanelField = (typeof PANEL_FIELDS)[number];
 
@@ -66,9 +67,7 @@ export const UnitDefSchema = z.object({
   interactions: z
     .object({
       /** Node kinds this unit can harvest, with the rate (resource per second) for each. */
-      gather: z
-        .object({ carry: z.number().int().positive(), targets: z.record(z.string(), z.number().positive()) })
-        .optional(),
+      gather: z.object({ targets: z.record(z.string(), z.number().positive()) }).optional(),
     })
     .default({}),
 });
@@ -80,8 +79,6 @@ export const BuildingDefSchema = z.object({
   hp: z.number().positive(),
   armor: z.number().min(0),
   popProvided: z.number().int().min(0),
-  /** Resource types workers may drop off here. */
-  dropSite: z.array(z.enum(RESOURCE_TYPES)).default([]),
   cost,
   buildTime: z.number().positive(),
 });
@@ -107,6 +104,9 @@ export const GameConfigSchema = z.object({
     buildSpeed: z.number().positive(),
   }),
   production: z.object({ queueMax: z.number().int().positive() }),
+  /** Buildings the player can place from the Build button (no workers needed). */
+  buildMenu: z.array(z.object({ building: z.string(), hotkey })),
+  construction: z.object({ startHpFraction: z.number().min(0.01).max(1) }),
   gathering: z.object({ retargetRadius: z.number().positive(), reach: z.number().positive() }),
 });
 export type GameConfig = z.infer<typeof GameConfigSchema>;
@@ -170,6 +170,12 @@ export function parseGameData(raw: RawGameData): GameData {
     }
   }
   for (const [id, b] of Object.entries(buildings)) checkActions(`buildings.${id}`, b.actions);
+  for (const entry of game.buildMenu) {
+    if (!buildings[entry.building]) issues.push(`game.buildMenu: unknown building "${entry.building}"`);
+  }
+  const menuKeys = game.buildMenu.map((e) => e.hotkey);
+  const menuDup = menuKeys.find((k, i) => menuKeys.indexOf(k) !== i);
+  if (menuDup) issues.push(`game.buildMenu: hotkey "${menuDup}" is used twice`);
   if (issues.length > 0) throw new GameDataError(issues);
 
   return { units, buildings, nodes, resources, game };

@@ -1,5 +1,5 @@
 {
-  "note": "Building definitions (PLAN §2.5). 'actions' drive the command grid: what can be trained/researched here, with hotkeys. Costs and times of trained units come from units.json. 'panel' lists the info fields shown when selected.",
+  "note": "Building definitions (PLAN §2.5). 'actions' drive the command grid of a finished building (what it trains, with hotkeys); costs and times of trained units come from units.json. 'panel' lists the info fields shown when selected. Which buildings the player can place is listed in game.json → buildMenu; construction takes buildTime seconds (× pace.buildSpeed) and needs no workers.",
   "buildings": {
     "town_hall": {
       "name": "Town Hall",
@@ -10,7 +10,6 @@
       "hp": 1500,
       "armor": 1,
       "popProvided": 5,
-      "dropSite": ["food", "wood", "gold"],
       "cost": { "wood": 300, "gold": 150 },
       "buildTime": 90,
       "panel": ["hp", "armor", "pop", "queue"],
@@ -28,7 +27,6 @@
       "hp": 300,
       "armor": 1,
       "popProvided": 5,
-      "dropSite": [],
       "cost": { "wood": 30 },
       "buildTime": 15,
       "panel": ["hp", "armor"],
@@ -43,7 +41,6 @@
       "hp": 1000,
       "armor": 1,
       "popProvided": 0,
-      "dropSite": [],
       "cost": { "wood": 150 },
       "buildTime": 40,
       "panel": ["hp", "armor", "queue"],

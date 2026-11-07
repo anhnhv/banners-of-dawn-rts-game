@@ -28,7 +28,14 @@ import { PathFinder } from './path/astar';
 import { assignSlots, formationSlots } from './path/groupMove';
 import { SpatialHash } from './spatial/SpatialHash';
 import { clearGoal, movementSystem, pathfindingSystem, separationSystem } from './systems/movement';
-import { acceptsDrop, describeTask, orderSystem } from './systems/orders';
+import {
+  buildTicks,
+  canPlace,
+  clearFootprint,
+  constructionSystem,
+  inBuildMenu,
+} from './systems/construction';
+import { describeTask, orderSystem } from './systems/orders';
 import { canTrain, populationOf, productionSystem, shortOf, trainTicks } from './systems/production';
 
 export interface GameOptions {
@@ -85,7 +92,8 @@ export class Game {
       this.state.nodeViews.set(node.id, { ...node });
     }
     // Town Halls at the spawns (tiles already blocked by loadMap), then starting units.
-    for (const spawn of this.loaded.spawns) this.addBuilding(spawn.player, SPAWN_BUILDING, spawn, false);
+    for (const spawn of this.loaded.spawns)
+      this.addBuilding(spawn.player, SPAWN_BUILDING, spawn, false, true);
     for (const spawn of this.loaded.spawns) {
       for (const [type, count] of map.startUnits) if (DATA.units[type]) this.spawnAround(spawn, type, count);
     }
@@ -142,6 +150,7 @@ export class Game {
       this.pending.splice(0, this.pending.length, ...this.pending.filter((c) => c.tick > s.tick));
       for (const env of due) this.apply(env);
     }
+    constructionSystem(s);
     productionSystem(s, (owner, type, x, y) => this.addUnit(owner, type, x, y));
     orderSystem(s);
     pathfindingSystem(s);
@@ -171,7 +180,6 @@ export class Game {
         activity: u.moving ? 'walk' : u.activity,
         task: describeTask(u),
         hasOrders: u.orders.length > 0,
-        carry: u.carry ? { ...u.carry } : null,
         radius: u.radius,
         hp: u.hp,
         maxHp: u.maxHp,
@@ -189,6 +197,8 @@ export class Game {
         h: b.h,
         hp: b.hp,
         maxHp: b.maxHp,
+        constructed: b.constructed,
+        buildProgress: b.constructed ? 1 : b.buildProgress / b.buildTotal,
         queue: b.queue.map((q) => ({ unit: q.unit, progress: q.total > 0 ? q.progress / q.total : 1 })),
         popBlocked: b.popBlocked,
         rally: b.rally ? { ...b.rally } : null,
@@ -224,7 +234,7 @@ export class Game {
       mix(u.x);
       mix(u.y);
       mix(u.orders.length);
-      mix(u.carry?.amount ?? -1);
+      mix(u.workProgress);
     }
     for (const p of this.state.players.values()) {
       mix(p.resources.food);
@@ -278,13 +288,6 @@ export class Game {
               },
               cmd.queue ?? false,
             );
-          } else if (
-            building &&
-            building.owner === u.owner &&
-            u.carry &&
-            acceptsDrop(building, u.carry.resource)
-          ) {
-            this.giveOrder(u, { kind: 'deposit', target: building.id }, cmd.queue ?? false);
           } else {
             movers.push(u);
           }
@@ -308,7 +311,7 @@ export class Game {
       case 'train': {
         const b = ownBuilding(cmd.building);
         if (!b) return reject('NOT_OWNER');
-        if (!canTrain(b, cmd.unit)) return reject('NOT_AVAILABLE');
+        if (!b.constructed || !canTrain(b, cmd.unit)) return reject('NOT_AVAILABLE');
         if (b.queue.length >= DATA.game.production.queueMax) return reject('QUEUE_FULL');
         const def = DATA.units[cmd.unit];
         const player = s.players.get(env.player);
@@ -336,9 +339,39 @@ export class Game {
       case 'setRally': {
         const b = ownBuilding(cmd.building);
         if (!b) return reject('NOT_OWNER');
-        if (!DATA.buildings[b.type]?.actions.some((a) => a.type === 'setRally'))
+        if (!b.constructed || !DATA.buildings[b.type]?.actions.some((a) => a.type === 'setRally'))
           return reject('NOT_AVAILABLE');
         b.rally = { x: cmd.to.x, y: cmd.to.y, ...(cmd.target !== undefined ? { target: cmd.target } : {}) };
+        return;
+      }
+      case 'build': {
+        const def = DATA.buildings[cmd.building];
+        const player = s.players.get(env.player);
+        if (!def || !player || !inBuildMenu(cmd.building)) return reject('NOT_AVAILABLE');
+        const rect = {
+          x: Math.floor(cmd.at.x),
+          y: Math.floor(cmd.at.y),
+          w: def.footprint[0],
+          h: def.footprint[1],
+        };
+        if (!canPlace(s, rect)) return reject('BAD_PLACEMENT');
+        const short = shortOf(player.resources, def.cost);
+        if (short) return reject(`NOT_ENOUGH_${short.toUpperCase()}`);
+        for (const [r, v] of Object.entries(def.cost)) player.resources[r as keyof ResourceAmounts] -= v ?? 0;
+        this.addBuilding(env.player, cmd.building, rect, true, false);
+        clearFootprint(s, rect);
+        return;
+      }
+      case 'cancelBuild': {
+        const b = ownBuilding(cmd.building);
+        if (!b || b.constructed) return reject('NOT_AVAILABLE');
+        const player = s.players.get(env.player);
+        const def = DATA.buildings[b.type];
+        if (player && def)
+          for (const [r, v] of Object.entries(def.cost))
+            player.resources[r as keyof ResourceAmounts] += v ?? 0;
+        s.buildings.delete(b.id);
+        s.grid.unblock(b.x, b.y, b.w, b.h);
         return;
       }
       default:
@@ -380,7 +413,7 @@ export class Game {
   debugBuilding(owner: PlayerId, type: string, x: number, y: number): EntityId {
     const def = DATA.buildings[type];
     if (!def) throw new Error(`Unknown building "${type}"`);
-    return this.addBuilding(owner, type, { x, y, w: def.footprint[0], h: def.footprint[1] }, true).id;
+    return this.addBuilding(owner, type, { x, y, w: def.footprint[0], h: def.footprint[1] }, true, true).id;
   }
 
   /** Dev/test helper: add resources to a player. */
@@ -401,6 +434,7 @@ export class Game {
     type: string,
     rect: { x: number; y: number; w: number; h: number },
     block: boolean,
+    constructed: boolean,
   ): Building {
     const def = DATA.buildings[type];
     if (!def) throw new Error(`Unknown building "${type}"`);
@@ -412,8 +446,11 @@ export class Game {
       y: rect.y,
       w: rect.w,
       h: rect.h,
-      hp: def.hp,
+      hp: constructed ? def.hp : def.hp * DATA.game.construction.startHpFraction,
       maxHp: def.hp,
+      constructed,
+      buildProgress: 0,
+      buildTotal: buildTicks(type),
       queue: [],
       popBlocked: false,
       rally: null,

@@ -85,7 +85,7 @@ Multiplayer, campaign, multiple factions, naval units, garrisoning, trading, alt
 | **Wood** | Tree (100 each) | 0.40/s | Buildings, archers, siege |
 | **Gold** | Gold mine (2×2, 800 each) | 0.35/s | Advanced units, techs, era advances |
 
-- A worker carries **10** units of a resource (15 with the *Wheelbarrow* tech) and returns them to a **drop site** (Town Hall or Storehouse).
+- **No carrying, no drop-off (decided 2026-11-06):** every unit of resource a worker harvests goes **straight into the stockpile**. Workers stay at the node until it runs out. There are no drop sites.
 - When a node runs out, the worker automatically looks for the nearest node of the same type within **8 tiles**. If none is found, the worker goes idle and the idle-worker indicator lights up.
 - A farm takes **1 worker** and never runs out. Farms are **walkable**.
 - **Starting state (Standard):** 200 Food, 200 Wood, 100 Gold, 1 Town Hall, 3 Workers, 1 Scout Rider.
@@ -129,9 +129,9 @@ Counter triangle, checked against the numbers above:
 ### 2.5 Buildings
 | Building | Footprint | Era | Cost | Build time\* | HP | Function |
 |---|---|---|---|---|---|---|
-| Town Hall | 3×3 | I (start) / II (extra) | 300 W, 150 G | 90 s | 1500 | Drop site for everything, trains Worker, researches Eras, +5 pop, shoots arrows (4 dmg, range 6, every 2 s) |
+| Town Hall | 3×3 | I (start) / II (extra) | 300 W, 150 G | 90 s | 1500 | Trains Worker, researches Eras, +5 pop, shoots arrows (4 dmg, range 6, every 2 s) |
 | House | 2×2 | I | 30 W | 15 s | 300 | +5 pop |
-| Storehouse | 2×2 | I | 80 W | 20 s | 400 | Drop site for everything, economy techs |
+| Storehouse | 2×2 | I | 80 W | 20 s | 400 | Economy techs (no drop-off role any more) |
 | Farm | 2×2 | I | 60 W | 15 s | 200 | Infinite food, 1 worker, walkable |
 | Barracks | 3×3 | I | 150 W | 40 s | 1000 | Trains Militia |
 | Archery Range | 3×3 | II | 150 W | 40 s | 1000 | Trains Archer (requires Barracks) |
@@ -143,10 +143,10 @@ Counter triangle, checked against the numbers above:
 | Siege Workshop | 3×3 | III | 200 W | 50 s | 1000 | Trains Catapult |
 | Castle | 4×4 | III | 400 W, 300 G | 100 s | 3000 | Shoots 3 arrows (6 dmg, range 8), +10 pop |
 
-\*Build time is for 1 worker. With more workers, the build rate is `1 + 0.6 × (n − 1)` times the base rate.
+\***Construction needs no workers (decided 2026-11-06).** The player presses **Build**, picks a building from the build menu and places it. The cost is paid immediately and the construction site finishes on its own after `buildTime` seconds (× `pace.buildSpeed`).
 - All buildings have **armor 1**.
 - A building under construction has HP in proportion to its progress.
-- **Repair** costs 25% of the building's cost, scaled by the HP restored, and runs at half the build speed.
+- **Repair** (later) will also be a button on the building, not a worker job.
 - **Destroyed buildings** leave rubble for 30 s.
 - **Deleting your own building** refunds nothing, except a building not yet started, which is refunded 100%.
 
@@ -175,7 +175,6 @@ Counter triangle, checked against the numbers above:
 | Auto-target priority | 1) a unit attacking me, 2) military units, 3) workers, 4) towers, 5) other buildings |
 | Leash | An auto-acquired chase stops after 12 tiles, then the unit returns. Explicit attack orders have no leash |
 | Workers | Never auto-attack. They flee 4 tiles when hit while idle |
-| After building | A worker that built a Storehouse or Farm starts gathering nearby automatically |
 | Order queue | Shift + command appends to the unit's order queue (max 16) |
 
 ### 2.9 Win / Lose
@@ -486,10 +485,10 @@ export interface MatchRules {
 | `Health` | hp, maxHp, armor |
 | `Mover` | speed, path[], pathIndex, goal, stuckTicks, repathCooldown |
 | `Attacker` | attack, range, minRange, cooldownTicks, cooldownLeft, targetId, projectileType?, splash? |
-| `Gatherer` | carryType, carryAmount, capacity, rates{}, targetNode, lastNodePos |
+| `Gatherer` | rates{} (from config), targetNode, lastNodePos, work progress |
 | `Builder` | buildRate, repairRate |
 | `ResourceNode` | resType, amount, slots, infinite (farm) |
-| `Building` | type, tileX, tileY, w, h, constructed, progress, dropSite, popProvided, gateOwnerPassable |
+| `Building` | type, tileX, tileY, w, h, constructed, build progress, queue, rally, gateOwnerPassable |
 | `Producer` | queue[{kind, id, progressTicks}], rally |
 | `Vision` | sight |
 | `Orders` | queue: Order[], stance |
@@ -507,7 +506,7 @@ Entity storage: `Map<EntityId, Entity>` plus per-component index arrays. IDs are
 | 5 | PathfindingSystem | Process path requests within a per-tick budget (20k expanded nodes) |
 | 6 | MovementSystem | Follow paths. Apply terrain speed. Detect stuck units (no progress for 1 s → repath) |
 | 7 | SeparationSystem | Soft push between units through the spatial hash |
-| 8 | GatherSystem | Harvest, carry, drop off. Handle depletion and auto-retarget |
+| 8 | GatherSystem | Harvest straight into the stockpile. Handle depletion and auto-retarget |
 | 9 | TargetingSystem | Every 4 ticks: idle or aggressive units acquire targets |
 | 10 | CombatSystem | Count down cooldowns. Melee deals damage immediately; ranged spawns a projectile |
 | 11 | ProjectileSystem | Arrows home in (always hit). Catapult stones land at a point (can miss) and deal splash damage |
@@ -630,7 +629,7 @@ The machine player is **ordinary local TypeScript**: heuristics, state machines 
 | `EnemyMemory` | Every enemy unit ever seen: type, last position, last-seen tick. A unit counts as "probably alive" for 90 s. Enemy buildings come from the ghost list |
 | `Enemy base estimate` | The other spawn candidate, confirmed by scouting |
 | `ThreatMap` | Grid at 4×4-tile resolution. Each cell stores estimated enemy strength, decaying over time |
-| `ResourceClusters` | Wood lines, gold mines and berry clusters, each with distance to the nearest own drop site |
+| `ResourceClusters` | Wood lines, gold mines and berry clusters, each with distance to the own base |
 | `Own base` | Bounding region of own buildings plus 6 tiles, with "front" (toward the enemy) and "back" directions |
 | `Army strength` | `Σ (hp × dps × counterFactor)` for own units and estimated enemy units |
 
@@ -638,9 +637,9 @@ The machine player is **ordinary local TypeScript**: heuristics, state machines 
 | Manager | Responsibility | Key rules |
 |---|---|---|
 | **BudgetManager** | Share resources among competing requests | Priorities: emergency defense 100, house when ≤ 3 free pop 90, workers up to target 80, era advance 70, military 60, new buildings 50, techs 40. Reserved resources are not spent on lower priorities |
-| **EconomyManager** | Workers and gathering | Worker target per era from the strategy (e.g. 16 / 26 / 32, capped at 40% of pop cap). Keep the Town Hall producing workers. Assign idle workers to the resource furthest below its target ratio. Request a Storehouse when a cluster is more than 6 tiles from a drop site. Request Farms as berries run low |
+| **EconomyManager** | Workers and gathering | Worker target per era from the strategy (e.g. 16 / 26 / 32, capped at 40% of pop cap). Keep the Town Hall producing workers. Assign idle workers to the resource furthest below its target ratio. Request Farms as berries run low |
 | **BuildManager** | Building requests → `build` commands | Spot from `Placement`. Nearest non-critical worker as builder (prefer wood). Helpers for important buildings. Retry if rejected |
-| **Placement** | Where to build | Houses in the back ring 4–8 tiles from the Town Hall. Storehouses at the cluster centroid. Military buildings toward the front, 6–10 tiles out. Towers at chokepoints and resource lines. Always leave a **1-tile gap** and run a **flood-fill check** so the AI never walls itself in |
+| **Placement** | Where to build | Houses in the back ring 4–8 tiles from the Town Hall.  Military buildings toward the front, 6–10 tiles out. Towers at chokepoints and resource lines. Always leave a **1-tile gap** and run a **flood-fill check** so the AI never walls itself in |
 | **ResearchManager** | Eras and techs | Advance an era when worker target ≥ 80%, requirements are met and posture ≠ DEFEND. Research the strategy's tech list in priority order |
 | **ProductionManager** | Fill production queues | Keep ≤ 2 items queued per building. Follow the target mix. Request extra production buildings when the bank is over 600 |
 | **ScoutManager** | Information | Use the starting Scout Rider to circle the enemy base early. Re-scout every 3 min × paceScale |
@@ -794,8 +793,8 @@ The strategy is chosen at random (seeded) from those available, unless one is se
 ### 7.7 Command grid contents
 | Selection | Grid (positional hotkeys) |
 |---|---|
-| Worker, page 1 "Economy" | Q House, W Storehouse, E Farm, R Town Hall, A Watch Tower, S Wall, D Gate · Z Repair, X Stop, C **Military page →** |
-| Worker, page 2 "Military" | Q Barracks, W Archery Range, E Stable, R Blacksmith, A Siege Workshop, S Castle · V **← Back** |
+| **Build menu** (Build button / B, any time) | One button per entry of `game.json → buildMenu`, at the slot of its hotkey (Q House, W Barracks, E Town Hall, …). Esc or the Back button closes it |
+| Worker | W Stop (gathering is right-click) |
 | Military units | Q Attack-move, W Stop, E Hold, R Aggressive · V Delete |
 | Town Hall | Q Worker, W Advance Era · Z Set rally |
 | Barracks / Range / Stable / Workshop | Q, W units · Z Set rally |
@@ -846,13 +845,14 @@ Locked buttons are greyed out with a lock icon. Unaffordable buttons are drawn w
 | Right click | Context command: move, attack, gather, assist or repair, set rally |
 | Shift + right click | Queue the command |
 | Q W E R / A S D F / Z X C V | Command grid positions |
+| B | Open/close the build menu (no worker needed); then a menu hotkey starts placement |
 | Ctrl + 1..9 / 1..9 / double-tap | Assign / select / center a control group |
 | `.` / `,` | Cycle idle workers / idle production buildings |
 | H | Select the Town Hall and center on it |
 | Space | Jump to the last alert |
 | Arrow keys / screen edge / middle-drag | Pan the camera |
 | Mouse wheel | Zoom |
-| Esc | Cancel placement or targeting, then open the pause menu |
+| Esc | Cancel placement, targeting or the build menu, then (later) open the pause menu |
 | F1 / F3 | How to play / debug overlay (dev) |
 | + / − | Game speed (1×, 1.5×, 2×) |
 | P / Pause | Pause |
@@ -954,9 +954,9 @@ A map editor page (3D view, tile painting, symmetry mirroring, live validation, 
 ### 9.1 Files
 | File | Contents |
 |---|---|
-| `src/data/game.json` | Global rules: starting resources, pop cap, **pace multipliers (fixed here for now)**, queue size, gathering reach and retarget radius |
+| `src/data/game.json` | Global rules: starting resources, pop cap, **pace multipliers (fixed here for now)**, queue size, gathering reach and retarget radius, **buildMenu** (what the Build button offers, with hotkeys), construction settings |
 | `src/data/units.json` | Every unit: stats, cost, train time, pop, model, icon, **interactions**, **panel**, **actions** |
-| `src/data/buildings.json` | Every building: footprint, hp, pop provided, **dropSite**, cost, build time, model, icon, **panel**, **actions** |
+| `src/data/buildings.json` | Every building: footprint, hp, pop provided, cost, build time, model, icon, **panel**, **actions** |
 | `src/data/resources.json` | Resource types (food, wood, gold) and resource **nodes** (tree, pine, berry bush, gold mine): resource, amount, model, icon, panel |
 | `src/data/terrain.json` | Terrain rules (walkable, buildable, speed) |
 | `src/data/palette.json` | All colors and team color sets |
@@ -970,7 +970,6 @@ Right-click sends one generic command, `interact {units, target}`. The engine lo
 "worker": {
   "interactions": {
     "gather": {
-      "carry": 10,
       "targets": { "tree": 0.4, "pine": 0.4, "berry_bush": 0.45, "gold_mine": 0.35 }  // node kind → rate per second
     }
     // later: "build": { … }, "repair": { … }, "attack": { … }
@@ -978,8 +977,23 @@ Right-click sends one generic command, `interact {units, target}`. The engine lo
 }
 ```
 - What resource a node gives comes from the node config, `resources.json` → `nodes.<kind>.resource`.
-- Where it can be dropped off comes from the building config: `buildings.json` → `dropSite: ["food","wood","gold"]`.
-- Every kind of work uses **one shared "interacting" animation** (a rhythmic lean), plus a carried bundle tinted by resource type. No per-resource animation code.
+- Harvested resources go **straight into the stockpile**; there is no carrying and no drop site.
+- Every kind of work uses **one shared "interacting" animation**: the body sways gently from side to side and the arms swing (the worker's tool is held in the right arm). There is no strong forward/back lean and no per-resource animation code.
+
+### 9.2b Building (no workers)
+```jsonc
+// game.json
+"buildMenu": [
+  { "building": "house",     "hotkey": "Q" },
+  { "building": "barracks",  "hotkey": "W" },
+  { "building": "town_hall", "hotkey": "E" }
+],
+"construction": { "startHpFraction": 0.1 }
+```
+- The **Build** button (hotkey B) shows this menu in the command grid at any time. Each button's cost, time and icon come from the building's config.
+- Placing a building pays its cost at once and creates a **construction site**. The site finishes on its own after `buildTime / pace.buildSpeed` seconds, and its HP grows from `startHpFraction` to full.
+- A site does not give population or actions until it is finished. It can be cancelled for a full refund.
+- **One generic construction-site visual for every building type:** a foundation slab, corner scaffold posts and a wooden block that rises with progress, generated from the footprint size, plus a progress bar. There are no per-building construction models.
 
 ### 9.3 Panel and actions (what clicking an entity shows)
 ```jsonc
@@ -991,8 +1005,8 @@ Right-click sends one generic command, `interact {units, target}`. The engine lo
   ]
 }
 ```
-- **Panel fields** (`PANEL_FIELDS` in `shared/gameData.ts`): `hp`, `armor`, `speed`, `sight`, `carry`, `task`, `pop`, `queue`, `amount`.
-- **Action types today:** `train`, `stop`, `setRally`. Coming next: `build` (M4), `research` (M6), plus attack-move and stance (M5).
+- **Panel fields** (`PANEL_FIELDS` in `shared/gameData.ts`): `hp`, `armor`, `speed`, `sight`, `gatherRate`, `task`, `pop`, `queue`, `amount`, `construction`.
+- **Action types today:** `train`, `stop`, `setRally`. Building is not a unit action; it is the global build menu (§9.2b). Coming later: `research` (M6), plus attack-move and stance (M5).
 - The command grid, hotkeys, tooltips (cost and time) and affordability tinting are all generated from these lists.
 
 ### 9.4 Example unit entry
@@ -1150,7 +1164,7 @@ Sizes: **S** ≈ small, **M** ≈ medium, **L** ≈ large (relative effort).
 Everything here is driven by config (§9); no per-unit or per-building logic in code.
 - [x] Game data schema + validation with cross-references (`shared/gameData.ts`); `game.json`, `buildings.json`, extended `units.json` and `resources.json`.
 - [x] Engine entities: resource nodes and Town Halls (from map spawns); player stockpiles; population and pop cap from `popProvided`.
-- [x] Generic `interact` command; gather loop (to node → harvest → to drop site → repeat), auto-retarget, depletion unblocks tiles; deposit at a chosen drop site.
+- [x] Generic `interact` command; gather loop (to node → harvest → to drop site → repeat), auto-retarget, depletion unblocks tiles; deposit at a chosen drop site. *(Changed in M4: drop-off removed, resources go straight to the stockpile.)*
 - [x] Training from building `actions` (cost, time, pop from the unit config), queue max, cancel with refund, pop-cap stall, rally point (to a resource = start gathering).
 - [x] Pace multipliers fixed in `game.json` (no setup UI).
 - [x] UI: buildings drawn from the engine (model from config), resources disappear when used up, one shared work animation, carried bundles.
@@ -1184,12 +1198,32 @@ Everything here is driven by config (§9); no per-unit or per-building logic in 
 - **Screenshots:** `docs/milestones/m3-*.png`.
 - **Not done yet (later milestones):** construction of new buildings (M4), Storehouse model, stumps for felled trees, custom tooltips (native `title` tooltips for now).
 
-### M4: Construction & production (M)
-- [ ] Placement ghost (translucent model + green/red tiles), foundations, multi-builder construction, repair, construction-stage models.
-- [ ] House, Storehouse, Farm, Barracks, Militia, rally points.
-- [ ] Selection panel, command grid with pages, hotkeys and tooltips (showing derived values).
+### M4: Construction without workers + economy changes (M) ✅ done 2026-11-07
+User decisions of 2026-11-06 (replacing the original worker-built design):
+- [x] **Build menu:** a Build button (B, under the idle-worker button) opens `game.json → buildMenu` in the command grid. No worker needs to be selected.
+- [x] **Placement:** a translucent ghost of the building plus green/red tiles; click to place (Shift places more), right-click or Esc cancels.
+- [x] **Engine:** `build {building, at}` validates the footprint, pays the cost and creates a construction site. It finishes by itself after `buildTime / pace.buildSpeed`. `cancelBuild` refunds in full. Units standing on the footprint are moved aside.
+- [x] **Construction site:** no population and no actions until finished; HP grows from `construction.startHpFraction` to full.
+- [x] **One generic construction-site visual** for every building type (foundation, scaffold posts, rising block, progress bar), sized from the footprint.
+- [x] **Gathering:** remove carrying and drop sites. Harvested resources go straight into the stockpile (remove `carry`, `dropSite`, the deposit order and the carried bundle).
+- [x] **Work animation:** separate arm parts; gentle side-to-side sway with swinging arms while working (tool in the right arm); arms also swing while walking.
+- [x] House and Barracks usable (more pop; Barracks trains Militia from its config).
 
-**Done when:** the full Era I loop works from the UI using only the mouse, or only hotkeys.
+**Done when:** a player can build houses and barracks from the Build button, sites show the generic construction UI and finish on time, population grows, workers gather straight into the stockpile, and the work animation is the gentle sway.
+
+**Implementation notes (M4):**
+- **Engine:** `engine/systems/construction.ts` holds `buildTicks`, `inBuildMenu`, `canPlace` (grid `isAreaBuildable`: terrain buildable, no building/resource/boulder) and `clearFootprint` (moves units on the new footprint to the nearest free spot). `constructionSystem` runs first in each tick; it advances every site by one tick and emits `buildingCompleted` when done. `Building` has `constructed`, `buildProgress`, `buildTotal`; `BuildingView` exposes `constructed` and `buildProgress` (0..1). `train`, `setRally` and production ignore unfinished sites; pop cap counts finished buildings only. New reject reason `BAD_PLACEMENT`.
+- **Gathering:** the gather order is just `toNode → harvest`; each whole unit harvested is added to the owner's stockpile at once. `carry`, `dropSite`, the `deposit` order and the carried bundle are gone; the worker panel field `carry` became `gatherRate` (best rate per resource, from `interactions.gather.targets`).
+- **Data:** `game.json` has `buildMenu` (building + hotkey, validated: known building, no duplicate hotkey) and `construction.startHpFraction`.
+- **UI:**
+  - `GameHud`: Build button + build menu (one button per `buildMenu` entry, greyed when unaffordable); the menu closes when the selection changes, and a toggle rebuilds the grid at once so a hotkey right after B works. A site shows ONE generic panel for every building type: name, "Under construction", HP bar, a gold construction bar with "Building N% · Ns left", and Cancel (C, full refund).
+  - `input/PlacementController.ts`: ghost = the finished-building mesh with cloned translucent materials; one tile quad per footprint tile, green when free and red when blocked (drawn on top, so a spot over a building still shows red); the ghost tints red when blocked or unaffordable. Free tiles are checked in `GameScreen.tileFree` (terrain rules, boulders, live resource nodes, buildings in the view); the engine re-checks.
+  - `SelectionController` routes clicks to the placement while it is active; Esc cancels placement, then rally targeting, then the build menu, then clears the selection.
+  - `BuildingRenderer`: construction sites use `constructionSiteGeometry` + `constructionCoreGeometry` (cached per footprint size); the core block rises with progress and a progress bar floats above, facing the camera. Messages: "Can't build there", "<Building> finished".
+  - `UnitRenderer`: arms are separate instanced parts pivoting at the shoulder (the axe is part of the right arm). Walk: legs and arms swing in opposite rhythm. Work (shared by every unit): body rolls about ±0.09 rad side to side, arms swing alternately; walk/work weights blend so switching never pops.
+- **Results:** 104 tests (new `tests/engine/construction.test.ts`: cost, timing, HP growth, pop only when finished, bad placement, unknown building, not enough wood, cancel refund + tiles freed, no training until finished, units moved off the footprint). Checked in the browser: build menu, ghost, red tiles over the Town Hall, house and barracks sites, pop 5 → 10 after a house, gathering straight into the stockpile, work sway.
+- **Screenshots:** `docs/milestones/m4-*.png`.
+- **Not done yet:** a site under attack (M5 combat), the AI using `build` (M8), custom tooltips.
 
 ### M5: Combat (M)
 - [ ] Attack, attack-move, stances, targeting, leash.
@@ -1282,26 +1316,29 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Pace | Configurable later (presets plus Custom). **For now fixed in `src/data/game.json`; no setup UI** (2026-11-06) |
 | Data-driven design | **Config first, no hard-coding** (2026-11-06): interactions, info panels, actions, train/build lists, costs and times all live in `src/data/*.json` (§9). One shared "interacting" animation for every unit |
 | Priorities | Game logic and units first; map polish later (2026-11-06) |
+| Construction | **No workers needed**: Build button → build menu from `game.json` → place → the site builds itself; one generic construction-site visual for all buildings (2026-11-06) |
+| Gathering | **No carrying or drop sites**: harvested resources go straight to the stockpile (2026-11-06) |
+| Work animation | Gentle side-to-side sway and swinging arms, not a strong forward/back lean (2026-11-06) |
 
-### Current status (updated 2026-11-06)
+### Current status (updated 2026-11-07)
 | Milestone | State |
 |---|---|
 | M0 setup, M0.5 style preview, M1 maps, M2 units & movement | ✅ done and committed |
 | M3 Economy (data-driven) | ✅ done and committed |
-| **Next: M4 Construction** | not started |
+| M4 Construction without workers + economy changes | ✅ done (2026-11-07) |
+| **M5 Combat** | next |
 
 **How to resume:**
 1. `nvm use && npm install && npm run dev`, then open `/?army=50` to see the current state.
 2. `npm run check` must stay green (typecheck, lint with module boundaries, map validation, tests).
 3. Continue with the first unchecked milestone in §12.
 4. After each milestone: tick its checklist, add implementation notes under it, update this table, commit.
+5. Browser check without a GUI: run `npx vite --port 5199`, start `google-chrome --headless=new --remote-debugging-port=9333 --use-angle=swiftshader --enable-unsafe-swiftshader`, and drive it over CDP (keys, clicks, screenshots) with a small Node 24 script (Node 24 has a global `WebSocket`).
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**M4 plan in short (keep it config-first):**
-1. New action type `build` in `shared/gameData.ts` (`{ "type": "build", "building": "<id>", "hotkey": "Q" }`) on the Worker, with command grid pages (Economy / Military) also described in config.
-2. A `build` interaction on units (`interactions.build: { rate }`) so the engine knows who can construct and repair.
-3. Command `build {units, building, at}`: validate the footprint (buildable, explored, free), pay the cost, place a foundation entity.
-4. The order `construct`: builders walk to the foundation and add progress at `1 + 0.6·(n−1)` speed, using `buildTime` and `pace.buildSpeed`. Repair works the same way.
-5. UI: placement ghost (translucent model + green/red tiles), construction-stage models, House / Storehouse / Farm / Barracks usable.
-6. Farm as an infinite, walkable food node created by a building. Storehouse as a drop site (config only).
+**M4 in short:** see the M4 checklist in §12 (user decisions of 2026-11-06):
+1. build from a global Build button, no workers;
+2. no carrying or drop-off, resources go straight to the stockpile;
+3. a gentle side-to-side work animation with swinging arms;
+4. one generic construction-site visual for every building.

@@ -1,20 +1,19 @@
 /**
  * Order system (PLAN §5.3 step 4, §5.4): runs each unit's current order as a small state machine
- * and sets the unit's movement goal. Everything a unit may do comes from the game data:
- * gather rates and carry capacity from units.json, drop sites from buildings.json.
+ * and sets the unit's movement goal. Gather rates come from units.json → interactions.gather.
  *
  *   move:     go there, then done
- *   gather:   toNode → harvest → (full) toDrop → toNode … ; when the node runs out, retarget the
- *             nearest node of the same resource within `retargetRadius`
- *   deposit:  walk to a drop site, unload, done
+ *   gather:   toNode → harvest. Every whole unit harvested goes straight into the owner's stockpile
+ *             (no carrying, no drop sites). When the node runs out, retarget the nearest node of
+ *             the same resource within `retargetRadius`.
  */
 import { TICK_RATE, type ResourceType } from '../../shared';
 import { DATA } from '../data';
-import type { Building, ResourceNode } from '../entities/Building';
-import { carryCapacity, gatherRate, type Order, type Unit } from '../entities/Unit';
+import type { ResourceNode } from '../entities/Building';
+import { gatherRate, type Order, type Unit } from '../entities/Unit';
 import type { GameState } from '../GameState';
 import { clearGoal, setGoal } from './movement';
-import { approachPoint, distanceToRect, inReach } from './reach';
+import { approachPoint, inReach } from './reach';
 
 const REACH = DATA.game.gathering.reach;
 
@@ -26,44 +25,34 @@ export function orderSystem(state: GameState): void {
       if (u.goal) clearGoal(u);
       continue;
     }
-    switch (order.kind) {
-      case 'move':
-        setGoal(state, u, order);
-        if (u.arrived) finish(u);
-        break;
-      case 'gather':
-        gather(state, u, order);
-        break;
-      case 'deposit':
-        deposit(state, u, order);
-        break;
+    if (order.kind === 'move') {
+      setGoal(state, u, order);
+      if (u.arrived) finish(u);
+    } else {
+      gather(state, u, order);
     }
   }
 }
 
 function finish(u: Unit): void {
   u.orders.shift();
+  u.workProgress = 0;
   clearGoal(u);
 }
 
-// ---- gather -----------------------------------------------------------------------------------
-
 function gather(state: GameState, u: Unit, o: Extract<Order, { kind: 'gather' }>): void {
   let node = state.nodes.get(o.target);
-  if (!node && o.phase !== 'toDrop') {
+  if (!node) {
     node = findNode(state, u, o.resource, o.lastX, o.lastY, null) ?? undefined;
-    if (node) {
-      o.target = node.id;
-      o.phase = 'toNode';
-    } else if (u.carry && u.carry.amount > 0) {
-      o.phase = 'toDrop'; // nothing left nearby: bring home what we have, then stop
-    } else {
+    if (!node) {
       finish(u);
       return;
     }
+    o.target = node.id;
+    o.phase = 'toNode';
   }
 
-  if (o.phase === 'toNode' && node) {
+  if (o.phase === 'toNode') {
     if (inReach(u, node, REACH)) {
       o.phase = 'harvest';
       clearGoal(u);
@@ -82,97 +71,28 @@ function gather(state: GameState, u: Unit, o: Extract<Order, { kind: 'gather' }>
     }
   }
 
-  if (o.phase === 'harvest' && node) {
-    if (!inReach(u, node, REACH)) {
-      o.phase = 'toNode'; // pushed away
-      return;
-    }
-    u.activity = 'work';
-    u.facing = Math.atan2(node.x + node.w / 2 - u.x, node.y + node.h / 2 - u.y);
-    if (!u.carry || u.carry.resource !== node.resource) u.carry = { resource: node.resource, amount: 0 };
-    const capacity = carryCapacity(u.type);
-    u.workProgress += (gatherRate(u.type, node.kind) * DATA.game.pace.gatherRate) / TICK_RATE;
-    while (u.workProgress >= 1 && u.carry.amount < capacity && node.amount > 0) {
-      u.workProgress -= 1;
-      u.carry.amount += 1;
-      node.amount -= 1;
-    }
-    const view = state.nodeViews.get(node.id);
-    if (view) view.amount = node.amount;
-    o.lastX = node.x;
-    o.lastY = node.y;
-    if (node.amount <= 0) depleteNode(state, node);
-    if (u.carry.amount >= capacity || node.amount <= 0) {
-      o.phase = u.carry.amount > 0 ? 'toDrop' : 'toNode';
-      u.workProgress = 0;
-    }
+  // harvest
+  if (!inReach(u, node, REACH)) {
+    o.phase = 'toNode'; // pushed away
     return;
   }
-
-  if (o.phase === 'toDrop') {
-    if (!u.carry || u.carry.amount <= 0) {
-      o.phase = 'toNode';
-      return;
-    }
-    const drop = nearestDropSite(state, u, u.carry.resource);
-    if (!drop) return; // nowhere to unload: wait
-    if (inReach(u, drop, REACH)) {
-      unload(state, u);
-      clearGoal(u);
-      o.phase = 'toNode';
-      return;
-    }
-    const spot = approachPoint(state.grid, drop, u);
-    if (spot) setGoal(state, u, spot);
-    if (u.arrived && u.blocked) finish(u);
-  }
-}
-
-function deposit(state: GameState, u: Unit, o: Extract<Order, { kind: 'deposit' }>): void {
-  const b = state.buildings.get(o.target);
-  if (!b || !u.carry || !acceptsDrop(b, u.carry.resource)) {
-    finish(u);
-    return;
-  }
-  if (inReach(u, b, REACH)) {
-    unload(state, u);
-    finish(u);
-    return;
-  }
-  const spot = approachPoint(state.grid, b, u);
-  if (!spot) {
-    finish(u);
-    return;
-  }
-  setGoal(state, u, spot);
-  if (u.arrived && u.blocked) finish(u);
-}
-
-function unload(state: GameState, u: Unit): void {
-  if (!u.carry) return;
+  u.activity = 'work';
+  u.facing = Math.atan2(node.x + node.w / 2 - u.x, node.y + node.h / 2 - u.y);
   const player = state.players.get(u.owner);
-  if (player) player.resources[u.carry.resource] += u.carry.amount;
-  u.carry = null;
-}
-
-// ---- lookups ------------------------------------------------------------------------------------
-
-export function acceptsDrop(b: Building, resource: ResourceType): boolean {
-  return DATA.buildings[b.type]?.dropSite.includes(resource) ?? false;
-}
-
-function nearestDropSite(state: GameState, u: Unit, resource: ResourceType): Building | null {
-  let best: Building | null = null;
-  let bestD = Infinity;
-  for (const b of state.buildings.values()) {
-    if (b.owner !== u.owner || !acceptsDrop(b, resource)) continue;
-    const d = distanceToRect(u.x, u.y, b);
-    if (d < bestD) {
-      bestD = d;
-      best = b;
-    }
+  u.workProgress += (gatherRate(u.type, node.kind) * DATA.game.pace.gatherRate) / TICK_RATE;
+  while (u.workProgress >= 1 && node.amount > 0) {
+    u.workProgress -= 1;
+    node.amount -= 1;
+    if (player) player.resources[node.resource] += 1;
   }
-  return best;
+  const view = state.nodeViews.get(node.id);
+  if (view) view.amount = node.amount;
+  o.lastX = node.x;
+  o.lastY = node.y;
+  if (node.amount <= 0) {
+    depleteNode(state, node);
+    o.phase = 'toNode';
+  }
 }
 
 /**
@@ -212,9 +132,6 @@ export function describeTask(u: Unit): string {
   const o = u.orders[0];
   if (!o) return 'Idle';
   if (o.kind === 'move') return 'Moving';
-  if (o.kind === 'deposit') return 'Dropping off';
   const name = DATA.resources[o.resource]?.name.toLowerCase() ?? o.resource;
-  if (o.phase === 'harvest') return `Gathering ${name}`;
-  if (o.phase === 'toDrop') return `Carrying ${name}`;
-  return `Going to gather ${name}`;
+  return o.phase === 'harvest' ? `Gathering ${name}` : `Going to gather ${name}`;
 }

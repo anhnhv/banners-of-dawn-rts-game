@@ -24,16 +24,17 @@ function setup(objects: Parameters<typeof openMap>[2] = []): { game: Game; hall:
 }
 
 describe('gathering (configured in units.json → interactions.gather)', () => {
-  it('a worker harvests a tree, carries the load home and adds it to the stockpile', () => {
+  it('a worker harvests a tree straight into the stockpile (no carrying, no drop-off)', () => {
     const { game } = setup([node('tree', 12, 5)]);
     const tree = [...game.nodes.values()][0]!;
-    const worker = game.debugSpawn(0, 'worker', 8.5, 5.5);
+    const worker = game.debugSpawn(0, 'worker', 11.3, 5.5);
     send(game, 0, { type: 'interact', units: [worker], target: tree.id });
     const rate = GAME_DATA.units.worker!.interactions.gather!.targets.tree!;
-    const carry = GAME_DATA.units.worker!.interactions.gather!.carry;
-    run(game, carry / rate + 10); // one full load + walking
-    expect(game.player(0).resources.wood).toBe(START.wood + carry);
-    expect(game.nodes.get(tree.id)!.amount).toBeLessThan(100 - carry + 1);
+    run(game, 10);
+    const gained = game.player(0).resources.wood - START.wood;
+    expect(gained).toBeGreaterThanOrEqual(Math.floor(rate * 10) - 1);
+    expect(gained).toBeLessThanOrEqual(Math.ceil(rate * 10));
+    expect(game.nodes.get(tree.id)!.amount).toBe(100 - gained);
     expect(game.units.get(worker)!.orders[0]?.kind).toBe('gather'); // keeps going
   });
 
@@ -72,19 +73,6 @@ describe('gathering (configured in units.json → interactions.gather)', () => {
     const u = game.units.get(militia)!;
     expect(Math.hypot(u.x - 20.5, u.y - 20.5)).toBeLessThan(2);
     expect(game.nodes.get(tree.id)!.amount).toBe(100);
-  });
-
-  it('a worker carrying resources can drop them at a chosen drop site', () => {
-    const { game, hall } = setup([node('gold_mine', 12, 4)]);
-    const mine = [...game.nodes.values()][0]!;
-    const worker = game.debugSpawn(0, 'worker', 11.5, 5);
-    send(game, 0, { type: 'interact', units: [worker], target: mine.id });
-    run(game, 8);
-    send(game, 0, { type: 'interact', units: [worker], target: hall });
-    run(game, 6);
-    expect(game.player(0).resources.gold).toBeGreaterThan(START.gold);
-    expect(game.units.get(worker)!.carry).toBeNull();
-    expect(game.units.get(worker)!.orders).toHaveLength(0);
   });
 });
 

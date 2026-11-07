@@ -14,7 +14,7 @@ export function populationOf(state: GameState, player: PlayerId): { pop: number;
   for (const u of state.units.values()) if (u.owner === player) pop += u.pop;
   let cap = 0;
   for (const b of state.buildings.values())
-    if (b.owner === player) cap += DATA.buildings[b.type]?.popProvided ?? 0;
+    if (b.owner === player && b.constructed) cap += DATA.buildings[b.type]?.popProvided ?? 0;
   return { pop, popCap: Math.min(DATA.game.popCap, cap) };
 }
 
@@ -38,6 +38,7 @@ export function productionSystem(
   spawn: (owner: PlayerId, type: UnitTypeId, x: number, y: number) => Unit,
 ): void {
   for (const b of state.buildings.values()) {
+    if (!b.constructed) continue;
     const item = b.queue[0];
     if (!item) {
       b.popBlocked = false;

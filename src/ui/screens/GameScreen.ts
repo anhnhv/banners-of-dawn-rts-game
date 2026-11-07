@@ -4,12 +4,23 @@
  * interpolation alpha and the engine events; player input leaves this screen only as Commands.
  */
 import * as THREE from 'three';
-import type { Command, DecodedMap, EntityId, GameEvent, PlayerId, PlayerView } from '../../shared';
+import {
+  costEntries,
+  type Command,
+  type DecodedMap,
+  type EntityId,
+  type GameEvent,
+  type PlayerId,
+  type PlayerView,
+  type TerrainType,
+} from '../../shared';
+import terrainData from '../../data/terrain.json';
 import { buildMapScene, tileKey, type MapScene } from '../art/mapScene';
 import { DATA, displayName } from '../data';
 import { GameHud } from '../hud/GameHud';
 import { Minimap } from '../hud/Minimap';
 import { CameraController } from '../input/CameraController';
+import { PlacementController } from '../input/PlacementController';
 import { SelectionController } from '../input/SelectionController';
 import { BuildingRenderer } from '../render/BuildingRenderer';
 import { MoveMarkers } from '../render/MoveMarkers';
@@ -31,7 +42,12 @@ const CORNERS: Array<[number, number]> = [
   [-1, -1],
 ];
 
+const BUILDABLE: Record<TerrainType, boolean> = Object.fromEntries(
+  Object.entries(terrainData.types).map(([k, t]) => [k, t.buildable]),
+) as Record<TerrainType, boolean>;
+
 const REJECT_TEXT: Record<string, string> = {
+  BAD_PLACEMENT: "Can't build there",
   NOT_ENOUGH_FOOD: 'Not enough food',
   NOT_ENOUGH_WOOD: 'Not enough wood',
   NOT_ENOUGH_GOLD: 'Not enough gold',
@@ -50,6 +66,7 @@ export class GameScreen {
   private readonly buildings = new BuildingRenderer();
   private readonly markers = new MoveMarkers();
   private readonly selection: SelectionController;
+  private readonly placement: PlacementController;
   private readonly objectAt: Int32Array;
   private readonly raycaster = new THREE.Raycaster();
   /** Tile → resource node id, rebuilt when nodes disappear. */
@@ -75,6 +92,20 @@ export class GameScreen {
       this.units.group,
       this.markers.group,
     );
+    this.placement = new PlacementController({
+      player: options.player,
+      tileFree: (x, y) => this.tileFree(x, y),
+      canAfford: (type) => {
+        const res = this.lastView?.self.resources;
+        return !!res && costEntries(DATA.buildings[type]?.cost ?? {}).every(([r, n]) => res[r] >= n);
+      },
+      onCommand: options.onCommand,
+      onChange: (active) => {
+        this.world.canvas.classList.toggle('placing', active);
+        if (active) this.cursor.set(null);
+      },
+    });
+    this.world.scene.add(this.placement.object);
 
     const home = map.objects.find((o) => o.kind === 'spawn' && o.player === options.player);
     const rig = this.world.rig;
@@ -96,6 +127,7 @@ export class GameScreen {
       onCommand: options.onCommand,
       onSelectIdleWorker: () => this.selectIdleWorker(),
       onBeginRally: (id) => this.selection.beginRally(id),
+      onStartPlacement: (type) => this.placement.begin(type),
     });
     this.selection = new SelectionController({
       container,
@@ -122,6 +154,12 @@ export class GameScreen {
           return true;
         }
         return this.hud.handleKey(e);
+      },
+      placement: this.placement,
+      onEscape: () => {
+        if (!this.hud.isBuildMenuOpen) return false;
+        this.hud.toggleBuildMenu(false);
+        return true;
       },
     });
 
@@ -196,6 +234,8 @@ export class GameScreen {
       else if (e.type === 'popCapped' && e.player === me) this.hud.message('Need more houses', 'warn');
       else if (e.type === 'unitTrained' && e.player === me)
         this.hud.message(`${displayName(e.unitType)} ready`);
+      else if (e.type === 'buildingCompleted' && e.player === me)
+        this.hud.message(`${displayName(e.buildingType)} finished`);
     }
   }
 
@@ -227,9 +267,26 @@ export class GameScreen {
     this.selection.centerOn(u.x, u.y);
   }
 
+  /** A building may stand on this tile: buildable terrain, no boulder, resource or building. */
+  private tileFree(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.map.width || y >= this.map.height) return false;
+    const i = y * this.map.width + x;
+    const terrain = this.map.terrain[i];
+    if (!terrain || !BUILDABLE[terrain]) return false;
+    const object = this.map.objects[this.objectAt[i] ?? -1];
+    if (object?.kind === 'stone') return false;
+    if (this.nodeAtTile.has(tileKey(x, y))) return false;
+    return !this.lastView?.buildings.some((b) => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h);
+  }
+
   private updateHover(): void {
     const ndc = this.camera.overCanvas ? this.camera.pointerNdc() : null;
     const hit = ndc ? this.world.rig.groundAt(ndc.x, ndc.y) : null;
+    if (this.placement.active) {
+      this.placement.update(hit ? { x: hit.x, z: hit.z } : null);
+      this.cursor.set(null);
+      return;
+    }
     if (!hit) {
       this.cursor.set(null);
       this.hud.clearTile();

@@ -8,7 +8,9 @@
  *                    unit config: gather, drop off, …); on the ground → move (shift: queue)
  *                    with an own building selected → set its rally point
  *  Ctrl/Alt + 1..9   assign control group; 1..9 select it; press twice to center the camera on it
- *  Esc               cancel targeting, then clear the selection
+ *  Esc               cancel placement / targeting / the build menu, then clear the selection
+ * While placing a building (build menu): left click places it (shift: place more), right click
+ * cancels.
  * Command hotkeys (from the config `actions`) are handled by the HUD through `onKey`.
  */
 import * as THREE from 'three';
@@ -37,6 +39,10 @@ export interface SelectionOptions {
   onChange: () => void;
   /** Gets every key first; return true to consume it (command hotkeys). */
   onKey: (e: KeyboardEvent) => boolean;
+  /** Building placement mode (see PlacementController). */
+  placement: { readonly active: boolean; place(shift: boolean): void; cancel(): void };
+  /** Esc after placement and targeting: return true if it closed something (e.g. the build menu). */
+  onEscape: () => boolean;
 }
 
 export class SelectionController {
@@ -101,6 +107,11 @@ export class SelectionController {
   // ---- input -------------------------------------------------------------------------------------
 
   private onPointerDown(e: PointerEvent): void {
+    if (this.o.placement.active) {
+      if (e.button === 0) this.o.placement.place(e.shiftKey);
+      else if (e.button === 2) this.o.placement.cancel();
+      return;
+    }
     if (e.button === 0) {
       if (this.rallyFor !== null) {
         this.placeRally(this.rallyFor, e.clientX, e.clientY);
@@ -178,8 +189,9 @@ export class SelectionController {
   private onKey(e: KeyboardEvent): void {
     if (e.repeat) return;
     if (e.code === 'Escape') {
-      if (this.rallyFor !== null) this.endRally();
-      else this.select([]);
+      if (this.o.placement.active) this.o.placement.cancel();
+      else if (this.rallyFor !== null) this.endRally();
+      else if (!this.o.onEscape()) this.select([]);
       return;
     }
     if (this.o.onKey(e)) {

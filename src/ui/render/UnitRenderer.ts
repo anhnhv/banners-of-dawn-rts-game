@@ -1,21 +1,21 @@
 /**
  * Draws all units from the PlayerView (PLAN §7.4):
- * - one InstancedMesh per (unit type, team) for the body, plus one per leg, so hundreds of units
- *   cost a few dozen draw calls;
- * - positions interpolated between ticks, facing smoothed, legs swing with distance walked;
- * - x-ray silhouettes: units hidden behind buildings/trees show as a team-colored ghost;
- * - selection rings under selected units.
+ * - per (unit type, team): one InstancedMesh for the body, one for all legs, one per arm side,
+ *   so hundreds of units cost a few dozen draw calls;
+ * - positions interpolated between ticks, facing smoothed;
+ * - animation (one set for every unit, no per-type code):
+ *     walk: legs and arms swing in opposite rhythm, small bob
+ *     work: the shared "interacting" animation — the body sways gently from side to side and the
+ *           arms swing (a tool held in the right arm swings with it)
+ * - x-ray silhouettes for units hidden behind buildings/trees; selection rings.
  */
 import * as THREE from 'three';
 import type { EntityId, PlayerId, PlayerView, UnitTypeId } from '../../shared';
 import { unitModel, unitParts, type UnitModel, type UnitPartGeometry } from '../art/models';
-import { VoxelBuilder } from '../art/VoxelBuilder';
-import { DATA } from '../data';
 import { resolveColor, type TeamName } from '../art/palette';
 import { voxelMaterial } from '../art/materials';
-
-/** Color of the bundle a unit carries on its back, per resource type. */
-const CARRY_COLOR: Record<string, string> = { food: '#d9413a', wood: '#8a5a32', gold: '#f6c945' };
+import type { TexKey } from '../art/textures';
+import { DATA } from '../data';
 
 export const TEAM_OF: Record<PlayerId, TeamName> = { 0: 'blue', 1: 'red' };
 
@@ -32,20 +32,23 @@ export interface UnitScreenState {
 interface Anim {
   facing: number;
   phase: number;
-  swing: number;
+  walk: number;
+  work: number;
   lastX: number;
   lastZ: number;
 }
 
 const tmpMatrix = new THREE.Matrix4();
-const tmpLeg = new THREE.Matrix4();
+const tmpPart = new THREE.Matrix4();
+const tmpSway = new THREE.Matrix4();
 const tmpPos = new THREE.Vector3();
 const tmpQuat = new THREE.Quaternion();
 const tmpScale = new THREE.Vector3(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
-const tmpLean = new THREE.Matrix4();
-const tmpColor = new THREE.Color();
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
+const mats = (textures: TexKey[]): THREE.Material[] => textures.map((t) => voxelMaterial(t));
 
 /** All instanced meshes for one unit type of one team. */
 class UnitBatch {
@@ -55,7 +58,9 @@ class UnitBatch {
   silhouette!: THREE.InstancedMesh;
   /** All legs of all units of this batch in ONE mesh (every leg of a unit type has the same shape). */
   legs!: THREE.InstancedMesh;
-  private readonly parts: UnitPartGeometry;
+  /** Left and right arms (people only). */
+  arms: THREE.InstancedMesh[] = [];
+  readonly parts: UnitPartGeometry;
   private readonly silhouetteMaterial: THREE.MeshBasicMaterial;
 
   constructor(
@@ -65,18 +70,13 @@ class UnitBatch {
   ) {
     this.parts = unitParts(model, team);
     // X-ray pass: drawn after the world but BEFORE the units (renderOrder 1 vs 2), with an inverted
-    // depth test, so it only shows where terrain, trees or buildings hide a unit. The units, drawn
-    // next, cover it wherever they are actually visible.
+    // depth test, so it only shows where terrain, trees or buildings hide a unit.
     this.silhouetteMaterial = new THREE.MeshBasicMaterial({
       color: resolveColor('team-light', team),
       depthWrite: false,
       depthFunc: THREE.GreaterDepth,
     });
     this.allocate(32);
-  }
-
-  get pivots(): ReadonlyArray<[number, number, number]> {
-    return this.parts.legs.map((l) => l.pivot);
   }
 
   get legsPerUnit(): number {
@@ -97,6 +97,10 @@ class UnitBatch {
     this.body.instanceMatrix.needsUpdate = true;
     this.legs.count = this.count * this.legsPerUnit;
     this.legs.instanceMatrix.needsUpdate = true;
+    for (const a of this.arms) {
+      a.count = this.count;
+      a.instanceMatrix.needsUpdate = true;
+    }
   }
 
   private allocate(capacity: number): void {
@@ -110,31 +114,24 @@ class UnitBatch {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.count = 0;
       m.frustumCulled = false;
+      m.castShadow = true;
+      m.renderOrder = 2;
       this.parent.add(m);
       return m;
     };
-    this.body = mk(
-      this.parts.body.geometry,
-      this.parts.body.textures.map((t) => voxelMaterial(t)),
-    );
-    this.body.castShadow = true;
+    this.body = mk(this.parts.body.geometry, mats(this.parts.body.textures));
     this.body.receiveShadow = true;
-    this.body.renderOrder = 2;
     this.silhouette = mk(this.parts.body.geometry, this.silhouetteMaterial);
     this.silhouette.instanceMatrix = this.body.instanceMatrix; // same transforms as the body
     this.silhouette.renderOrder = 1;
+    this.silhouette.castShadow = false;
     const leg = this.parts.legs[0]?.geometry ?? this.parts.body;
-    this.legs = mk(
-      leg.geometry,
-      leg.textures.map((t) => voxelMaterial(t)),
-      capacity * Math.max(1, this.legsPerUnit),
-    );
-    this.legs.castShadow = true;
-    this.legs.renderOrder = 2;
+    this.legs = mk(leg.geometry, mats(leg.textures), capacity * Math.max(1, this.legsPerUnit));
+    this.arms = this.parts.arms.map((a) => mk(a.geometry.geometry, mats(a.geometry.textures)));
   }
 
   private dispose(): void {
-    for (const m of [this.body, this.silhouette, this.legs]) {
+    for (const m of [this.body, this.silhouette, this.legs, ...this.arms]) {
       this.parent.remove(m);
       m.dispose();
     }
@@ -149,27 +146,16 @@ export class UnitRenderer {
   private readonly anim = new Map<EntityId, Anim>();
   private rings: THREE.InstancedMesh;
   private ringCapacity = 64;
-  private carries: THREE.InstancedMesh;
-  private carryCapacity = 64;
   private time = 0;
 
   constructor() {
     this.group.name = 'units';
     this.rings = this.makeRings(this.ringCapacity);
-    this.carries = this.makeCarries(this.carryCapacity);
   }
 
   update(view: PlayerView, alpha: number, dt: number, selected: ReadonlySet<EntityId>): void {
     this.time += dt;
     for (const b of this.batches.values()) b.count = 0;
-    let carryCount = 0;
-    const carriers = view.units.reduce((n, u) => n + (u.carry && u.carry.amount > 0 ? 1 : 0), 0);
-    if (carriers > this.carryCapacity) {
-      while (this.carryCapacity < carriers) this.carryCapacity *= 2;
-      this.group.remove(this.carries);
-      this.carries.dispose();
-      this.carries = this.makeCarries(this.carryCapacity);
-    }
     this.states.length = 0;
     const seen = new Set<EntityId>();
     let ringCount = 0;
@@ -187,6 +173,7 @@ export class UnitRenderer {
     }
     for (const [b, n] of counts) b.ensure(n);
 
+    const ease = Math.min(1, dt * 10);
     for (const u of view.units) {
       seen.add(u.id);
       const x = u.prevX + (u.x - u.prevX) * alpha;
@@ -195,7 +182,7 @@ export class UnitRenderer {
 
       let a = this.anim.get(u.id);
       if (!a) {
-        a = { facing: u.facing, phase: 0, swing: 0, lastX: x, lastZ: z };
+        a = { facing: u.facing, phase: 0, walk: 0, work: 0, lastX: x, lastZ: z };
         this.anim.set(u.id, a);
       }
       const moved = Math.hypot(x - a.lastX, z - a.lastZ);
@@ -203,36 +190,43 @@ export class UnitRenderer {
       a.lastZ = z;
       a.facing = approachAngle(a.facing, u.facing, Math.min(1, dt * 12));
       a.phase += moved * 9;
-      a.swing += ((u.moving ? 0.7 : 0) - a.swing) * Math.min(1, dt * 10);
+      // blend weights so switching between walking and working never pops
+      a.walk += ((u.activity === 'walk' ? 1 : 0) - a.walk) * ease;
+      a.work += ((u.activity === 'work' ? 1 : 0) - a.work) * ease;
 
       const batch = this.batch(u.type, u.owner);
       const i = batch.count++;
-      const bob = u.moving ? Math.abs(Math.sin(a.phase)) * 0.025 : 0;
+      const bob = Math.abs(Math.sin(a.phase)) * 0.025 * a.walk;
       tmpPos.set(x, bob, z);
       tmpQuat.setFromAxisAngle(UP, a.facing);
       tmpMatrix.compose(tmpPos, tmpQuat, tmpScale);
-      if (u.activity === 'work') {
-        // the one shared "interacting" animation: a rhythmic lean into the work
-        const beat = Math.max(0, Math.sin(this.time * 7 + u.id * 1.7));
-        tmpLean.makeRotationAxis(X_AXIS, beat * beat * 0.32);
-        tmpMatrix.multiply(tmpLean);
+
+      // shared work animation: gentle side-to-side sway (roll around the forward axis)
+      const beat = this.time * 5 + u.id * 1.7;
+      if (a.work > 0.01) {
+        tmpSway.makeRotationAxis(Z_AXIS, Math.sin(beat) * 0.09 * a.work);
+        tmpMatrix.multiply(tmpSway);
       }
       batch.body.setMatrixAt(i, tmpMatrix);
-      batch.pivots.forEach((pivot, li) => {
+
+      const legSwing = Math.sin(a.phase) * 0.7 * a.walk;
+      const n = batch.legsPerUnit;
+      batch.parts.legs.forEach((leg, li) => {
         // people: left/right alternate; horses: diagonal pairs move together
-        const n = batch.legsPerUnit;
         const sign = n === 4 ? (li === 0 || li === 3 ? 1 : -1) : li % 2 === 0 ? 1 : -1;
-        tmpLeg.makeRotationAxis(X_AXIS, Math.sin(a.phase) * a.swing * sign);
-        tmpLeg.setPosition(pivot[0], pivot[1], pivot[2]);
-        batch.legs.setMatrixAt(i * n + li, tmpLeg.premultiply(tmpMatrix));
+        tmpPart.makeRotationAxis(X_AXIS, legSwing * sign);
+        tmpPart.setPosition(leg.pivot[0], leg.pivot[1], leg.pivot[2]);
+        batch.legs.setMatrixAt(i * n + li, tmpPart.premultiply(tmpMatrix));
       });
 
-      if (u.carry && u.carry.amount > 0) {
-        tmpLeg.makeTranslation(0, 0.34, -0.14);
-        this.carries.setMatrixAt(carryCount, tmpLeg.premultiply(tmpMatrix));
-        this.carries.setColorAt(carryCount, tmpColor.set(CARRY_COLOR[u.carry.resource] ?? '#ffffff'));
-        carryCount++;
-      }
+      batch.parts.arms.forEach((arm, side) => {
+        const sign = side === 0 ? 1 : -1;
+        // walking: arms opposite to the legs; working: arms swing back and forth with the sway
+        const swing = -legSwing * 0.8 * sign + Math.sin(beat * 2 + side * Math.PI) * 0.55 * a.work;
+        tmpPart.makeRotationAxis(X_AXIS, -swing);
+        tmpPart.setPosition(arm.pivot[0], arm.pivot[1], arm.pivot[2]);
+        batch.arms[side]?.setMatrixAt(i, tmpPart.premultiply(tmpMatrix));
+      });
 
       if (selected.has(u.id)) {
         const s = u.radius / 0.28;
@@ -245,9 +239,6 @@ export class UnitRenderer {
     for (const b of this.batches.values()) b.finish();
     this.rings.count = ringCount;
     this.rings.instanceMatrix.needsUpdate = true;
-    this.carries.count = carryCount;
-    this.carries.instanceMatrix.needsUpdate = true;
-    if (this.carries.instanceColor) this.carries.instanceColor.needsUpdate = true;
     for (const id of this.anim.keys()) if (!seen.has(id)) this.anim.delete(id);
   }
 
@@ -259,22 +250,6 @@ export class UnitRenderer {
       this.batches.set(key, b);
     }
     return b;
-  }
-
-  private makeCarries(capacity: number): THREE.InstancedMesh {
-    const built = new VoxelBuilder().boxC(0, -0.07, 0, 0.15, 0.14, 0.1, 'planks', '#ffffff').build();
-    const mesh = new THREE.InstancedMesh(
-      built.geometry,
-      built.textures.map((t) => voxelMaterial(t)),
-      capacity,
-    );
-    mesh.setColorAt(0, tmpColor.set('#ffffff'));
-    mesh.count = 0;
-    mesh.frustumCulled = false;
-    mesh.castShadow = true;
-    mesh.renderOrder = 2;
-    this.group.add(mesh);
-    return mesh;
   }
 
   private makeRings(capacity: number): THREE.InstancedMesh {
