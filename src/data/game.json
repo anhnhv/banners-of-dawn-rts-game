@@ -12,7 +12,8 @@
     { "building": "house", "hotkey": "Q" },
     { "building": "barracks", "hotkey": "W" },
     { "building": "town_hall", "hotkey": "E" },
-    { "building": "watch_tower", "hotkey": "R" }
+    { "building": "watch_tower", "hotkey": "R" },
+    { "building": "stable", "hotkey": "A" }
   ],
   "construction": { "startHpFraction": 0.1 },
   "combat": {

@@ -44,7 +44,7 @@
     },
     "barracks": {
       "name": "Barracks",
-      "description": "Trains infantry.",
+      "description": "Trains Militia and Archers.",
       "model": "barracks",
       "icon": "sword",
       "footprint": [3, 3],
@@ -56,6 +56,25 @@
       "panel": ["hp", "armor", "queue"],
       "actions": [
         { "type": "train", "unit": "militia", "hotkey": "Q" },
+        { "type": "train", "unit": "archer", "hotkey": "W" },
+        { "type": "setRally", "hotkey": "Z" }
+      ]
+    },
+    "stable": {
+      "name": "Stable",
+      "description": "Trains Scout Riders and Knights.",
+      "model": "stable",
+      "icon": "horse",
+      "footprint": [3, 3],
+      "hp": 900,
+      "armor": 1,
+      "popProvided": 0,
+      "cost": { "wood": 175 },
+      "buildTime": 45,
+      "panel": ["hp", "armor", "queue"],
+      "actions": [
+        { "type": "train", "unit": "scout_rider", "hotkey": "Q" },
+        { "type": "train", "unit": "knight", "hotkey": "W" },
         { "type": "setRally", "hotkey": "Z" }
       ]
     },

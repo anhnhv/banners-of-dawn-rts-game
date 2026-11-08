@@ -25,6 +25,7 @@ import type {
   UnitTypeId,
 } from '../shared';
 import { allocate, type Cost, type Request } from './Budget';
+import { bestCounter, counterScore } from './counters';
 import { DEFAULT_AI_MODE, PROFILES, type AIMode } from './profiles';
 import {
   analyze,
@@ -63,6 +64,8 @@ const RESOURCES: ResourceType[] = ['food', 'wood', 'gold'];
 export class MachinePlayer {
   profile: AIProfile = PROFILES[DEFAULT_AI_MODE];
   private rng = new Rng(1);
+  /** Separate stream for unit picks, so they do not shift the daydream and defence rolls. */
+  private pickRng = new Rng(2);
   private info!: StaticMapInfo;
   private data!: GameData;
   private map!: TileMap;
@@ -96,6 +99,7 @@ export class MachinePlayer {
   init(info: StaticMapInfo, mode: AIMode = DEFAULT_AI_MODE, seed = 1): void {
     this.profile = PROFILES[mode] ?? PROFILES[DEFAULT_AI_MODE];
     this.rng = new Rng(seed);
+    this.pickRng = new Rng(seed * 31 + 7);
     this.waveSize = this.profile.attack.minWavePop;
     this.info = info;
     this.data = info.data;
@@ -365,6 +369,14 @@ export class MachinePlayer {
 
   // ---- buildings ------------------------------------------------------------------------------
 
+  /** The kinds of army building this mode uses: the first buildings.militaryBuildingTypes in buildMenu order. */
+  private militaryKinds(): BuildingTypeId[] {
+    return this.data.game.buildMenu
+      .map((m) => m.building)
+      .filter((t) => this.trainsMilitary(t))
+      .slice(0, this.profile.buildings.militaryBuildingTypes);
+  }
+
   private trainsMilitary(type: BuildingTypeId): boolean {
     return (this.data.buildings[type]?.actions ?? []).some(
       (a) => a.type === 'train' && isMilitary(this.data, a.unit),
@@ -418,11 +430,16 @@ export class MachinePlayer {
         this.pushBuild(out, obs, sit, house.type, prio.house, 'back', p.houseDistance);
     }
 
-    // military production: the first one early, more when money piles up and all are busy
+    // military production: the first one early, more when money piles up and all are busy.
+    // Kinds of army building come one after another, in buildMenu order, up to
+    // buildings.militaryBuildingTypes; the next kind waits until the previous one stands.
+    let kinds = 0;
+    let previousStands = true;
     for (const { building: type } of this.data.game.buildMenu) {
       if (!this.trainsMilitary(type)) continue;
       const def = this.data.buildings[type];
       if (!def) continue;
+      if (kinds++ >= p.militaryBuildingTypes || !previousStands) break;
       const have = this.count(sit, type);
       const built = (sit.ownByType.get(type) ?? []).filter((b) => b.constructed);
       const allBusy = built.every((b) => b.queue.length >= militaryQueue);
@@ -431,6 +448,7 @@ export class MachinePlayer {
         this.pushBuild(out, obs, sit, type, prio.firstProducer, 'front', p.militaryDistance);
       else if (have > 0 && have < p.maxProducersPerType && this.sitesOf(sit, type) === 0 && allBusy && rich)
         this.pushBuild(out, obs, sit, type, prio.extraProducer, 'front', p.militaryDistance);
+      previousStands = built.length > 0;
     }
 
     // a defensive tower once the base is going
@@ -486,19 +504,18 @@ export class MachinePlayer {
     const inArmy = new Map<UnitTypeId, number>();
     for (const u of sit.army) inArmy.set(u.type, (inArmy.get(u.type) ?? 0) + 1);
     let room = sit.freePop;
+    const kinds = this.militaryKinds();
+    const globalBest = this.bestCounterScore(sit, kinds);
     for (const list of sit.ownByType.values()) {
       for (const b of list) {
-        if (!b.constructed) continue;
+        if (!b.constructed || (this.trainsMilitary(b.type) && !kinds.includes(b.type))) continue;
         const options = (this.data.buildings[b.type]?.actions ?? [])
           .filter((a) => a.type === 'train' && isMilitary(this.data, a.unit))
           .map((a) => (a.type === 'train' ? a.unit : ''));
         if (options.length === 0) continue;
         let slots = this.profile.army.militaryQueue - b.queue.length - this.pendingTrains(b.id);
         while (slots-- > 0) {
-          // the type we have fewest of, for a mixed army
-          const unit = [...options].sort(
-            (a, c) => (inArmy.get(a) ?? 0) - (inArmy.get(c) ?? 0) || a.localeCompare(c),
-          )[0];
+          const unit = this.pickUnit(obs, sit, options, inArmy, globalBest);
           const pop = unit ? (this.data.units[unit]?.pop ?? 1) : 1;
           if (!unit || room < pop) break;
           room -= pop;
@@ -520,6 +537,55 @@ export class MachinePlayer {
       }
     }
     return out;
+  }
+
+  /**
+   * What a building trains next (army.unitChoice): `first` always presses the first button,
+   * `fewest` keeps the army mixed, `random` presses
+   * any button, `counter` answers the enemy army (src/ai/counters.ts) for army.counterShare of the
+   * picks and uses `fewest` for the rest. Types whose cost can never be paid any more (a resource
+   * gone from the stock and from every safe node) are skipped.
+   */
+  private pickUnit(
+    obs: Observation,
+    sit: Situation,
+    options: UnitTypeId[],
+    inArmy: Map<UnitTypeId, number>,
+    globalBest = 0,
+  ): UnitTypeId | undefined {
+    const payable = options.filter((u) =>
+      RESOURCES.every((r) => {
+        const c = this.data.units[u]?.cost[r] ?? 0;
+        return c === 0 || obs.resources[r] + this.safeAmount(obs, sit, r) >= c;
+      }),
+    );
+    const list = payable.length > 0 ? payable : options;
+    const fewest = (): UnitTypeId | undefined =>
+      [...list].sort((a, c) => (inArmy.get(a) ?? 0) - (inArmy.get(c) ?? 0) || a.localeCompare(c))[0];
+    const army = this.profile.army;
+    if (army.unitChoice === 'first') return list[0];
+    if (army.unitChoice === 'random') return list[Math.floor(this.pickRng.next() * list.length)];
+    if (army.unitChoice === 'counter' && sit.enemyArmy.length > 0 && globalBest > 0) {
+      const best = bestCounter(this.data, list, sit.enemyArmy, army.counterRangedEdge);
+      const score = best ? counterScore(this.data, best, sit.enemyArmy, army.counterRangedEdge) : 0;
+      if (score < army.counterMinShare * globalBest) return undefined; // a poor answer: skip this building
+      if (this.pickRng.next() < army.counterShare) return best ?? fewest();
+    }
+    return fewest();
+  }
+
+  /** The best counter score of any soldier the allowed army buildings train (0 when not countering). */
+  private bestCounterScore(sit: Situation, kinds: BuildingTypeId[]): number {
+    const army = this.profile.army;
+    if (army.unitChoice !== 'counter' || sit.enemyArmy.length === 0) return 0;
+    let best = 0;
+    for (const type of kinds) {
+      if (!(sit.ownByType.get(type) ?? []).some((b) => b.constructed)) continue;
+      for (const a of this.data.buildings[type]?.actions ?? [])
+        if (a.type === 'train' && isMilitary(this.data, a.unit))
+          best = Math.max(best, counterScore(this.data, a.unit, sit.enemyArmy, army.counterRangedEdge));
+    }
+    return best;
   }
 
   /** Military buildings send new units to the staging point. */

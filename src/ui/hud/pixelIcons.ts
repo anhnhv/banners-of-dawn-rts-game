@@ -43,6 +43,7 @@ export type IconName =
   | 'tree'
   | 'bow'
   | 'horse'
+  | 'knight'
   | 'stop'
   | 'shield';
 
@@ -241,6 +242,21 @@ ICONS.horse = [
   'kbttttbbk...',
   'kbttttbk....',
   '.kbbbbbk....',
+  '.kbk.kbk....',
+  '.kbk.kbk....',
+  '.kk..kk.....',
+];
+// armored horse with a lance: the Knight (the plain horse is the Scout Rider)
+ICONS.knight = [
+  'k.......kk..',
+  '.k.....kIIk.',
+  '..k...kIiIIk',
+  '...k.kIIkIk.',
+  '.kkkkIIIk...',
+  'kIiiiIIIk...',
+  'kIttttIIk...',
+  'kIttttIk....',
+  '.kIIIIIk....',
   '.kbk.kbk....',
   '.kbk.kbk....',
   '.kk..kk.....',

@@ -18,6 +18,7 @@
     "houseBufferPerProducer": 2,
     "firstProducerAtWorkers": 6,
     "maxProducersPerType": 2,
+    "militaryBuildingTypes": 2,
     "extraProducerBank": 350,
     "towers": 1,
     "towerAfterSeconds": 300,
@@ -39,7 +40,11 @@
     "militaryQueue": 2,
     "stagingDistance": 7,
     "defenceHp": 150,
-    "reissueSeconds": 4
+    "reissueSeconds": 4,
+    "unitChoice": "counter",
+    "counterShare": 0.7,
+    "counterRangedEdge": 1.5,
+    "counterMinShare": 0.5
   },
   "attack": {
     "earliestAttackSeconds": 300,

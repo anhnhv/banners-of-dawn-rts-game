@@ -37,6 +37,8 @@ export const AIProfileSchema = z.object({
     houseBufferPerProducer: z.number().int().min(0),
     firstProducerAtWorkers: z.number().int().min(0),
     maxProducersPerType: z.number().int().min(0),
+    /** How many different kinds of army building it builds, in game.json → buildMenu order. */
+    militaryBuildingTypes: z.number().int().min(0),
     extraProducerBank: num,
     towers: z.number().int().min(0),
     towerAfterSeconds: num,
@@ -61,6 +63,21 @@ export const AIProfileSchema = z.object({
     stagingDistance: num,
     defenceHp: num,
     reissueSeconds: num,
+    /**
+     * What to train: 'first' = always the building's first button, 'fewest' = the type it has
+     * fewest of, 'random' = any button (seeded), 'counter' = the best answer to the enemy army it
+     * sees (see counterShare).
+     */
+    unitChoice: z.enum(['first', 'fewest', 'random', 'counter']),
+    /** With 'counter': share of soldiers that follow the counter pick; the rest use 'fewest'. */
+    counterShare: chance,
+    /** With 'counter': how much more a ranged unit is worth against melee units (free shots while they walk in). */
+    counterRangedEdge: num,
+    /**
+     * With 'counter': a building trains only if its best answer scores at least this share of the
+     * best answer of all its army buildings (0 = always trains). Keeps Stables idle against spears.
+     */
+    counterMinShare: chance,
   }),
   attack: z.object({
     earliestAttackSeconds: num,

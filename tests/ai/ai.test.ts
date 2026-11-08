@@ -69,6 +69,40 @@ describe('Normal: a careful player', () => {
     expect(obs.pop).toBeLessThanOrEqual(obs.popCap);
   });
 
+  it('builds a Stable after its Barracks and trains cavalry too (standard start)', () => {
+    const m = match({ scenario: false, ai: [1], mode: 'normal' });
+    m.run(10 * 60);
+    expect(count(m, 1, 'barracks')).toBeGreaterThanOrEqual(1);
+    expect(count(m, 1, 'stable')).toBeGreaterThanOrEqual(1);
+    const t = m.trained.get(1) ?? {};
+    expect((t.scout_rider ?? 0) + (t.knight ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('answers what it sees: against an all-Knight army it trains mostly Militia (counter pick)', () => {
+    const m = match({ scenario: false, ai: [1], mode: 'normal' });
+    const th = townHall(m, 0);
+    for (let i = 0; i < 6; i++)
+      m.game.debugSpawn(0, 'knight', th.x - 2 - (i % 3), th.y + 4 + Math.floor(i / 3));
+    m.run(10 * 60);
+    const t = m.trained.get(1) ?? {};
+    const army = Object.entries(t).filter(([type]) => type !== 'worker');
+    const total = army.reduce((n, [, c]) => n + c, 0);
+    expect(total).toBeGreaterThan(4);
+    expect((t.militia ?? 0) / total).toBeGreaterThan(0.5);
+  });
+
+  it('against an all-Militia army it trains Archers and leaves its Stable idle (no horses into spears)', () => {
+    const m = match({ scenario: false, ai: [1], mode: 'normal' });
+    const th = townHall(m, 0);
+    for (let i = 0; i < 12; i++)
+      m.game.debugSpawn(0, 'militia', th.x - 2 - (i % 4), th.y + 4 + Math.floor(i / 4));
+    m.run(10 * 60);
+    const t = m.trained.get(1) ?? {};
+    expect(count(m, 1, 'stable')).toBeGreaterThanOrEqual(1);
+    expect(t.archer ?? 0).toBeGreaterThan(3);
+    expect((t.scout_rider ?? 0) + (t.knight ?? 0)).toBe(0);
+  });
+
   it('beats an idle opponent from the scenario start (decides to attack once it cannot grow)', () => {
     const m = match({ scenario: true, ai: [1], mode: 'normal' });
     m.run(15 * 60);
@@ -113,12 +147,14 @@ describe('Normal: a careful player', () => {
 describe('Easy: plays like a primary-school child', () => {
   const easy = PROFILES.easy;
 
-  it('keeps a small economy: few workers, one Barracks, no tower', () => {
+  it('keeps a small economy: few workers, one Barracks, no tower, no Stable, only Militia', () => {
     const m = match({ scenario: false, ai: [1], mode: 'easy' });
     m.run(8 * 60);
     expect(count(m, 1, 'worker')).toBeLessThanOrEqual(easy.economy.workerTarget);
     expect(count(m, 1, 'barracks')).toBeLessThanOrEqual(easy.buildings.maxProducersPerType);
     expect(count(m, 1, 'watch_tower')).toBe(0);
+    expect(count(m, 1, 'stable')).toBe(0); // one kind of army building: the Barracks
+    expect(Object.keys(m.trained.get(1) ?? {}).filter((t) => t !== 'worker')).toEqual(['militia']); // the first button
   });
 
   it(`attacks with at most ${easy.attack.groupSize} soldiers at a time, never before ${easy.attack.earliestAttackSeconds / 60}:00`, () => {

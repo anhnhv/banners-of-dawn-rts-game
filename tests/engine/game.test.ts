@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createGame, type Game } from '../../src/engine';
+import { createGame, GAME_DATA, type Game } from '../../src/engine';
 import { decodeMap, type Command, type PlayerId } from '../../src/shared';
 import { asciiMap, openMap } from './helpers';
 
@@ -25,14 +25,14 @@ describe('Game: movement', () => {
     expect(u.moving).toBe(false);
   });
 
-  it('moves at the unit speed (militia 2.2 tiles/s)', () => {
+  it('moves at the unit speed (units.json → militia.speed)', () => {
     const game = createGame(openMap(40, 5), { seed: 1 });
     const id = game.debugSpawn(0, 'militia', 1.5, 2.5);
     send(game, 0, { type: 'move', units: [id], to: { x: 35.5, y: 2.5 } });
     run(game, 20 * 5);
     const u = game.units.get(id)!;
-    expect(u.x - 1.5).toBeGreaterThan(2.2 * 5 - 0.6);
-    expect(u.x - 1.5).toBeLessThan(2.2 * 5 + 0.1);
+    expect(u.x - 1.5).toBeGreaterThan(GAME_DATA.units.militia!.speed * 5 - 0.6);
+    expect(u.x - 1.5).toBeLessThan(GAME_DATA.units.militia!.speed * 5 + 0.1);
   });
 
   it('walks around a wall and never stands on blocked tiles', () => {

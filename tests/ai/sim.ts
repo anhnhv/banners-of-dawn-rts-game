@@ -12,6 +12,8 @@ export const GREEN_VALLEY = JSON.parse(
 export interface Match {
   game: Game;
   ais: InlineAIController[];
+  /** Units trained so far, per player and type (from unitTrained events). */
+  trained: Map<PlayerId, Record<string, number>>;
   /** Run until `seconds` of game time pass or the match ends. */
   run(seconds: number): void;
 }
@@ -32,13 +34,21 @@ export function match(opts: {
   const modeOf = (p: PlayerId): AIMode =>
     (typeof opts.mode === 'string' ? opts.mode : opts.mode?.[p]) ?? 'easy';
   const ais = opts.ai.map((p) => new InlineAIController(game, p, modeOf(p), undefined, opts.seed ?? 5));
+  const trained = new Map<PlayerId, Record<string, number>>();
   return {
     game,
     ais,
+    trained,
     run(seconds: number) {
       const end = game.tick + seconds * TICK_RATE;
       while (game.tick < end && !game.result) {
         const events = game.step();
+        for (const e of events)
+          if (e.type === 'unitTrained') {
+            const t = trained.get(e.player) ?? {};
+            t[e.unitType] = (t[e.unitType] ?? 0) + 1;
+            trained.set(e.player, t);
+          }
         for (const ai of ais) ai.afterStep(events);
       }
     },

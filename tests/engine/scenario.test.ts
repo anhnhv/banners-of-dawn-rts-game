@@ -96,6 +96,50 @@ describe('map scenario', () => {
     expect(errors).toMatch(/unknown resource "mana"/);
   });
 
+  it('each side has a Barracks (Militia, Archer) and a Stable (Scout Rider, Knight) whose units get out', () => {
+    const game = scenarioGame();
+    const trains = (type: string): string[] =>
+      (GAME_DATA.buildings[type]?.actions ?? []).flatMap((a) => (a.type === 'train' ? [a.unit] : []));
+    expect(trains('barracks')).toEqual(['militia', 'archer']);
+    expect(trains('stable')).toEqual(['scout_rider', 'knight']);
+    expect(GAME_DATA.game.buildMenu.map((m) => m.building)).toContain('stable');
+    const before = new Set(game.units.keys());
+    for (const owner of [0, 1] as const) {
+      game.debugGive(owner, { food: 1000, wood: 1000, gold: 1000 });
+      game.debugBuilding(owner, 'house', owner === 0 ? 66 : 12, owner === 0 ? 50 : 28); // room for 5 more
+      for (const type of ['barracks', 'stable']) {
+        const b = [...game.buildings.values()].find((x) => x.owner === owner && x.type === type);
+        expect(b, `${type} of player ${owner}`).toBeDefined();
+        for (const unit of trains(type))
+          game.enqueue({ player: owner, tick: game.tick, cmd: { type: 'train', building: b!.id, unit } });
+      }
+    }
+    run(game, 60);
+    const fresh = [...game.units.values()].filter((u) => !before.has(u.id));
+    expect(fresh.map((u) => `${u.owner}:${u.type}`).sort()).toEqual(
+      ['archer', 'knight', 'militia', 'scout_rider'].flatMap((t) => [`0:${t}`, `1:${t}`]).sort(),
+    );
+    // every new unit can walk out of its base (to a spot away from both armies)
+    const out = { 0: { x: 64, y: 47 }, 1: { x: 16, y: 33 } } as const;
+    for (const owner of [0, 1] as const)
+      game.enqueue({
+        player: owner,
+        tick: game.tick,
+        cmd: {
+          type: 'move',
+          units: fresh.filter((u) => u.owner === owner).map((u) => u.id),
+          to: out[owner],
+        },
+      });
+    run(game, 40);
+    for (const u of fresh) {
+      const now = game.units.get(u.id);
+      const to = out[u.owner as 0 | 1];
+      expect(now, `${u.type} of player ${u.owner}`).toBeDefined();
+      expect(Math.hypot(now!.x - to.x, now!.y - to.y)).toBeLessThan(3);
+    }
+  });
+
   it('is deterministic', () => {
     const a = scenarioGame();
     const b = scenarioGame();

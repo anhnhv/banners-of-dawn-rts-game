@@ -28,7 +28,7 @@
       "name": "Berry Bush",
       "description": "Quick food early in the game.",
       "resource": "food",
-      "amount": 100,
+      "amount": 200,
       "model": "berryBush",
       "icon": "food",
       "panel": ["amount"]

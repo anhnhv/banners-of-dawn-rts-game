@@ -2,8 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { allocate, type Request } from '../../src/ai/Budget';
 import { TileMap } from '../../src/ai/TileMap';
-import { createGame } from '../../src/engine';
-import type { Command } from '../../src/shared';
+import { bestCounter } from '../../src/ai/counters';
+import { PROFILES } from '../../src/ai/profiles';
+import { createGame, GAME_DATA } from '../../src/engine';
+import type { Command, ObservedUnit } from '../../src/shared';
 import { openMap } from '../engine/helpers';
 
 function req(label: string, priority: number, cost: Request['cost']): Request {
@@ -74,5 +76,38 @@ describe('TileMap placement', () => {
     }
     // "back" = away from the enemy (front is +x): most houses are left of the Town Hall
     expect(placed.filter((p) => p.x + 1 < 14.5).length).toBeGreaterThan(placed.length / 2);
+  });
+});
+
+describe('counter pick (src/ai/counters.ts)', () => {
+  const army = (type: string, n: number): ObservedUnit[] =>
+    Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      owner: 1,
+      type,
+      x: 0,
+      y: 0,
+      hp: GAME_DATA.units[type]!.hp,
+      maxHp: GAME_DATA.units[type]!.hp,
+      stance: 'aggressive' as const,
+      order: { kind: 'idle' as const },
+    }));
+  const edge = PROFILES.normal.army.counterRangedEdge;
+  const ALL = ['militia', 'archer', 'scout_rider', 'knight'];
+
+  it('answers each army the way docs/units.md says', () => {
+    expect(bestCounter(GAME_DATA, ALL, army('militia', 10), edge)).toBe('archer');
+    expect(bestCounter(GAME_DATA, ALL, army('knight', 5), edge)).toBe('militia');
+    expect(bestCounter(GAME_DATA, ALL, army('scout_rider', 8), edge)).toBe('militia');
+    expect(['scout_rider', 'knight']).toContain(bestCounter(GAME_DATA, ALL, army('archer', 10), edge));
+  });
+
+  it('picks within what one building trains: the Barracks answers Knights with Militia', () => {
+    expect(bestCounter(GAME_DATA, ['militia', 'archer'], army('knight', 5), edge)).toBe('militia');
+    expect(bestCounter(GAME_DATA, ['militia', 'archer'], army('militia', 5), edge)).toBe('archer');
+  });
+
+  it('with no enemy army there is no counter pick', () => {
+    expect(bestCounter(GAME_DATA, ALL, [], edge)).toBeNull();
   });
 });

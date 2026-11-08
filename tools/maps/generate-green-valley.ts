@@ -199,6 +199,7 @@ const SCENARIO: NonNullable<MapFileInput['scenario']> = {
         { type: 'house', at: [57, 65] },
         { type: 'house', at: [52, 61] },
         { type: 'barracks', at: [55, 53] },
+        { type: 'stable', at: [62, 62] }, // behind the base, off the attack path
         { type: 'watch_tower', at: [52, 57] },
       ],
       units: [
@@ -219,6 +220,7 @@ const SCENARIO: NonNullable<MapFileInput['scenario']> = {
         { type: 'house', at: [18, 23] },
         { type: 'house', at: [14, 23] },
         { type: 'barracks', at: [26, 15] },
+        { type: 'stable', at: [18, 13] }, // behind the base, off the attack path
         { type: 'watch_tower', at: [24, 24] },
       ],
       units: [

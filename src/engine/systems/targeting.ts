@@ -2,7 +2,8 @@
  * Targeting (PLAN §2.8, §5.3 step 9). Every `combat.acquireEveryTicks` (staggered by id):
  *  - idle units with `combat.autoAttack`: aggressive stance scans its sight, hold stance its reach;
  *    an idle unit that was just hit goes for the attacker even beyond its sight (aggressive only);
- *  - attack-moving units scan their sight and insert an auto attack in front of the attack-move.
+ *  - attack-moving units go for a recent attacker first (even beyond sight), otherwise scan their
+ *    sight; either way they insert an auto attack in front of the attack-move.
  * Buildings with an attack pick through `bestTarget` too (see combatSystem).
  *
  * Choice: lowest priority first (the unit hitting me = combat.attackerPriority, otherwise
@@ -35,7 +36,12 @@ export function targetingSystem(state: GameState): void {
       const t = bestTarget(state, u, attack, hold ? reachOf(attack) : Math.max(def.sight, reachOf(attack)));
       if (t) u.orders = [{ ...here, target: t.id }];
     } else if (order.kind === 'attackMove') {
-      const t = bestTarget(state, u, attack, Math.max(def.sight, reachOf(attack)));
+      // strike back at whoever just hit me, even from beyond my sight (an archer outranging me)
+      const attacker = recentAttacker(state, u);
+      const t =
+        attacker && canHit(u.owner, attack, attacker)
+          ? attacker
+          : bestTarget(state, u, attack, Math.max(def.sight, reachOf(attack)));
       if (t) u.orders.unshift({ ...here, target: t.id });
     }
   }

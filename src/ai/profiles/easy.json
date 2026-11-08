@@ -18,6 +18,7 @@
     "houseBufferPerProducer": 0,
     "firstProducerAtWorkers": 8,
     "maxProducersPerType": 1,
+    "militaryBuildingTypes": 1,
     "extraProducerBank": 99999,
     "towers": 0,
     "towerAfterSeconds": 99999,
@@ -39,7 +40,11 @@
     "militaryQueue": 1,
     "stagingDistance": 7,
     "defenceHp": 150,
-    "reissueSeconds": 6
+    "reissueSeconds": 6,
+    "unitChoice": "first",
+    "counterShare": 0,
+    "counterRangedEdge": 1,
+    "counterMinShare": 0
   },
   "attack": {
     "earliestAttackSeconds": 360,
@@ -57,5 +62,5 @@
     "target": "nearestBuilding"
   },
   "retreat": { "retreatRatio": 0, "retreatCooldownSeconds": 60, "retreatGiveUpSeconds": 20 },
-  "defence": { "threatRadius": 6, "defendChance": 0.5, "homeRadius": 20, "raidShare": 0.3 }
+  "defence": { "threatRadius": 6, "defendChance": 0.25, "homeRadius": 20, "raidShare": 0.3 }
 }

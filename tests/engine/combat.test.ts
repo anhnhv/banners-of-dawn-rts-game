@@ -134,7 +134,10 @@ describe('projectiles (projectiles.json)', () => {
     expect(game.getView(0).projectiles.length).toBe(1);
     expect(game.units.get(m)!.hp).toBe(U.militia!.hp);
     run(game, 1);
-    expect(game.units.get(m)!.hp).toBe(U.militia!.hp - (4 + 4 - 1));
+    const arrow = U.archer!.attack!;
+    expect(game.units.get(m)!.hp).toBe(
+      U.militia!.hp - (arrow.damage + arrow.bonus.infantry! - U.militia!.armor),
+    );
     const p = game.getView(0).projectiles;
     expect(p.every((x) => x.z >= 0)).toBe(true);
   });
@@ -194,6 +197,37 @@ describe('targeting, stances and leash (PLAN §2.8)', () => {
     const events = run(game, 30);
     expect(events.some((e) => e.type === 'unitDied' && e.unit === w)).toBe(true);
     for (const id of mil) expect(game.units.get(id)!.x).toBeGreaterThan(28);
+  });
+
+  it('attack-moving units strike back at an archer shooting from beyond their sight', () => {
+    const game = arena();
+    // the archer stands farther than militia sight but within its own range of the path
+    const y = 10 + U.militia!.sight + 0.8;
+    expect(y - 10 - U.militia!.radius - U.archer!.radius).toBeLessThan(U.archer!.attack!.range);
+    const a = game.debugSpawn(1, 'archer', 20, y);
+    send(game, 1, { type: 'setStance', units: [a], stance: 'hold' });
+    const m = game.debugSpawn(0, 'militia', 5, 10);
+    send(game, 0, { type: 'attackMove', units: [m], to: { x: 35, y: 10 } });
+    for (let i = 0; i < 20 * 20 && game.units.get(m)!.hp === U.militia!.hp; i++) game.step();
+    expect(game.units.get(m)!.hp).toBeLessThan(U.militia!.hp); // shot from beyond its sight
+    run(game, 0.5);
+    expect(game.units.get(m)!.orders[0]).toMatchObject({ kind: 'attack', target: a, auto: true });
+    run(game, 4);
+    expect(game.units.get(a)!.hp).toBeLessThan(U.archer!.hp); // it walked up and hit back
+  });
+
+  it('a strike-back chase still ends at the leash, then the attack-move goes on', () => {
+    const game = arena();
+    const a = game.debugSpawn(1, 'archer', 20, 10 + U.militia!.sight + 0.8);
+    const m = game.debugSpawn(0, 'militia', 5, 10);
+    send(game, 0, { type: 'attackMove', units: [m], to: { x: 35, y: 10 } });
+    for (let i = 0; i < 40 * 20 && game.units.get(m)!.orders[0]?.kind !== 'attack'; i++) game.step();
+    expect(game.units.get(m)!.orders[0]).toMatchObject({ kind: 'attack', target: a, auto: true });
+    send(game, 1, { type: 'move', units: [a], to: { x: 20, y: 39 } }); // runs away, never caught
+    run(game, 40);
+    const u = game.units.get(m)!;
+    expect(u.x).toBeGreaterThan(33);
+    expect(u.orders).toHaveLength(0);
   });
 
   it('an explicit attack order ignores the leash', () => {

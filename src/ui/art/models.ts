@@ -11,7 +11,8 @@ import { voxelMaterial } from './materials';
 import { resolveColor, type TeamName } from './palette';
 import { VoxelBuilder, type BuiltGeometry } from './VoxelBuilder';
 
-export type BuildingModel = 'townHall' | 'house' | 'barracks' | 'farm' | 'tower' | 'goldMine' | 'berryBush';
+export type BuildingModel =
+  'townHall' | 'house' | 'barracks' | 'stable' | 'farm' | 'tower' | 'goldMine' | 'berryBush';
 export type WallAxis = 'x' | 'z';
 export type UnitModel = 'worker' | 'militia' | 'archer' | 'scoutRider' | 'knight';
 export type TreeModel = 'oak' | 'oakTall' | 'pine' | 'pineSmall';
@@ -106,6 +107,43 @@ const BUILDINGS: Record<BuildingModel, (b: VoxelBuilder) => void> = {
       b.box(2.86, 0.2, z, 0.03, 0.95, 0.03, 'bark', 'wood');
       b.box(2.85, 1.12, z - 0.01, 0.05, 0.1, 0.05, 'plain', 'iron');
     }
+  },
+
+  // long low barn with open horse stalls and a small paddock in front (reads differently from the
+  // tall stone Barracks: lower, wooden, thatched, horses looking out)
+  stable: (b) => {
+    b.box(0.1, 0, 0.1, 2.8, 0.12, 2.8, 'soil', 'dirt-dark', { top: 'soil', topColor: 'dirt' });
+    b.box(0.2, 0.12, 0.35, 2.6, 0.12, 1.6, 'rock', 'stone-dark', { topColor: 'stone' }); // footing
+    b.box(0.25, 0.24, 0.4, 2.5, 0.7, 1.5, 'planks', 'wood');
+    // three open stalls on the front, two with a horse looking out
+    for (const [i, x] of [0.42, 1.2, 1.98].entries()) {
+      b.box(x, 0.24, 1.9, 0.6, 0.56, 0.03, 'plain', 'shadow');
+      b.box(x, 0.24, 1.91, 0.6, 0.2, 0.04, 'planks', 'wood-light'); // half door
+      if (i !== 1) {
+        b.box(x + 0.2, 0.5, 1.88, 0.2, 0.2, 0.2, 'plain', i === 0 ? 'horse' : 'horse-dark'); // head
+        b.box(x + 0.23, 0.7, 1.98, 0.04, 0.07, 0.04, 'plain', 'horse-dark'); // ears
+        b.box(x + 0.33, 0.7, 1.98, 0.04, 0.07, 0.04, 'plain', 'horse-dark');
+      }
+    }
+    for (const x of [0.25, 1.06, 1.84, 2.66]) b.box(x, 0.24, 1.88, 0.09, 0.72, 0.06, 'planks', 'wood-dark');
+    b.box(0.25, 0.86, 1.88, 2.5, 0.08, 0.06, 'planks', 'wood-dark'); // lintel
+    b.gableRoof(0.25, 0.94, 0.4, 2.5, 1.5, 0.62, 'x', 'thatch', 'straw', 'planks', 'wood-light', 0.14);
+    b.box(0.12, 1.53, 1.1, 2.76, 0.07, 0.1, 'cloth', 'team'); // team-colored ridge
+    // paddock fence along the front, open in the middle
+    for (const x of [0.14, 0.78, 2.14, 2.78]) b.box(x, 0.12, 2.76, 0.08, 0.36, 0.08, 'bark', 'wood-dark');
+    for (const [x0, x1] of [
+      [0.14, 0.86],
+      [2.14, 2.86],
+    ] as const) {
+      b.box(x0, 0.24, 2.78, x1 - x0, 0.05, 0.04, 'planks', 'wood-light');
+      b.box(x0, 0.38, 2.78, x1 - x0, 0.05, 0.04, 'planks', 'wood-light');
+    }
+    // hay bale, water trough and a banner
+    b.box(2.25, 0.12, 2.15, 0.45, 0.3, 0.35, 'thatch', 'straw-light');
+    b.box(0.3, 0.12, 2.25, 0.55, 0.2, 0.25, 'planks', 'wood-dark');
+    b.box(0.35, 0.2, 2.3, 0.45, 0.05, 0.15, 'plain', 'water');
+    b.box(2.82, 0.12, 0.42, 0.06, 1.7, 0.06, 'bark', 'wood-dark');
+    b.box(2.88, 1.35, 0.43, 0.4, 0.3, 0.03, 'cloth', 'team');
   },
 
   farm: (b) => {

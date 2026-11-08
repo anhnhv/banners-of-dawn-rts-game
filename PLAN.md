@@ -108,6 +108,8 @@ Multiplayer, campaign, multiple factions, naval units, garrisoning, trading, alt
 Typical timings at Standard pace: Era II at about 7–9 minutes, Era III at about 14–16 minutes.
 
 ### 2.4 Units
+> **Updated 2026-11-07 (M6.5):** the four army units, their roles, counters and current numbers are in `docs/units.md` (kept in sync with `units.json` by a test). The Barracks trains Militia and Archers; the Stable trains Scout Riders and Knights. The table below is the original design, kept as history.
+
 Damage formula:
 ```
 damage = max(1, attack + bonus[target.class] + attackUpgrades - (target.armor + armorUpgrades))
@@ -137,7 +139,7 @@ Counter triangle, checked against the numbers above:
 | Farm | 2×2 | I | 60 W | 15 s | 200 | Infinite food, 1 worker, walkable |
 | Barracks | 3×3 | I | 150 W | 40 s | 1000 | Trains Militia |
 | Archery Range | 3×3 | II | 150 W | 40 s | 1000 | Trains Archer (requires Barracks) |
-| Stable | 3×3 | II | 150 W | 40 s | 1000 | Trains Scout Rider, Knight (III) |
+| Stable | 3×3 | II | 150 W | 40 s | 1000 | Trains Scout Rider, Knight (III). **Built in M6.5:** 175 W, 45 s, 900 HP, no era or prerequisite; the Barracks trains Archers, so there is no Archery Range |
 | Blacksmith | 3×3 | II | 150 W | 40 s | 900 | Attack and armor upgrades |
 | Watch Tower | 1×1 | II | 125 W, 50 G | 35 s | 500 | 6 dmg, range 7, every 2 s, sight 9 |
 | Wall | 1×1 per segment | II | 3 W per segment | 4 s per segment | 250 | Drag to place a line along a grid axis |
@@ -1332,9 +1334,22 @@ User decisions (2026-11-07): the machine plays by default and decides from the c
 
 **Known limit:** food is finite (berries only, about 700 per side), so long games stall once both sides have spent it. A Farm or more berries would fix it (user decision).
 
+### M6.5: Army roster (M) ✅ done 2026-11-07, details in `docs/plans/m6.5-army-roster.md`, units in `docs/units.md`
+User decisions (2026-11-07): the Barracks trains Archers too; a new Stable trains Scout Rider and Knight; every unit needs a clear role, an exploitable weakness and a situation where it shines, and no unit may be best everywhere. No Stable prerequisite; berries 100 → 200; the Catapult stays untrainable.
+- [x] Combat fix: an attack-moving unit hit from beyond its sight strikes back (archers no longer walk past Militia unanswered).
+- [x] Data: Barracks Q Militia / W Archer, Stable (175 W, 45 s, 900 HP) Q Scout Rider / W Knight, build menu A; rebalanced bonuses (`docs/units.md` §5); negative bonus = weak against buildings.
+- [x] Voxel Stable model and a Knight HUD icon; a finished Stable behind each base in the scenario.
+- [x] Tests: equal-cost matrix at 400 and 800 a side, rule 4, eight army mixes each beaten by another, one situation per unit, weaknesses; `docs/units.md` tables checked against the data.
+- [x] Machine player: `buildings.militaryBuildingTypes`, `army.unitChoice` (`first` / `fewest` / `random` / `counter`), `army.counterShare`, `army.counterRangedEdge`, `army.counterMinShare`; Normal answers what it sees, Easy presses the Militia button.
+
+*Implementation notes:*
+- The counter pick (`src/ai/counters.ts`) scores by Lanchester's square law (cost²); with plain cost it would answer Knights with Knights, which the fights disprove.
+- Easy had to be retuned: with the scenario Stables on the novice's path and archers at home, the novice won only 3 of 8 seeds. The Stables moved behind the bases, Easy only trains Militia (`unitChoice: first`) and notices attacks 1 time in 4 (`defence.defendChance` 0.25): 8 of 8.
+- Normal now beats Easy in all 3 seeds tried, at about 6:00.
+
 ### Later: Remaining content (was M6)
 - [ ] Eras and all techs.
-- [ ] Archery Range, Stable, Blacksmith, Siege Workshop, Castle; Archer, Scout Rider, Knight, Catapult.
+- [ ] Blacksmith, Siege Workshop, Castle; Catapult. (Archer, Scout Rider, Knight and the Stable are done in M6.5; the Barracks trains Archers, so there is no Archery Range.)
 - [ ] Wall drag along the grid axes with auto-joining wall models (posts, corners, T-joins); owner-only gates with 2 orientations.
 
 **Done when:** everything in §2 is playable and data-driven.
@@ -1433,6 +1448,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | M5 Combat | ✅ done (2026-11-07) |
 | Test scenario start (map `scenario`, §8.1) | ✅ done (2026-11-07) |
 | M6 Play against the machine (Easy) | ✅ done (2026-11-07) |
+| M6.5 Army roster (Barracks: Militia + Archer; new Stable: Scout Rider + Knight) | ✅ done (2026-11-07), waiting for review; details in `docs/plans/m6.5-army-roster.md`, units in `docs/units.md` |
 | **Next** | user's choice: e.g. a Farm for infinite food, more difficulties, fog, menus |
 
 **How to resume:**
@@ -1446,4 +1462,6 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Where we are (2026-11-07):** a match against the machine works from `/` (scenario start) and `/?setup=standard`. Modes: `/?ai=easy` (default, a child anyone can beat), `/?ai=normal`, `/?ai=off` (idle). Each mode's numbers are in `src/ai/profiles/<mode>.json`; `docs/ai-modes.md` explains the logic and has the configuration table.
 
-**Next:** ask the user. Open points: food runs out (berries only, so long games stall; a Farm would fix it); Normal/Hard profiles; fog; menus. No eras (decision 2026-11-07).
+**Army (M6.5, 2026-11-07):** the Barracks trains Militia and Archers, and the new Stable (build menu A) trains Scout Riders and Knights. Each unit's role, weakness and best situation are in `docs/units.md`; `tests/engine/balance.test.ts` proves the counter cycle. Normal picks counters to what it sees; Easy only presses the Militia button.
+
+**Next:** ask the user. Open points: Farm (food is still finite, berries now 200 each); more difficulties; fog; menus. No eras (decision 2026-11-07).
