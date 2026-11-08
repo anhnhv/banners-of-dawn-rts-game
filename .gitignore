@@ -5,4 +5,5 @@ coverage/
 .DS_Store
 .vite/
 sim-results/
+.firebase
 .claude/

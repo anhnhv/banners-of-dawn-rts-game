@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run validate-maps && npm test",
     "validate-maps": "tsx tools/validate-maps.ts",
-    "maps:generate": "tsx tools/maps/generate-green-valley.ts"
+    "maps:generate": "tsx tools/maps/generate-green-valley.ts",
+    "deploy": "bash scripts/deploy.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
