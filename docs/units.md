@@ -13,12 +13,14 @@ Workers are not army units. The Catapult exists in `units.json` but cannot be tr
 - `tests/docs/units.test.ts` checks that the tables in §4 and §5 match it.
 - `tests/engine/balance.test.ts` checks the matchups and situations described here.
 
-| Unit            | Trained at | Role in one line                                               |
-| --------------- | ---------- | -------------------------------------------------------------- |
-| **Militia**     | Barracks   | Cheap spear wall that stops horses                             |
-| **Archer**      | Barracks   | Back-line damage that melts infantry before it arrives         |
-| **Scout Rider** | Stable     | Fast raider that hunts workers and archers, then runs          |
-| **Knight**      | Stable     | Heavy shock cavalry that breaks archers and survives base fire |
+**Overview.** The details and measurements are in §1–§5.
+
+| Unit            | Trained at | Role             | Strong when                                                    | Weakness to exploit                                    |
+| --------------- | ---------- | ---------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
+| **Militia**     | Barracks   | Cheap spear wall | facing cavalry; gold runs out (needs none)                     | Archers; slowest unit, cannot catch anything           |
+| **Archer**      | Barracks   | Back-line damage | facing Militia; standing behind a Militia line                 | cavalry; does only 1 damage to buildings               |
+| **Scout Rider** | Stable     | Fast raider      | raiding workers, hunting Archers; needs no gold                | Militia, Knights; does only 1 damage to buildings      |
+| **Knight**      | Stable     | Heavy hammer     | breaking Archers and Scouts; attacking a base under tower fire | Militia; costs gold, uses 2 population, trains slowest |
 
 ## 1. The counter cycle
 
