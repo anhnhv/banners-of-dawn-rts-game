@@ -4,19 +4,20 @@
  * `classic` for anything the active collection does not define.
  *
  * To add a collection: write it (see autumn.ts) and add it to ART_COLLECTIONS below.
- * Switch with `?art=<id>`. Switch before anything is drawn: meshes and icons already made keep
+ * The game starts with DEFAULT_ART_ID; switch with `?art=<id>` (`?art=classic` for the base look). Switch before anything is drawn: meshes and icons already made keep
  * their old look (the HUD gallery redraws everything when it switches).
  */
 import { autumn } from './autumn';
 import { classic } from './classic';
+import { aetherfall } from './aetherfall';
 import type { ArtCollection, ArtCollectionParts, BaseArtCollection } from './types';
 
 export type * from './types';
 
-export const ART_COLLECTIONS: readonly ArtCollection[] = [classic, autumn];
+export const ART_COLLECTIONS: readonly ArtCollection[] = [classic, autumn, aetherfall];
 
-let active: ArtCollection = classic;
-let resolved: BaseArtCollection = classic;
+/** The collection used when the URL names none (or an unknown one). */
+export const DEFAULT_ART_ID = aetherfall.id;
 
 /** Merge a collection over classic: maps entry by entry, everything else replaced when given. */
 function resolve(c: ArtCollection): BaseArtCollection {
@@ -36,6 +37,9 @@ function resolve(c: ArtCollection): BaseArtCollection {
   return merged;
 }
 
+let active: ArtCollection = aetherfall;
+let resolved: BaseArtCollection = resolve(aetherfall);
+
 /** The active collection, complete (missing parts filled in from classic). */
 export function art(): BaseArtCollection {
   return resolved;
@@ -46,9 +50,9 @@ export function artId(): string {
   return active.id;
 }
 
-/** Make a collection active. Unknown ids select classic. Returns the id now active. */
+/** Make a collection active. Missing or unknown ids select the default. Returns the id now active. */
 export function setArtCollection(id: string | null | undefined): string {
-  active = ART_COLLECTIONS.find((c) => c.id === id) ?? classic;
+  active = ART_COLLECTIONS.find((c) => c.id === id) ?? aetherfall;
   resolved = resolve(active);
   return active.id;
 }

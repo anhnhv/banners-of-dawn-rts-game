@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { GAME_DATA } from '../../src/engine';
-import { ART_COLLECTIONS, art, setArtCollection } from '../../src/ui/art/collections';
+import { ART_COLLECTIONS, DEFAULT_ART_ID, art, setArtCollection } from '../../src/ui/art/collections';
 import { classic } from '../../src/ui/art/collections/classic';
 import {
   buildingGeometry,
@@ -94,7 +94,9 @@ describe('art collections', () => {
     expect(art().icons).toBe(classic.icons);
   });
 
-  it('unknown ids fall back to classic', () => {
-    expect(setArtCollection('nope')).toBe('classic');
+  it('missing and unknown ids fall back to the default collection', () => {
+    expect(setArtCollection('nope')).toBe(DEFAULT_ART_ID);
+    expect(setArtCollection(null)).toBe(DEFAULT_ART_ID);
+    expect(DEFAULT_ART_ID).toBe('aetherfall');
   });
 });

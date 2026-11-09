@@ -25,7 +25,7 @@ import {
   type BuildingModel,
   type TreeModel,
 } from '../art/models';
-import { ART_COLLECTIONS, artId, setArtCollection } from '../art/collections';
+import { ART_COLLECTIONS, DEFAULT_ART_ID, artId, setArtCollection } from '../art/collections';
 import { TEAMS } from '../art/palette';
 import { DATA } from '../data';
 import { iconFor, iconImg, type IconName } from '../hud/pixelIcons';
@@ -227,7 +227,7 @@ export class HudGallery {
   /** Switch the art collection (kept in the URL as `?hud&art=<id>`) and redraw. */
   private setArt(id: string): void {
     const now = setArtCollection(id);
-    const query = now === 'classic' ? '?hud' : `?hud&art=${encodeURIComponent(now)}`;
+    const query = now === DEFAULT_ART_ID ? '?hud' : `?hud&art=${encodeURIComponent(now)}`;
     window.history.replaceState(null, '', `${window.location.pathname}${query}${window.location.hash}`);
     this.show(this.current);
   }

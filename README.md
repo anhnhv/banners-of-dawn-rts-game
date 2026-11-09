@@ -60,7 +60,8 @@ More screenshots: [docs/preview/](docs/preview/) and [docs/milestones/](docs/mil
 ## Art collections
 
 All drawing data (palette, HUD icons, every voxel model) lives in [src/ui/art/collections/](src/ui/art/collections/).
-`classic/` defines everything; another collection only lists what it changes and takes the rest from
+The game is drawn with **Aetherfall** by default (`DEFAULT_ART_ID` in `collections/index.ts`); `?art=classic` shows
+the original look. `classic/` defines everything; another collection only lists what it changes and takes the rest from
 classic ([autumn.ts](src/ui/art/collections/autumn.ts) is a small example). To make one, copy `autumn.ts`, then add it to
 `ART_COLLECTIONS` in `collections/index.ts`. Review it in `/?hud` (switch at the top of the sidebar, or `,` / `.`)
 and play with it via `?art=<id>`.

@@ -12,6 +12,7 @@
  *   /?models      → the model viewer (every model and HUD icon)
  *   /?hud         → the HUD gallery (units, buildings, construction, resources; #collection)
  *   ?art=<id>     → draw everything with that art collection (src/ui/art/collections), any page
+ *                   (default: aetherfall; ?art=classic for the base look)
  * Any match parameter skips the menu; unspecified options come from the last setup.
  */
 import { startApp } from './host';
