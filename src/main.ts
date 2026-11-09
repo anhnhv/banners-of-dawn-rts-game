@@ -1,32 +1,24 @@
 /**
  * Browser entry point. It wires modules together and contains no game logic.
- *   /             → the game
- *   /?map=<id>    → a specific map from maps/index.json
- *                   (the map's ready-made `scenario` start is used when it has one)
- *   /?setup=standard → the standard start instead (Town Hall + map start.units only)
- *   /?ai=easy|normal → the machine player's mode (default easy, src/ai/profiles/<mode>.json)
- *   /?ai=off      → the machine player does nothing (an idle opponent)
+ *   /             → the Main Menu (Play → Match Setup, Quick start, Settings, How to Play)
+ *   /?play        → start a match at once with the last setup (or the defaults)
+ *   /?map=<id>    → start at once on that map (maps/index.json)
+ *   /?ai=easy|normal|off → start at once against that opponent (off = idle)
+ *   /?setup=scenario|standard → the map's ready-made battle, or Town Hall + start units
+ *   /?pace=relaxed|standard|fast|blitz, /?speed=0.5|1|1.5|2 → pace preset and game speed
  *   /?army=<n>    → dev: give the human player n extra units to test movement
  *   /?enemy=<n>   → dev: n enemy units between the bases, to test combat
  *   /?preview     → the style-preview diorama (keys 1 2 3 switch views)
+ *   /?models      → the model viewer (every model and HUD icon)
+ * Any match parameter skips the menu; unspecified options come from the last setup.
  */
-import { bootGame, isAIMode } from './host';
-import { startStylePreview } from './ui';
+import { startApp } from './host';
+import { startModelViewer, startStylePreview } from './ui';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container in index.html');
 
 const params = new URLSearchParams(window.location.search);
 if (params.has('preview')) startStylePreview(container);
-else {
-  const army = Number(params.get('army') ?? 0);
-  const enemy = Number(params.get('enemy') ?? 0);
-  const aiParam = params.get('ai');
-  void bootGame(container, {
-    mapId: params.get('map'),
-    testArmy: Number.isFinite(army) ? Math.min(400, Math.max(0, army)) : 0,
-    testEnemy: Number.isFinite(enemy) ? Math.min(400, Math.max(0, enemy)) : 0,
-    scenario: params.get('setup') !== 'standard',
-    ai: aiParam === 'off' ? null : isAIMode(aiParam) ? aiParam : undefined,
-  });
-}
+else if (params.has('models')) startModelViewer(container);
+else void startApp(container, window.location.search);

@@ -8,6 +8,9 @@
 import {
   Rng,
   TICK_RATE,
+  applyRules,
+  defaultRules,
+  type MatchRules,
   type BuildingView,
   type Command,
   type CommandEnvelope,
@@ -63,6 +66,11 @@ export interface GameOptions {
    * standard start. Ignored when the map has none. Off unless asked for.
    */
   scenario?: boolean;
+  /**
+   * The match's pace, pop cap and starting resources (Match Setup → src/data/pace.json).
+   * Default: game.json's values (= the Standard preset).
+   */
+  rules?: MatchRules;
 }
 
 const TEST_ARMY_MIX: UnitTypeId[] = ['militia', 'militia', 'archer', 'knight', 'worker', 'scout_rider'];
@@ -78,8 +86,10 @@ export class Game {
   constructor(map: DecodedMap, options: GameOptions) {
     this.loaded = loadMap(map);
     const grid = this.loaded.grid;
+    const rules = options.rules ?? defaultRules(DATA.game);
     this.state = {
       tick: 0,
+      rules: { ...rules, startingResources: { ...rules.startingResources } },
       grid,
       rng: new Rng(options.seed),
       players: new Map(),
@@ -99,10 +109,11 @@ export class Game {
     for (const p of [0, 1] as const) {
       this.state.players.set(p, {
         id: p,
-        resources: { ...DATA.game.startingResources },
+        resources: { ...rules.startingResources },
         lastAlertTick: -Infinity,
         stats: { unitsTrained: 0, unitsLost: 0, buildingsBuilt: 0, buildingsLost: 0 },
         hadKeyBuilding: false,
+        surrendered: false,
       });
     }
     // Resource nodes (their tiles are already blocked by loadMap).
@@ -137,6 +148,11 @@ export class Game {
 
   get tick(): number {
     return this.state.tick;
+  }
+
+  /** The match rules (pace, pop cap, starting resources). */
+  get rules(): Readonly<MatchRules> {
+    return this.state.rules;
   }
 
   get width(): number {
@@ -374,7 +390,7 @@ export class Game {
       buildable,
       passable,
       spawns: this.loaded.spawns.map((sp) => ({ player: sp.player, x: sp.x, y: sp.y, w: sp.w, h: sp.h })),
-      data: DATA,
+      data: applyRules(DATA, this.state.rules),
     };
   }
 
@@ -543,7 +559,7 @@ export class Game {
         const short = shortOf(player.resources, def.cost);
         if (short) return reject(`NOT_ENOUGH_${short.toUpperCase()}`);
         for (const [r, v] of Object.entries(def.cost)) player.resources[r as keyof ResourceAmounts] -= v ?? 0;
-        b.queue.push({ unit: cmd.unit, progress: 0, total: trainTicks(cmd.unit) });
+        b.queue.push({ unit: cmd.unit, progress: 0, total: trainTicks(s, cmd.unit) });
         return;
       }
       case 'cancelTrain': {
@@ -596,6 +612,11 @@ export class Game {
             player.resources[r as keyof ResourceAmounts] += v ?? 0;
         s.buildings.delete(b.id);
         s.grid.unblock(b.x, b.y, b.w, b.h);
+        return;
+      }
+      case 'surrender': {
+        const player = s.players.get(env.player);
+        if (player) player.surrendered = true; // victorySystem ends the match this tick
         return;
       }
       default:
@@ -674,7 +695,7 @@ export class Game {
       maxHp: def.hp,
       constructed,
       buildProgress: 0,
-      buildTotal: buildTicks(type),
+      buildTotal: buildTicks(this.state, type),
       queue: [],
       popBlocked: false,
       rally: null,

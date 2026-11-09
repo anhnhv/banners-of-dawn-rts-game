@@ -2,12 +2,12 @@
 
 The machine player has two modes:
 
-| Mode               | Plays like                                  | How to pick it     |
-| ------------------ | ------------------------------------------- | ------------------ |
-| **Easy** (default) | A primary-school child: anyone can beat it  | `/` or `/?ai=easy` |
-| **Normal**         | A careful player who counts before fighting | `/?ai=normal`      |
+| Mode               | Plays like                                  | How to pick it                                    |
+| ------------------ | ------------------------------------------- | ------------------------------------------------- |
+| **Easy** (default) | A primary-school child: anyone can beat it  | Match Setup → Opponent → Easy, or `/?ai=easy`     |
+| **Normal**         | A careful player who counts before fighting | Match Setup → Opponent → Normal, or `/?ai=normal` |
 
-`/?ai=off` gives an idle opponent.
+Opponent → Idle (or `/?ai=off`) gives an opponent that does nothing. Match Setup lists every mode in `src/ai/profiles/index.ts` and shows its `persona` as the help text, so a new mode file appears in the menu by itself.
 
 **Each mode is one config file**: `src/ai/profiles/easy.json` and `src/ai/profiles/normal.json`.
 

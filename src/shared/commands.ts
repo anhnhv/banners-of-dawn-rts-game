@@ -26,7 +26,9 @@ export type Command =
   /** Place a construction site (top-left tile `at`). No workers needed: it builds itself. */
   | { type: 'build'; building: string; at: { x: number; y: number } }
   /** Cancel a construction site for a full refund. */
-  | { type: 'cancelBuild'; building: EntityId };
+  | { type: 'cancelBuild'; building: EntityId }
+  /** Give up the match: the other player wins at once. */
+  | { type: 'surrender' };
 
 export type CommandType = Command['type'];
 

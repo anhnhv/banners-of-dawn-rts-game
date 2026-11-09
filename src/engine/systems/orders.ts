@@ -138,7 +138,7 @@ function gather(state: GameState, u: Unit, o: Extract<Order, { kind: 'gather' }>
   u.activity = 'work';
   u.facing = Math.atan2(node.x + node.w / 2 - u.x, node.y + node.h / 2 - u.y);
   const player = state.players.get(u.owner);
-  u.workProgress += (gatherRate(u.type, node.kind) * DATA.game.pace.gatherRate) / TICK_RATE;
+  u.workProgress += (gatherRate(u.type, node.kind) * state.rules.gatherRate) / TICK_RATE;
   while (u.workProgress >= 1 && node.amount > 0) {
     u.workProgress -= 1;
     node.amount -= 1;

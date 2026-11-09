@@ -58,6 +58,18 @@ export class World3D {
     return this.renderer.domElement;
   }
 
+  /** Settings → shadows. three.js picks the matching shaders on the next frame. */
+  setShadows(on: boolean): void {
+    this.sun.castShadow = on;
+  }
+
+  /** Settings → render quality: 'low' draws fewer pixels (for slow graphics cards). */
+  setQuality(quality: 'high' | 'low'): void {
+    const dpr = window.devicePixelRatio || 1;
+    this.renderer.setPixelRatio(quality === 'high' ? Math.min(dpr, 2) : 0.75);
+    this.resize();
+  }
+
   render(): RenderStats {
     this.followCamera();
     this.renderer.render(this.scene, this.rig.camera);

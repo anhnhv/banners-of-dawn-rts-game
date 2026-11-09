@@ -21,7 +21,7 @@
       "resource": "wood",
       "amount": 100,
       "model": "pine",
-      "icon": "tree",
+      "icon": "pine",
       "panel": ["amount"]
     },
     "berry_bush": {
@@ -30,7 +30,7 @@
       "resource": "food",
       "amount": 200,
       "model": "berryBush",
-      "icon": "food",
+      "icon": "berryBush",
       "panel": ["amount"]
     },
     "gold_mine": {
@@ -39,7 +39,7 @@
       "resource": "gold",
       "amount": 800,
       "model": "goldMine",
-      "icon": "gold",
+      "icon": "goldMine",
       "panel": ["amount"]
     }
   }

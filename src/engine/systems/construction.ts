@@ -1,6 +1,6 @@
 /**
  * Construction (decided 2026-11-06): no workers. A placed construction site advances by itself,
- * finishing after buildTime / pace.buildSpeed seconds. Its HP grows from
+ * finishing after buildTime / rules.buildSpeed seconds (the match's pace). Its HP grows from
  * construction.startHpFraction to full. Placement rules live here too.
  */
 import { secondsToTicks, type BuildingTypeId } from '../../shared';
@@ -9,9 +9,9 @@ import type { Building, Rect } from '../entities/Building';
 import type { GameState } from '../GameState';
 import { approachPoint } from './reach';
 
-export function buildTicks(type: BuildingTypeId): number {
+export function buildTicks(state: GameState, type: BuildingTypeId): number {
   const def = DATA.buildings[type];
-  return Math.max(1, secondsToTicks((def?.buildTime ?? 1) / DATA.game.pace.buildSpeed));
+  return Math.max(1, secondsToTicks((def?.buildTime ?? 1) / state.rules.buildSpeed));
 }
 
 /** True if `type` is offered by the build menu (game.json → buildMenu). */

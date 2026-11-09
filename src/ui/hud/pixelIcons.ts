@@ -26,6 +26,8 @@ const INK: Record<string, string> = {
   E: '#7ab84c',
   x: '#6f6b78',
   X: '#d6d3db',
+  q: '#2f6a3b',
+  Q: '#5aa257',
 };
 
 export type IconName =
@@ -45,7 +47,15 @@ export type IconName =
   | 'horse'
   | 'knight'
   | 'stop'
-  | 'shield';
+  | 'shield'
+  | 'barracks'
+  | 'stable'
+  | 'tower'
+  | 'pine'
+  | 'berryBush'
+  | 'goldMine'
+  | 'catapult'
+  | 'menu';
 
 const ICONS: Record<string, string[]> & Partial<Record<IconName, string[]>> = {
   food: [
@@ -292,7 +302,136 @@ ICONS.shield = [
   '....kkkk....',
 ];
 
+// ---- own icons for every building, node and unit (until M7a several reused another's icon) ----
+
+/** A hall with team shields and two spears leaning on it. */
+ICONS.barracks = [
+  'ik........ki',
+  '.ik......ki.',
+  '..bk....kb..',
+  '...bk..kb...',
+  '.kkkkkkkkkk.',
+  'kppppppppppk',
+  'kkkkkkkkkkkk',
+  '.kBBBBBBBBk.',
+  '.kBttBBttBk.',
+  '.kBttnnttBk.',
+  '.kBBBnnBBBk.',
+  'kkkkkkkkkkkk',
+];
+/** A barn with a horseshoe in the gable and braced double doors. */
+ICONS.stable = [
+  '.....kk.....',
+  '....kppk....',
+  '...kpiipk...',
+  '..kpippipk..',
+  '.kppippippk.',
+  'kkkkkkkkkkkk',
+  '.kBBBBBBBBk.',
+  '.kBknnnnkBk.',
+  '.kBknBBnkBk.',
+  '.kBkBnnBkBk.',
+  '.kBknBBnkBk.',
+  'kkkkkkkkkkkk',
+];
+/** A stone watch tower with merlons, a window and a team flag. */
+ICONS.tower = [
+  '......kkk...',
+  '.....nttTk..',
+  '.....nttk...',
+  '.....n......',
+  '.kk.kkkk.kk.',
+  '.kXkkXXkkXk.',
+  '.kXXXXXXXXk.',
+  '..kXXxXXXk..',
+  '..kXXkkXXk..',
+  '..kXXkkXXk..',
+  '..kXXXXXxk..',
+  '.kkkkkkkkkk.',
+];
+/** A layered conifer (the oak is `tree`). */
+ICONS.pine = [
+  '.....kk.....',
+  '....kqqk....',
+  '...kqQqqk...',
+  '....kqqk....',
+  '..kqQqqqqk..',
+  '.kqqqqQqqqk.',
+  '...kqqqqk...',
+  '.kqQqqqqqqk.',
+  'kqqqqqqqQqqk',
+  'kkkkkbbkkkkk',
+  '....kbbk....',
+  '....kkkk....',
+];
+/** A round bush with red berries. */
+ICONS.berryBush = [
+  '............',
+  '....kkkk....',
+  '..kkEEEEkk..',
+  '.kEERrEEEEk.',
+  '.kEErdEERrk.',
+  'kEEEEEEErdEk',
+  'keRreeEEEEek',
+  'kerdeeeRreek',
+  '.keeeeerdek.',
+  '..kkeeeeekk.',
+  '....kkkkk...',
+  '............',
+];
+/** A rock mound with a timbered entrance and gold inside. */
+ICONS.goldMine = [
+  '............',
+  '....kkkk....',
+  '..kkXXXXkk..',
+  '.kXyXxXXyXk.',
+  '.kXxkkkkxXk.',
+  'kXXkbbbbkXXk',
+  'kyxbkkkkbxXk',
+  'kXXbkkkkbXyk',
+  'kxXbkYykbXxk',
+  'kXXbkyykbXXk',
+  'kkkkkkkkkkkk',
+  '............',
+];
+/** A wheeled frame with a raised throwing arm and a stone in the bucket. */
+ICONS.catapult = [
+  '.........kk.',
+  '........kxXk',
+  '.......kbkk.',
+  '......kbk...',
+  '.....kbk....',
+  '....kbk.....',
+  '.kkkbkkkkk..',
+  'kBBBBBBBBBk.',
+  '.kBkkkkkBk..',
+  'kBnk...kBnk.',
+  'knBk...knBk.',
+  '.kk.....kk..',
+];
+
+/** The in-game menu button: three brass bars. */
+ICONS.menu = [
+  '............',
+  '.kkkkkkkkkk.',
+  '.kYYYYYYYYk.',
+  '.kkkkkkkkkk.',
+  '............',
+  '.kkkkkkkkkk.',
+  '.kYYYYYYYYk.',
+  '.kkkkkkkkkk.',
+  '............',
+  '.kkkkkkkkkk.',
+  '.kYYYYYYYYk.',
+  '.kkkkkkkkkk.',
+];
+
 const cache = new Map<IconName, string>();
+
+/** Every icon, in the order they are defined (model viewer). */
+export function iconNames(): IconName[] {
+  return Object.keys(ICONS) as IconName[];
+}
 
 /** Icon for a config icon name (falls back to a generic person icon). */
 export function iconFor(name: string): IconName {

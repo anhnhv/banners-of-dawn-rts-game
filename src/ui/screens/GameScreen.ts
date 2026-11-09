@@ -11,6 +11,7 @@ import {
   type DecodedMap,
   type EntityId,
   type GameEvent,
+  type MatchRules,
   type PlayerId,
   type PlayerView,
   type TerrainType,
@@ -29,14 +30,35 @@ import { HealthBars } from '../render/HealthBars';
 import { ProjectileRenderer } from '../render/ProjectileRenderer';
 import { MoveMarkers } from '../render/MoveMarkers';
 import { UnitRenderer } from '../render/UnitRenderer';
+import { SCROLL_FACTOR, type Settings } from '../settings';
 import { TileCursor } from '../three/TileCursor';
 import { World3D } from '../three/World3D';
+import { PauseMenu } from './PauseMenu';
+
+/** What the screen may ask of the host: time control and leaving the match. */
+export interface MatchControls {
+  setPaused(paused: boolean): void;
+  setSpeed(speed: number): void;
+  /** Restart / Play again: a new match with the same setup. */
+  restart(): void;
+  /** Quit / Main menu. */
+  quit(): void;
+}
 
 export interface GameScreenOptions {
   player: PlayerId;
   onCommand: (cmd: Command) => void;
   /** Validator warnings to surface in the console. */
   warnings?: readonly string[];
+  /** The match's pace (tooltips and timers show the real times). */
+  rules: MatchRules;
+  controls: MatchControls;
+  /** Game speeds offered by + / - and the pause menu, and the one to start with. */
+  speeds: readonly number[];
+  speed: number;
+  settings: Settings;
+  /** A setting was changed in the pause menu (the host saves it). */
+  onSettings(settings: Settings): void;
 }
 
 const CORNERS: Array<[number, number]> = [
@@ -84,6 +106,10 @@ export class GameScreen {
   private time = 0;
   private fpsFrames = 0;
   private fpsTime = 0;
+  private readonly pauseMenu: PauseMenu;
+  private speed: number;
+  private paused = false;
+  private settings: Settings;
 
   constructor(
     container: HTMLElement,
@@ -133,12 +159,41 @@ export class GameScreen {
       rig.target.set(x, 0, z);
       rig.pan(0, 0);
     };
-    this.hud = new GameHud(container, map, this.minimap, options.warnings ?? [], {
-      onCommand: options.onCommand,
-      onSelectIdleWorker: () => this.selectIdleWorker(),
-      onBeginRally: (id) => this.selection.beginRally(id),
-      onStartPlacement: (type) => this.placement.begin(type),
-      onBeginAttackMove: (ids) => this.selection.beginAttackMove(ids),
+    this.hud = new GameHud(
+      container,
+      map,
+      this.minimap,
+      options.warnings ?? [],
+      {
+        onCommand: options.onCommand,
+        onSelectIdleWorker: () => this.selectIdleWorker(),
+        onBeginRally: (id) => this.selection.beginRally(id),
+        onStartPlacement: (type) => this.placement.begin(type),
+        onBeginAttackMove: (ids) => this.selection.beginAttackMove(ids),
+        onOpenMenu: () => this.openMenu(),
+        onPlayAgain: () => options.controls.restart(),
+        onMainMenu: () => options.controls.quit(),
+      },
+      options.rules,
+    );
+    this.speed = options.speed;
+    this.settings = { ...options.settings };
+    this.pauseMenu = new PauseMenu(this.hud.root, {
+      speeds: options.speeds,
+      speed: () => this.speed,
+      settings: () => this.settings,
+      onSpeed: (s) => this.setSpeed(s),
+      onSettings: (s) => {
+        this.applySettings(s);
+        options.onSettings(s);
+      },
+      onResume: () => this.closeMenu(),
+      onRestart: () => options.controls.restart(),
+      onSurrender: () => {
+        this.closeMenu(); // the command is applied at the next tick, so time must run
+        options.onCommand({ type: 'surrender' });
+      },
+      onQuit: () => options.controls.quit(),
     });
     this.selection = new SelectionController({
       container,
@@ -170,15 +225,30 @@ export class GameScreen {
           this.selectIdleWorker();
           return true;
         }
+        if (e.code === 'KeyP' || e.code === 'Pause') {
+          this.setPaused(!this.paused);
+          return true;
+        }
+        if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
+          this.stepSpeed(1);
+          return true;
+        }
+        if (e.key === '-' || e.code === 'NumpadSubtract') {
+          this.stepSpeed(-1);
+          return true;
+        }
         return this.hud.handleKey(e);
       },
       placement: this.placement,
       onEscape: () => {
-        if (!this.hud.isBuildMenuOpen) return false;
-        this.hud.toggleBuildMenu(false);
+        // cancel the build menu first; otherwise Esc opens the pause menu
+        if (this.hud.isBuildMenuOpen) this.hud.toggleBuildMenu(false);
+        else this.openMenu();
         return true;
       },
     });
+    this.applySettings(this.settings);
+    this.hud.setSpeed(this.speed, false);
 
     this.objectAt = new Int32Array(map.width * map.height).fill(-1);
     map.objects.forEach((o, i) => {
@@ -192,11 +262,61 @@ export class GameScreen {
     this.hud.setOpponent(text);
   }
 
+  /** Settings that act on the running match (camera, shadows, render quality, help-box lines). */
+  applySettings(s: Settings): void {
+    this.settings = { ...s };
+    this.camera.edgeScroll = s.edgeScroll;
+    this.camera.panSpeed = SCROLL_FACTOR[s.scrollSpeed];
+    this.world.setShadows(s.shadows);
+    this.world.setQuality(s.quality);
+    this.hud.setVisibility(s.showFps, s.showAiStatus);
+  }
+
+  // ---- time control and the pause menu ----------------------------------------------------------
+
+  private setPaused(paused: boolean): void {
+    if (this.hud.resultVisible) paused = false;
+    this.paused = paused;
+    this.options.controls.setPaused(paused);
+    this.hud.setSpeed(this.speed, paused, paused && !this.pauseMenu.isOpen);
+  }
+
+  private setSpeed(speed: number): void {
+    this.speed = speed;
+    this.options.controls.setSpeed(speed);
+    this.hud.setSpeed(speed, this.paused, this.paused && !this.pauseMenu.isOpen);
+  }
+
+  private stepSpeed(dir: 1 | -1): void {
+    const list = this.options.speeds;
+    const i = list.indexOf(this.speed);
+    const next = list[Math.max(0, Math.min(list.length - 1, (i < 0 ? list.indexOf(1) : i) + dir))];
+    if (next !== undefined) this.setSpeed(next);
+  }
+
+  private openMenu(): void {
+    if (this.hud.resultVisible || this.pauseMenu.isOpen) return;
+    this.placement.cancel();
+    this.camera.enabled = false;
+    this.pauseMenu.open();
+    this.setPaused(true);
+  }
+
+  private closeMenu(): void {
+    this.pauseMenu.close();
+    this.camera.enabled = true;
+    this.setPaused(false);
+  }
+
   /** Called by the host every animation frame. */
   frame(dtSeconds: number, view: PlayerView, alpha: number, events: readonly GameEvent[] = []): void {
     this.time += dtSeconds;
     this.lastView = view;
-    if (view.result) this.hud.showResult(view.result, view.player, TICK_RATE);
+    if (view.result && !this.hud.resultVisible) {
+      this.pauseMenu.close();
+      this.camera.enabled = true;
+      this.hud.showResult(view.result, view.player, TICK_RATE);
+    }
     this.syncResources(view);
     this.showEvents(events);
     this.camera.update(dtSeconds);

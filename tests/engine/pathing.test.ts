@@ -54,6 +54,24 @@ describe('A*', () => {
   });
 });
 
+describe('grid regions', () => {
+  it('labels connected land; a pocket enclosed by rock is its own region', () => {
+    const grid = gridOf(['.....', '.###.', '.#.#.', '.###.', '.....']);
+    expect(grid.regionAt(0, 0)).toBe(grid.regionAt(4, 4));
+    expect(grid.regionAt(2, 2)).toBeGreaterThanOrEqual(0);
+    expect(grid.regionAt(2, 2)).not.toBe(grid.regionAt(0, 0));
+    expect(grid.regionAt(1, 1)).toBe(-1);
+  });
+
+  it('updates after blockers change', () => {
+    const grid = gridOf(['.....', '.....', '.....']);
+    grid.block(2, 0, 1, 3); // a wall splits the map
+    expect(grid.regionAt(0, 1)).not.toBe(grid.regionAt(4, 1));
+    grid.unblock(2, 1, 1, 1); // a gap opens
+    expect(grid.regionAt(0, 1)).toBe(grid.regionAt(4, 1));
+  });
+});
+
 describe('smoothing', () => {
   it('reduces an open-field path to its two ends', () => {
     const grid = gridOf(['..........', '..........', '..........', '..........']);

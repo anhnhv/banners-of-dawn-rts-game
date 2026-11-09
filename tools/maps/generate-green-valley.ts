@@ -2,66 +2,20 @@
  * Generates maps/green_valley.json (PLAN §8.3): an open 80×80 grassland, the beginner map.
  *
  * Only the human player's half is designed; the other half is a 180° rotation, so the map is fair
- * by construction. The output is a normal, hand-editable map file. Re-run after changing this script:
- *   npx tsx tools/maps/generate-green-valley.ts
+ * by construction (helpers in mapgen.ts). Re-run after changing this script: npm run maps:generate
  */
-import { writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { decodeMap, Rng, type MapFileInput, type MapObjectName, type TerrainType } from '../../src/shared';
-import { validateMap } from '../../src/engine';
+import { Rng, type MapFileInput, type TerrainType } from '../../src/shared';
+import { dist, legend, MapCanvas, noise, writeMap } from './mapgen';
 
 const W = 80;
 const H = 80;
 const rng = new Rng(0x6ee41a);
-
-const TERRAIN_CHAR: Record<TerrainType, string> = {
-  grass: '.',
-  dirt: ',',
-  sand: ':',
-  shallow: '~',
-  water: 'W',
-  rock: '#',
-};
-const OBJECT_CHAR: Record<MapObjectName, string> = {
-  tree: 'T',
-  pine: 'P',
-  gold_mine: 'G',
-  berry_bush: 'B',
-  stone: 'r',
-  spawn_p1: '1',
-  spawn_p2: '2',
-};
-const FOOTPRINT: Partial<Record<MapObjectName, number>> = { gold_mine: 2, spawn_p1: 3, spawn_p2: 3 };
-
-// ---- helpers ---------------------------------------------------------------------------------------
-
-/** The human player's half (bottom-right on screen). Its 180° mirror is the machine player's half. */
-const inPrimaryHalf = (x: number, y: number): boolean => x + y > W - 1 || (x + y === W - 1 && x >= W / 2);
-const idx = (x: number, y: number): number => y * W + x;
-const dist = (ax: number, ay: number, bx: number, by: number): number => Math.hypot(ax - bx, ay - by);
-
-function hash(x: number, y: number, seed: number): number {
-  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 2246822519);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-/** Smooth value noise in [0, 1). */
-function noise(x: number, y: number, scale: number, seed: number): number {
-  const fx = x / scale;
-  const fy = y / scale;
-  const x0 = Math.floor(fx);
-  const y0 = Math.floor(fy);
-  const tx = fx - x0;
-  const ty = fy - y0;
-  const sx = tx * tx * (3 - 2 * tx);
-  const sy = ty * ty * (3 - 2 * ty);
-  const a = hash(x0, y0, seed);
-  const b = hash(x0 + 1, y0, seed);
-  const c = hash(x0, y0 + 1, seed);
-  const d = hash(x0 + 1, y0 + 1, seed);
-  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
-}
+const canvas = new MapCanvas(W, H);
+const { terrain, reserved } = canvas;
+const inPrimaryHalf = (x: number, y: number): boolean => canvas.inPrimaryHalf(x, y);
+const idx = (x: number, y: number): number => canvas.idx(x, y);
+const reserve = canvas.reserve.bind(canvas);
+const place = canvas.place.bind(canvas);
 
 // ---- layout (human player's half) ----------------------------------------------------------------
 
@@ -70,23 +24,6 @@ const HOME_C = { x: HOME.x + 1.5, y: HOME.y + 1.5 };
 const POND = { x: 49.5, y: 46.5 };
 const ROCKS = { x: 69.5, y: 45.5 };
 const CENTER = { x: 40, y: 40 };
-
-const terrain: TerrainType[] = new Array<TerrainType>(W * H).fill('grass');
-const objects: Array<{ name: MapObjectName; x: number; y: number }> = [];
-/** Tiles that must stay free of generated trees/stones (footprints plus breathing room). */
-const reserved = new Uint8Array(W * H);
-
-function reserve(x: number, y: number, w: number, h: number, margin: number): void {
-  for (let j = y - margin; j < y + h + margin; j++)
-    for (let i = x - margin; i < x + w + margin; i++)
-      if (i >= 0 && j >= 0 && i < W && j < H) reserved[idx(i, j)] = 1;
-}
-
-function place(name: MapObjectName, x: number, y: number, margin = 1): void {
-  const size = FOOTPRINT[name] ?? 1;
-  objects.push({ name, x, y });
-  reserve(x, y, size, size, margin);
-}
 
 // Terrain
 for (let y = 0; y < H; y++) {
@@ -159,26 +96,8 @@ for (let n = 0; n < 9;) {
 
 // ---- mirror into the machine player's half -------------------------------------------------------
 
-for (let y = 0; y < H; y++)
-  for (let x = 0; x < W; x++)
-    if (!inPrimaryHalf(x, y)) terrain[idx(x, y)] = terrain[idx(W - 1 - x, H - 1 - y)] ?? 'grass';
-
-const mirrored = objects.map((o) => {
-  const size = FOOTPRINT[o.name] ?? 1;
-  const name: MapObjectName = o.name === 'spawn_p1' ? 'spawn_p2' : o.name;
-  return { name, x: W - o.x - size, y: H - o.y - size };
-});
-objects.push(...mirrored);
-objects.push({ name: 'gold_mine', x: CENTER.x - 1, y: CENTER.y - 1 }); // the rich center mine is its own mirror
-
-// ---- encode ----------------------------------------------------------------------------------------
-
-const objectGrid = Array.from({ length: H }, () => new Array<string>(W).fill('.'));
-for (const o of objects) {
-  const row = objectGrid[o.y];
-  if (!row) throw new Error(`object outside map at ${o.x},${o.y}`);
-  row[o.x] = OBJECT_CHAR[o.name];
-}
+canvas.mirror();
+canvas.objects.push({ name: 'gold_mine', x: CENTER.x - 1, y: CENTER.y - 1 }); // the rich center mine is its own mirror
 
 /**
  * Ready-made start used by default while testing (PLAN §8.1): both bases already built up with
@@ -236,7 +155,7 @@ const SCENARIO: NonNullable<MapFileInput['scenario']> = {
   ],
 };
 
-const file: MapFileInput = {
+writeMap({
   id: 'green_valley',
   name: 'Green Valley',
   description:
@@ -245,20 +164,9 @@ const file: MapFileInput = {
   size: { w: W, h: H },
   players: 2,
   symmetry: 'rotate180',
-  legend: {
-    terrain: Object.fromEntries(Object.entries(TERRAIN_CHAR).map(([t, c]) => [c, t])) as Record<
-      string,
-      TerrainType
-    >,
-    objects: Object.fromEntries(Object.entries(OBJECT_CHAR).map(([o, c]) => [c, o])) as Record<
-      string,
-      MapObjectName
-    >,
-  },
-  terrain: Array.from({ length: H }, (_, y) =>
-    Array.from({ length: W }, (_, x) => TERRAIN_CHAR[terrain[idx(x, y)] ?? 'grass']).join(''),
-  ),
-  objects: objectGrid.map((row) => row.join('')),
+  legend: legend(),
+  terrain: canvas.terrainRows(),
+  objects: canvas.objectRows(),
   overrides: [{ at: [CENTER.x - 1, CENTER.y - 1], amount: 1500 }],
   start: {
     units: [
@@ -267,21 +175,4 @@ const file: MapFileInput = {
     ],
   },
   scenario: SCENARIO,
-};
-
-const decoded = decodeMap(file);
-const result = validateMap(decoded);
-for (const s of result.summary) {
-  console.log(
-    `player ${s.player + 1}: gold≤8=${s.goldMinesWithin8} berries≤8=${s.berriesWithin8} trees≤12=${s.treesWithin12} gold≤20=${s.goldMinesWithin20} totals=${JSON.stringify(s.totals)}`,
-  );
-}
-result.warnings.forEach((w) => console.warn(`warning: ${w}`));
-if (result.errors.length > 0) {
-  result.errors.forEach((e) => console.error(`error: ${e}`));
-  process.exit(1);
-}
-
-const out = fileURLToPath(new URL('../../maps/green_valley.json', import.meta.url));
-writeFileSync(out, `${JSON.stringify(file, null, 2)}\n`);
-console.log(`wrote ${out} (${decoded.objects.length} objects)`);
+});

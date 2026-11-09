@@ -20,6 +20,10 @@ export class Grid {
   readonly terrain: Uint8Array;
   /** Number of static blockers (buildings, resources) on each tile. */
   readonly blockers: Uint16Array;
+  /** Bumped whenever a blocker is added or removed (invalidates the region labels). */
+  private version = 0;
+  private regionVersion = -1;
+  private regions: Int32Array | null = null;
 
   constructor(
     readonly width: number,
@@ -64,11 +68,59 @@ export class Grid {
   }
 
   block(x: number, y: number, w: number, h: number): void {
+    this.version++;
     this.forArea(x, y, w, h, (i) => (this.blockers[i] = (this.blockers[i] ?? 0) + 1));
   }
 
   unblock(x: number, y: number, w: number, h: number): void {
+    this.version++;
     this.forArea(x, y, w, h, (i) => (this.blockers[i] = Math.max(0, (this.blockers[i] ?? 0) - 1)));
+  }
+
+  /**
+   * Connected land region of a passable tile, or -1 for a blocked tile. Two tiles with the same
+   * region can reach each other (A* moves diagonally only past two free orthogonal tiles, so
+   * 4-neighbour connectivity is the same thing). Recomputed lazily after blockers change.
+   */
+  regionAt(x: number, y: number): number {
+    if (!this.isPassable(x, y)) return -1;
+    if (this.regionVersion !== this.version || !this.regions) this.labelRegions();
+    return this.regions?.[this.index(x, y)] ?? -1;
+  }
+
+  private labelRegions(): void {
+    const { width: w, height: h } = this;
+    const labels = this.regions ?? new Int32Array(w * h);
+    labels.fill(-1);
+    const queue = new Int32Array(w * h);
+    let next = 0;
+    for (let start = 0; start < w * h; start++) {
+      if (labels[start] !== -1 || !this.isPassable(start % w, Math.floor(start / w))) continue;
+      const label = next++;
+      labels[start] = label;
+      let head = 0;
+      let tail = 0;
+      queue[tail++] = start;
+      while (head < tail) {
+        const i = queue[head++] ?? 0;
+        const x = i % w;
+        const y = (i - x) / w;
+        for (const [nx, ny] of [
+          [x + 1, y],
+          [x - 1, y],
+          [x, y + 1],
+          [x, y - 1],
+        ] as const) {
+          if (!this.isPassable(nx, ny)) continue;
+          const n = ny * w + nx;
+          if (labels[n] !== -1) continue;
+          labels[n] = label;
+          queue[tail++] = n;
+        }
+      }
+    }
+    this.regions = labels;
+    this.regionVersion = this.version;
   }
 
   private forArea(x: number, y: number, w: number, h: number, fn: (index: number) => void): void {

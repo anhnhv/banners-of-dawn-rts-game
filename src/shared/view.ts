@@ -131,6 +131,8 @@ export interface PlayerStats {
 export interface MatchResult {
   /** null = draw. */
   winner: PlayerId | null;
+  /** Why it ended: a side lost its key buildings (game.json → victory), or a player surrendered. */
+  reason: 'destroyed' | 'surrender';
   /** Tick at which the match ended. */
   tick: number;
   /** Indexed by player id. */

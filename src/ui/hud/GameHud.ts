@@ -7,6 +7,7 @@
  */
 import {
   costEntries,
+  formatSpeed,
   type ActionDef,
   type AttackDef,
   type BuildingView,
@@ -15,6 +16,7 @@ import {
   type EntityId,
   type MapObject,
   type MatchResult,
+  type MatchRules,
   type PanelField,
   type PlayerId,
   type PlayerStats,
@@ -47,6 +49,11 @@ export interface HudCallbacks {
   onBeginAttackMove(units: EntityId[]): void;
   /** A building was picked from the build menu: start placing it. */
   onStartPlacement(building: string): void;
+  /** The menu button (≡): open the pause menu. */
+  onOpenMenu(): void;
+  /** Result screen buttons. */
+  onPlayAgain(): void;
+  onMainMenu(): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -83,6 +90,8 @@ export class GameHud {
   private readonly hover: HTMLElement;
   private readonly perf: HTMLElement;
   private readonly opponent: HTMLElement;
+  private readonly speedPill: HTMLSpanElement;
+  private readonly pausedBanner: HTMLElement;
   private resultShown = false;
   private readonly portrait: HTMLElement;
   private readonly info: HTMLElement;
@@ -105,6 +114,8 @@ export class GameHud {
     minimap: Minimap,
     warnings: readonly string[],
     private readonly cb: HudCallbacks,
+    /** The match's pace: tooltips and timers show the real times. */
+    private readonly rules: MatchRules,
   ) {
     this.root = el('div', 'hud');
 
@@ -118,6 +129,18 @@ export class GameHud {
       return value;
     };
     this.res = { food: pill('food'), wood: pill('wood'), gold: pill('gold'), pop: pill('pop') };
+    const speed = el('div', 'res-pill panel speed-pill');
+    speed.title = 'Game speed (+ / -) · P: pause';
+    this.speedPill = el('span', '', '1×');
+    speed.append(this.speedPill);
+    const menuBtn = el('button', 'px-btn hud-menu-btn');
+    menuBtn.type = 'button';
+    menuBtn.title = 'Menu (Esc)\nPause, speed, settings, restart, surrender, quit.';
+    menuBtn.append(iconImg('menu'));
+    menuBtn.addEventListener('click', () => this.cb.onOpenMenu());
+    bar.append(speed);
+    this.pausedBanner = el('div', 'hud-paused panel', 'Paused · P to resume');
+    this.pausedBanner.style.display = 'none';
 
     const mapPanel = el('div', 'hud-minimap-live panel');
     mapPanel.append(minimap.element);
@@ -136,6 +159,7 @@ export class GameHud {
       el('div', '', `${map.name} · Right click: move / gather / rally · B: build`),
       el('div', '', 'Click / drag: select · Double click: same type · Ctrl/Alt+1-9: group'),
       el('div', '', 'Arrows / edge / middle-drag: pan · Wheel: zoom · .: idle worker'),
+      el('div', '', 'P: pause · + / -: speed · Esc: menu'),
     );
     this.opponent = el('div', 'help-ai', '');
     this.perf = el('div', 'help-perf', '');
@@ -157,7 +181,18 @@ export class GameHud {
     this.buildBtn.append(iconImg('hammer'), el('span', 'hotkey', 'B'));
     this.buildBtn.addEventListener('click', () => this.toggleBuildMenu());
 
-    this.root.append(bar, mapPanel, this.idleBtn, this.buildBtn, this.messages, help, this.hover, bottom);
+    this.root.append(
+      bar,
+      mapPanel,
+      this.idleBtn,
+      this.buildBtn,
+      this.messages,
+      this.pausedBanner,
+      menuBtn,
+      help,
+      this.hover,
+      bottom,
+    );
     container.append(this.root);
   }
 
@@ -248,26 +283,46 @@ export class GameHud {
     if (this.opponent.textContent !== text) this.opponent.textContent = text;
   }
 
+  /** Speed pill and the "Paused" banner (not while the pause menu covers the screen). */
+  setSpeed(speed: number, paused: boolean, banner = paused): void {
+    this.speedPill.textContent = paused ? 'Paused' : formatSpeed(speed);
+    this.speedPill.parentElement?.classList.toggle('paused', paused);
+    this.pausedBanner.style.display = banner ? 'block' : 'none';
+  }
+
+  /** Settings → show FPS / show the machine's plan. */
+  setVisibility(showPerf: boolean, showOpponent: boolean): void {
+    this.perf.style.display = showPerf ? '' : 'none';
+    this.opponent.style.display = showOpponent ? '' : 'none';
+  }
+
+  /** The result screen is up (Esc must not open the pause menu behind it). */
+  get resultVisible(): boolean {
+    return this.resultShown;
+  }
+
   /** The Victory / Defeat screen (once). */
   showResult(result: MatchResult, me: PlayerId, tickRate: number): void {
     if (this.resultShown) return;
     this.resultShown = true;
     const won = result.winner === me;
     const title = result.winner === null ? 'Draw' : won ? 'Victory!' : 'Defeat';
+    const reason =
+      result.winner === null
+        ? 'Both sides fell at once.'
+        : result.reason === 'surrender'
+          ? won
+            ? 'The machine player surrendered.'
+            : 'You surrendered.'
+          : won
+            ? 'The enemy Town Hall has fallen.'
+            : 'Your Town Hall has fallen.';
     const box = el('div', `result-box panel ${won ? 'won' : 'lost'}`);
     const secs = Math.floor(result.tick / tickRate);
     const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
     box.append(
       el('div', 'result-title', title),
-      el(
-        'div',
-        'result-sub',
-        result.winner === null
-          ? 'Both sides fell at once.'
-          : won
-            ? 'The enemy Town Hall has fallen.'
-            : 'Your Town Hall has fallen.',
-      ),
+      el('div', 'result-sub', reason),
       el('div', 'result-time', `Match time ${time}`),
     );
     const table = el('table', 'result-stats');
@@ -292,8 +347,13 @@ export class GameHud {
     }
     const again = el('button', 'px-btn result-again', 'Play again');
     again.type = 'button';
-    again.addEventListener('click', () => window.location.reload());
-    box.append(table, again);
+    again.addEventListener('click', () => this.cb.onPlayAgain());
+    const menu = el('button', 'px-btn result-again', 'Main menu');
+    menu.type = 'button';
+    menu.addEventListener('click', () => this.cb.onMainMenu());
+    const buttons = el('div', 'result-buttons');
+    buttons.append(again, menu);
+    box.append(table, buttons);
     const overlay = el('div', 'hud-result');
     overlay.append(box);
     this.root.append(overlay);
@@ -374,7 +434,7 @@ export class GameHud {
       button.type = 'button';
       button.title = `Build ${def?.name ?? entry.building} (${entry.hotkey})\n${cost
         .map(([r, n]) => `${n} ${r}`)
-        .join(', ')} · ${def?.buildTime ?? 0}s\n${def?.description ?? ''}`;
+        .join(', ')} · ${seconds((def?.buildTime ?? 0) / this.rules.buildSpeed)}\n${def?.description ?? ''}`;
       button.append(iconImg(iconFor(def?.icon ?? '')), el('span', 'hotkey', entry.hotkey));
       const enabled = (): boolean => cost.every(([r, n]) => view.self.resources[r] >= n);
       if (!enabled()) button.classList.add('disabled');
@@ -456,7 +516,7 @@ export class GameHud {
           const e = current(v);
           if (!e || !('buildProgress' in e)) return;
           fill.style.width = `${Math.round(e.buildProgress * 100)}%`;
-          const total = (DATA.buildings[e.type]?.buildTime ?? 0) / DATA.game.pace.buildSpeed;
+          const total = (DATA.buildings[e.type]?.buildTime ?? 0) / this.rules.buildSpeed;
           const left = Math.ceil((1 - e.buildProgress) * total);
           label.textContent = `Building ${Math.floor(e.buildProgress * 100)}% · ${left}s left`;
         });
@@ -518,7 +578,7 @@ export class GameHud {
       const def = DATA.units[a.unit];
       const cost = costEntries(def?.cost ?? {});
       const costText = cost.map(([r, n]) => `${n} ${r}`).join(', ');
-      button.title = `Train ${def?.name ?? a.unit} (${a.hotkey})\n${costText} · ${def?.trainTime ?? 0}s\n${def?.description ?? ''}`;
+      button.title = `Train ${def?.name ?? a.unit} (${a.hotkey})\n${costText} · ${seconds((def?.trainTime ?? 0) / this.rules.trainSpeed)}\n${def?.description ?? ''}`;
       button.append(iconImg(iconFor(def?.icon ?? '')));
       const building = sel.building.id;
       enabled = () =>
@@ -576,6 +636,11 @@ export class GameHud {
 }
 
 // ---- helpers ------------------------------------------------------------------------------------
+
+/** "12s" or "7.5s" (times divided by the pace are rarely whole). */
+function seconds(s: number): string {
+  return `${Math.round(s * 10) / 10}s`;
+}
 
 function isWorker(u: UnitView): boolean {
   return !!DATA.units[u.type]?.interactions.gather;

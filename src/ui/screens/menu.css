@@ -1,0 +1,439 @@
+/* Menus (docs/plans/m7-menus-art-maps.md §2): the HUD's pixel style, slate panels and brass buttons. */
+
+.menu {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 36px 16px;
+  box-sizing: border-box;
+  font-family: 'Pixelify Sans', monospace;
+  color: #f4ecdc;
+  user-select: none;
+  --panel: rgba(30, 34, 52, 0.92);
+  --panel-edge: #0f111a;
+  --panel-hi: #4a5578;
+  --brass: #d9a24a;
+  --brass-hi: #f5cf7a;
+  --brass-lo: #8c5d22;
+  /* sky with soft pixel hills, drawn with gradients only */
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 16px, transparent 16px 32px),
+    linear-gradient(180deg, #9fd0ea 0%, #cfe6f2 55%, #8fbf6a 55%, #6fa152 78%, #567f40 100%);
+}
+
+.menu-loading {
+  justify-content: center;
+}
+
+.menu-title {
+  text-align: center;
+}
+
+.menu-logo {
+  font-size: 64px;
+  font-weight: 700;
+  color: var(--brass-hi);
+  text-shadow:
+    4px 4px 0 #2a1a0c,
+    0 0 0 #000;
+  letter-spacing: 2px;
+}
+
+.menu-tagline {
+  margin-top: 4px;
+  font-size: 20px;
+  color: #1f2a3c;
+}
+
+.menu-body {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.menu-panel {
+  background: #262b40;
+  padding: 18px 22px;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.menu-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 420px;
+}
+
+.menu-page {
+  width: 720px;
+}
+
+.menu-setup {
+  width: 980px;
+}
+
+.menu-heading {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--brass-hi);
+  text-shadow: 2px 2px 0 #0f111a;
+  margin-bottom: 12px;
+}
+
+/* ---- buttons ---- */
+.menu-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 54px;
+  padding: 8px 18px;
+  background: var(--brass);
+  border: 3px solid #2a1a0c;
+  box-shadow:
+    inset -4px -4px 0 var(--brass-lo),
+    inset 4px 4px 0 var(--brass-hi);
+  color: #2a1a0c;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.menu-btn:hover {
+  filter: brightness(1.08);
+}
+
+.menu-btn:active {
+  box-shadow:
+    inset 4px 4px 0 var(--brass-lo),
+    inset -4px -4px 0 var(--brass-hi);
+}
+
+.menu-btn-label {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.menu-btn-sub {
+  font-size: 14px;
+  color: #4a3218;
+}
+
+.menu-btn.primary {
+  background: #e8b65a;
+  min-width: 220px;
+}
+
+.menu-btn.danger {
+  background: #d8604a;
+  box-shadow:
+    inset -4px -4px 0 #8a2a1c,
+    inset 4px 4px 0 #ff9a84;
+}
+
+.menu-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice-btn {
+  padding: 6px 12px;
+  min-width: 64px;
+  background: #2a3048;
+  border: 3px solid #0f111a;
+  box-shadow: inset 0 0 0 2px #4a5578;
+  color: #e9e3d4;
+  font-family: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.choice-btn:hover:not(:disabled) {
+  background: #36405f;
+}
+
+.choice-btn.active {
+  background: var(--brass);
+  color: #2a1a0c;
+  box-shadow:
+    inset -3px -3px 0 var(--brass-lo),
+    inset 3px 3px 0 var(--brass-hi);
+  font-weight: 700;
+}
+
+.choice-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.option-block {
+  margin-bottom: 14px;
+}
+
+.option-label {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--brass-hi);
+}
+
+.option-help {
+  margin-top: 5px;
+  font-size: 15px;
+  color: #c9c2b2;
+  line-height: 1.35;
+}
+
+/* ---- match setup ---- */
+.setup-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 22px;
+}
+
+.map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 12px;
+  background: #2a3048;
+  border: 3px solid #0f111a;
+  box-shadow: inset 0 0 0 2px #4a5578;
+  color: #e9e3d4;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.map-btn.active {
+  background: var(--brass);
+  color: #2a1a0c;
+  box-shadow:
+    inset -3px -3px 0 var(--brass-lo),
+    inset 3px 3px 0 var(--brass-hi);
+}
+
+.map-name {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.map-size {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.map-preview {
+  display: grid;
+  place-items: center;
+  margin: 12px 0 8px;
+  min-height: 190px;
+}
+
+.map-preview canvas {
+  image-rendering: pixelated;
+}
+
+.map-info {
+  font-size: 15px;
+  line-height: 1.4;
+  color: #d9d2c2;
+}
+
+/* ---- settings and how to play ---- */
+.settings-list .option-block {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+}
+
+.settings-list .option-label {
+  margin: 0;
+}
+
+.settings-list .option-help {
+  grid-column: 2;
+}
+
+.howto {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.howto-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--brass-hi);
+  margin: 10px 0 4px;
+}
+
+.howto p {
+  margin: 4px 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+/* ---- in-game: speed pill, menu button, pause banner, pause menu ---- */
+.speed-pill {
+  padding: 4px 12px;
+  min-width: 64px;
+  justify-content: center;
+}
+
+.speed-pill.paused {
+  color: #ffd27a;
+}
+
+.hud-menu-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 50px;
+  height: 50px;
+}
+
+.hud-menu-btn .px-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.hud-paused {
+  position: absolute;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffd27a;
+}
+
+.hud-pause {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(12, 14, 22, 0.55);
+  z-index: 30;
+}
+
+.pause-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 420px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.pause-panel .settings-list .option-block {
+  grid-template-columns: 1fr;
+}
+
+.pause-panel .settings-list .option-help {
+  grid-column: 1;
+}
+
+.pause-panel:has(.settings-list),
+.pause-panel:has(.howto) {
+  width: 620px;
+}
+
+.result-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ---- model viewer (/?models) ---- */
+.viewer-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'Pixelify Sans', monospace;
+}
+
+.viewer-label,
+.viewer-row {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  padding: 1px 6px;
+  font-size: 14px;
+  color: #f4ecdc;
+  background: rgba(30, 34, 52, 0.85);
+  border: 2px solid #0f111a;
+}
+
+.viewer-row {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f5cf7a;
+}
+
+.viewer-icons {
+  --panel: rgba(30, 34, 52, 0.9);
+  --panel-edge: #0f111a;
+  --panel-hi: #4a5578;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 300px;
+  padding: 10px 12px;
+  font-family: 'Pixelify Sans', monospace;
+  color: #f4ecdc;
+}
+
+.viewer-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.viewer-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+}
+
+.viewer-help {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #c9c2b2;
+}
+
+@media (max-width: 1000px) {
+  .setup-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-list .option-block {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-list .option-help {
+    grid-column: 1;
+  }
+}

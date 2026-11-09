@@ -10,6 +10,10 @@ const ZOOM_SENSITIVITY = 0.0012;
 
 export class CameraController {
   edgeScroll = true;
+  /** Pan speed factor (Settings → scroll speed). */
+  panSpeed = 1;
+  /** False while a menu covers the game: no camera keys and no edge scrolling. */
+  enabled = true;
   /** Pointer position in client pixels, or null when it is outside the window. */
   pointer: { x: number; y: number } | null = null;
   /** True while the pointer is over the 3D canvas (not over the HUD). */
@@ -52,6 +56,7 @@ export class CameraController {
 
   /** Apply keyboard and edge scrolling; call once per frame. */
   update(dtSeconds: number): void {
+    if (!this.enabled) return;
     let dx = 0;
     let dy = 0;
     if (this.keys.has('ArrowLeft')) dx -= 1;
@@ -66,7 +71,7 @@ export class CameraController {
       if (p.y >= window.innerHeight - EDGE_SCROLL_PX) dy -= 1;
     }
     if (dx !== 0 || dy !== 0) {
-      const speed = this.rig.distance * PAN_SPEED * dtSeconds;
+      const speed = this.rig.distance * PAN_SPEED * this.panSpeed * dtSeconds;
       this.rig.pan(dx * speed, dy * speed);
     }
   }

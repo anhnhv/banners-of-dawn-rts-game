@@ -15,7 +15,7 @@ export function populationOf(state: GameState, player: PlayerId): { pop: number;
   let cap = 0;
   for (const b of state.buildings.values())
     if (b.owner === player && b.constructed) cap += DATA.buildings[b.type]?.popProvided ?? 0;
-  return { pop, popCap: Math.min(DATA.game.popCap, cap) };
+  return { pop, popCap: Math.min(state.rules.popCap, cap) };
 }
 
 export function canTrain(b: Building, unit: UnitTypeId): boolean {
@@ -28,9 +28,9 @@ export function shortOf(have: ResourceAmounts, cost: Partial<ResourceAmounts>): 
   return null;
 }
 
-export function trainTicks(unit: UnitTypeId): number {
+export function trainTicks(state: GameState, unit: UnitTypeId): number {
   const def = DATA.units[unit];
-  return Math.max(1, secondsToTicks((def?.trainTime ?? 1) / DATA.game.pace.trainSpeed));
+  return Math.max(1, secondsToTicks((def?.trainTime ?? 1) / state.rules.trainSpeed));
 }
 
 export function productionSystem(

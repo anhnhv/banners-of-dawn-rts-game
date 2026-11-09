@@ -14,7 +14,7 @@ import { VoxelBuilder, type BuiltGeometry } from './VoxelBuilder';
 export type BuildingModel =
   'townHall' | 'house' | 'barracks' | 'stable' | 'farm' | 'tower' | 'goldMine' | 'berryBush';
 export type WallAxis = 'x' | 'z';
-export type UnitModel = 'worker' | 'militia' | 'archer' | 'scoutRider' | 'knight';
+export type UnitModel = 'worker' | 'militia' | 'archer' | 'scoutRider' | 'knight' | 'catapult';
 export type TreeModel = 'oak' | 'oakTall' | 'pine' | 'pineSmall';
 
 function builder(team: TeamName): VoxelBuilder {
@@ -237,7 +237,7 @@ const BUILDINGS: Record<BuildingModel, (b: VoxelBuilder) => void> = {
   },
 };
 
-const UNIT_MODELS: readonly UnitModel[] = ['worker', 'militia', 'archer', 'scoutRider', 'knight'];
+const UNIT_MODELS: readonly UnitModel[] = ['worker', 'militia', 'archer', 'scoutRider', 'knight', 'catapult'];
 
 /** Resolve a config `model` name to a known unit model (unknown names fall back to militia). */
 export function unitModel(name: string): UnitModel {
@@ -407,7 +407,31 @@ export function unitParts(model: UnitModel, team: TeamName): UnitPartGeometry {
   const arms: LegPart[] = [];
   const hip = 0.17;
 
-  if (model === 'knight') {
+  if (model === 'catapult') {
+    // a siege engine: no legs or arms, it rolls (the walk cycle only bobs it a little)
+    b.boxC(0, 0.12, 0, 0.42, 0.07, 0.84, 'planks', 'wood'); // deck
+    b.boxC(0.22, 0.1, 0, 0.06, 0.08, 0.92, 'planks', 'wood-dark'); // side beams
+    b.boxC(-0.22, 0.1, 0, 0.06, 0.08, 0.92, 'planks', 'wood-dark');
+    for (const [x, z] of [
+      [0.28, 0.27],
+      [-0.28, 0.27],
+      [0.28, -0.27],
+      [-0.28, -0.27],
+    ] as const) {
+      b.boxC(x, 0, z, 0.06, 0.26, 0.26, 'bark', 'wood-dark'); // wheel
+      b.boxC(x + Math.sign(x) * 0.035, 0.1, z, 0.02, 0.06, 0.06, 'plain', 'iron'); // hub
+    }
+    b.boxC(0.15, 0.19, 0.08, 0.06, 0.4, 0.06, 'planks', 'wood'); // uprights
+    b.boxC(-0.15, 0.19, 0.08, 0.06, 0.4, 0.06, 'planks', 'wood');
+    b.boxC(0, 0.55, 0.08, 0.36, 0.06, 0.07, 'cloth', 'team'); // padded crossbar
+    // the throwing arm, raised toward the back, in four steps
+    for (let i = 0; i < 4; i++)
+      b.boxC(0, 0.22 + i * 0.13, 0.12 - i * 0.12, 0.06, 0.15, 0.08, 'bark', 'wood-light');
+    b.boxC(0, 0.68, -0.36, 0.17, 0.06, 0.17, 'planks', 'wood-dark'); // bucket
+    b.boxC(0, 0.74, -0.36, 0.11, 0.1, 0.11, 'rock', 'stone');
+    b.boxC(0, 0.19, -0.3, 0.22, 0.14, 0.16, 'rock', 'stone-dark'); // ballast
+    b.boxC(0, 0.19, 0.36, 0.2, 0.12, 0.1, 'cloth', 'team-dark'); // team banner box
+  } else if (model === 'knight') {
     horse(b, team, 'horse', 'horse-dark', legs);
     b.boxC(0, 0.56, -0.02, 0.26, 0.2, 0.18, 'plain', 'iron');
     b.boxC(0, 0.56, 0.0, 0.27, 0.06, 0.19, 'cloth', 'team');

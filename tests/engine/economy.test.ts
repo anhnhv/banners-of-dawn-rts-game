@@ -24,6 +24,23 @@ function setup(objects: Parameters<typeof openMap>[2] = []): { game: Game; hall:
 }
 
 describe('gathering (configured in units.json → interactions.gather)', () => {
+  it('skips a tree whose only free neighbour is a pocket enclosed by other trees', () => {
+    // a 5×5 block of trees with a free tile in the middle: the tree just above the pocket can
+    // only be reached from inside it, so the worker takes a reachable tree of the block instead
+    const trees: Parameters<typeof openMap>[2] = [];
+    for (let y = 8; y <= 12; y++)
+      for (let x = 18; x <= 22; x++) if (x !== 20 || y !== 10) trees.push(node('tree', x, y));
+    const { game } = setup(trees);
+    const pocketTree = [...game.nodes.values()].find((n) => n.x === 20 && n.y === 9)!;
+    const worker = game.debugSpawn(0, 'worker', 12.5, 10.5);
+    send(game, 0, { type: 'interact', units: [worker], target: pocketTree.id });
+    run(game, 15);
+    const order = game.units.get(worker)!.orders[0];
+    expect(order?.kind).toBe('gather');
+    expect(order?.kind === 'gather' && order.target).not.toBe(pocketTree.id);
+    expect(game.player(0).resources.wood).toBeGreaterThan(START.wood);
+  });
+
   it('a worker harvests a tree straight into the stockpile (no carrying, no drop-off)', () => {
     const { game } = setup([node('tree', 12, 5)]);
     const tree = [...game.nodes.values()][0]!;

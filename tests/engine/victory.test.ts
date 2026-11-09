@@ -60,6 +60,27 @@ describe('victory', () => {
     townHall(game, 1).hp = 0;
     run(game, 1);
     expect(game.result?.stats[0]?.unitsTrained).toBe(1);
+    expect(game.result?.reason).toBe('destroyed');
+  });
+
+  it('surrender ends the match at once; the other player wins', () => {
+    const game = createGame(decodeMap(GREEN_VALLEY), { seed: 1 });
+    run(game, 1);
+    game.enqueue({ player: 0, tick: game.tick, cmd: { type: 'surrender' } });
+    const events = run(game, 1);
+    expect(events).toContainEqual({ type: 'gameOver', winner: 1 });
+    expect(game.result).toMatchObject({ winner: 1, reason: 'surrender' });
+    expect(townHall(game, 0).hp).toBeGreaterThan(0); // nothing had to be destroyed
+  });
+
+  it('a surrender after the match is over changes nothing', () => {
+    const game = createGame(decodeMap(GREEN_VALLEY), { seed: 1 });
+    run(game, 1);
+    townHall(game, 1).hp = 0;
+    run(game, 1);
+    game.enqueue({ player: 0, tick: game.tick, cmd: { type: 'surrender' } });
+    run(game, 1);
+    expect(game.result).toMatchObject({ winner: 0, reason: 'destroyed' });
   });
 });
 

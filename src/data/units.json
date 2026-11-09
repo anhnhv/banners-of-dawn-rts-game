@@ -140,8 +140,8 @@
     "catapult": {
       "name": "Catapult",
       "description": "Siege engine. Smashes buildings from range.",
-      "model": "militia",
-      "icon": "hammer",
+      "model": "catapult",
+      "icon": "catapult",
       "class": "siege",
       "cost": { "wood": 150, "gold": 120 },
       "trainTime": 40,

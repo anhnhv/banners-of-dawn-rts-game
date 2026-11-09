@@ -1,7 +1,7 @@
 # Banners of Dawn: Web RTS Game, Detailed Project Plan (v4, for review)
 
 > **Banners of Dawn** is a 3D voxel-style (low-poly with pixel textures), 1v1 real-time strategy game played against the computer in the browser.
-> Status: M0 done. A **style preview** is running (`npm run dev`) for review of the visual direction.
+> Status (2026-11-08): playable against the machine from a Main Menu, on 3 maps, with match settings (difficulty, start, pace, game speed), a pause menu and player settings. Progress per milestone: §12; how to resume: §14.
 
 ### Changes since v3 (graphics direction corrected)
 | What | v3 | v4 |
@@ -196,7 +196,7 @@ Counter triangle, checked against the numbers above:
 - A **How to Play** screen with illustrated pages, plus optional first-match tips.
 
 ### 2.11 Match pace (configurable)
-> **Current decision (2026-11-06):** there is no pace selection UI yet. The pace multipliers are fixed in `src/data/game.json` → `pace` (gatherRate, trainSpeed, buildSpeed; 1.0 = Standard). The presets and the Match Setup choice below come later and only need to fill in the same values.
+> **Current state (2026-11-08, M7a):** the four presets below are in `src/data/pace.json` and are picked in Match Setup (or `/?pace=fast`). They set gather, build and train speed, starting resources and pop cap; there are no research or era columns (no eras), and **no Custom sliders yet**. `src/data/game.json` → `pace`, `startingResources`, `popCap` stay as the engine default and must equal the Standard preset (a test checks it). The engine keeps the chosen rules in its state (`GameOptions.rules`); the machine player receives game data with them already applied (`applyRules`), and the HUD shows the real times. The AI does not yet scale its own timings by pace. Details: `docs/plans/m7-menus-art-maps.md` §3.
 
 Pace is chosen in Match Setup and **fixed for the whole match**. It is separate from **game speed** (1×, 1.5×, 2×), which is a time scale you can change at any moment during play.
 
@@ -858,12 +858,14 @@ Locked buttons are greyed out with a lock icon. Unaffordable buttons are drawn w
 | Space | Jump to the last alert |
 | Arrow keys / screen edge / middle-drag | Pan the camera |
 | Mouse wheel | Zoom |
-| Esc | Cancel placement, targeting or the build menu, then (later) open the pause menu |
+| Esc | Cancel placement, targeting or the build menu; otherwise open the pause menu (M7a) |
 | F1 / F3 | How to play / debug overlay (dev) |
-| + / − | Game speed (1×, 1.5×, 2×) |
-| P / Pause | Pause |
+| + / − | Game speed (0.5×, 1×, 1.5×, 2×) (M7a) |
+| P / Pause | Pause (M7a) |
 
 ### 7.12 Screens & flow
+> **Built in M7a (2026-11-08):** Main Menu (Play, Quick start, Settings, How to Play), Match Setup (map with preview, opponent, start, pace, game speed), Loading, pause menu (Resume, speed, Settings, How to Play, Restart, Surrender, Quit), Settings (edge scroll, scroll speed, shadows, render quality, FPS line, machine's plan line), Result (Play again, Main menu), How to Play as text. Not yet: the orbiting 3D menu background, illustrated How to Play, Credits, custom pace sliders, reveal map, player color, AI-vs-AI spectator, volumes and HUD scale. Details: `docs/plans/m7-menus-art-maps.md` §2 and §4.
+
 ```
 Boot (build models/textures) → Main Menu ─┬─ Play → Match Setup → Loading → Game ⇄ Pause → Result → Main Menu
                                           ├─ How to Play (6 illustrated pages)
@@ -959,8 +961,10 @@ Maps are stored in **grid space** as character grids (grid x → world x, grid y
 | Map | Size | Layout | Feel |
 |---|---|---|---|
 | **Green Valley** | 80×80 | Open grassland. Forests on the edges, 2 gold mines per side, 1 rich center gold mine (1500) | Beginner, open fights |
-| **Twin Rivers** | 96×96 | A river runs across the diagonal, with 3 shallow fords (wide middle, narrow sides). Extra gold near the outer fords | Chokepoints, towers at fords |
-| **Forest Pass** | 96×96 | Dense central forest with 2 passes and a long open route around the edge | Walls, gates, defense, cutting through wood |
+| **Twin Rivers** ✅ M7a | 96×96 | A river runs across the diagonal, with 3 shallow fords (wide middle about 9 tiles, narrow ones of about 3 near each end). Rock outcrops flank the way to the middle ford. 2 gold mines per base plus an extra one near each outer ford on each side | Chokepoints, towers at fords |
+| **Forest Pass** ✅ M7a | 96×96 | A dense forest belt (about 14 tiles thick) on the diagonal, with 2 passes (about 5 wide, each 14 tiles off the center) framed by rock outcrops, and a long open road around each end of the belt. A rich gold mine (1200) at one pass mouth per side | Defending passes, cutting through wood (walls and gates come later) |
+
+All three are made by scripts in `tools/maps/` (`npm run maps:generate`; shared helpers in `mapgen.ts`) and each has a ready-made `scenario`. On every map a novice beats Easy and Normal beats Easy in the headless tests (`tests/ai/maps.test.ts`, `novice.test.ts`).
 
 ### 8.4 Loading pipeline
 `host/loaders.ts` fetches `maps/index.json`, then the map file. The engine's `validateMap` checks it and `loadMap` builds the Grid and the entities. The UI builds the terrain mesh, instanced trees and resources, and the minimap.
@@ -977,13 +981,14 @@ A map editor page (3D view, tile painting, symmetry mirroring, live validation, 
 ### 9.1 Files
 | File | Contents |
 |---|---|
-| `src/data/game.json` | Global rules: starting resources, pop cap, **pace multipliers (fixed here for now)**, queue size, gathering reach and retarget radius, **buildMenu** (what the Build button offers, with hotkeys), construction settings |
+| `src/data/game.json` | Global rules: starting resources, pop cap, **default pace multipliers** (= the Standard preset of `pace.json`), queue size, gathering reach and retarget radius, **buildMenu** (what the Build button offers, with hotkeys), construction settings |
 | `src/data/units.json` | Every unit: stats, cost, train time, pop, model, icon, **interactions**, **panel**, **actions** |
 | `src/data/buildings.json` | Every building: footprint, hp, pop provided, cost, build time, model, icon, **panel**, **actions** |
 | `src/data/resources.json` | Resource types (food, wood, gold) and resource **nodes** (tree, pine, berry bush, gold mine): resource, amount, model, icon, panel |
 | `src/data/projectiles.json` | Projectile types (arrow, stone): speed, arc, homing, model, launch height (M5) |
 | `src/data/terrain.json` | Terrain rules (walkable, buildable, speed) |
 | `src/data/palette.json` | All colors and team color sets |
+| `src/data/pace.json` | Match pace presets (M7a): gather, build and train speed, starting resource set, pop cap, target length; picked in Match Setup (§2.11) |
 
 All of them are validated at startup by `shared/gameData.ts` (zod). The check covers the shape and the **cross-references**: a train action naming an unknown unit, a gather target naming an unknown node, or a duplicate hotkey stops the game with a clear list of problems. `tests/shared/gameData.test.ts` covers this.
 
@@ -1347,6 +1352,25 @@ User decisions (2026-11-07): the Barracks trains Archers too; a new Stable train
 - Easy had to be retuned: with the scenario Stables on the novice's path and archers at home, the novice won only 3 of 8 seeds. The Stables moved behind the bases, Easy only trains Militia (`unitChoice: first`) and notices attacks 1 time in 4 (`defence.defendChance` 0.25): 8 of 8.
 - Normal now beats Easy in all 3 seeds tried, at about 6:00.
 
+### M7a: Menus & match settings, art clean-up, two new maps (M) ✅ done 2026-11-08, details in `docs/plans/m7-menus-art-maps.md`
+User request (2026-11-08): a main menu, match setup, pause and simple settings (difficulty, speed, …) instead of opening straight into a match; replace the temporary art; add 2 more maps. This takes the screens part of M7 and pieces of M10 and M11.
+- [x] **Flow:** `/` opens the Main Menu (Play → Match Setup, Quick start with the last setup, Settings, How to Play). Any match parameter in the URL (`?play`, `?map=`, `?ai=`, `?setup=`, `?pace=`, `?speed=`, `?army=`, `?enemy=`) skips the menu, so the dev shortcuts still work. A Loading panel shows while the scene is built.
+- [x] **Match Setup:** map list with a minimap preview, size and description; opponent Easy / Normal (from `src/ai/profiles/`, help text = the profile's `persona`) / Idle; start Ready-made battle / Standard (the first is disabled on a map without a scenario); pace Relaxed / Standard / Fast / Blitz; game speed 0.5× / 1× / 1.5× / 2×. The last setup is remembered (`localStorage` key `bod.setup.v1`).
+- [x] **Pace per match:** `src/data/pace.json` (validated by `shared/rules.ts`); `GameOptions.rules` replaces the global `game.json → pace / popCap / startingResources` in gathering, construction, training, pop cap and the starting stockpile; the AI gets the same rules inside its game data; HUD tooltips and timers show the real times.
+- [x] **In the match:** speed pill and a menu button (≡) at the top; `P` pauses ("Paused" banner); `+` / `-` change the speed; `Esc` cancels placement, targeting or the build menu, otherwise opens the **pause menu** (Resume, speed, Settings, How to Play, Restart, Surrender, Quit to menu; Surrender and Quit ask for a second click). Game input is blocked while it is open.
+- [x] **Surrender:** a new `surrender` command; the engine ends the match at once (`MatchResult.reason: 'surrender'`); the result screen says "You surrendered" and has Play again and Main menu.
+- [x] **Settings** (`src/ui/settings.ts`, key `bod.settings.v1`, all storage access wrapped): edge scrolling, scroll speed, shadows, render quality, FPS line, machine's plan line. They apply at once in a running match.
+- [x] **Art:** own HUD icons for Barracks, Stable, Watch Tower, Pine, Berry Bush, Gold Mine and Catapult (before they reused the Attack-move, Scout Rider, Archer, oak, food and gold icons and the Build hammer); a voxel Catapult model (before: the Militia); a menu icon. **Model viewer** at `/?models`: every model on a turntable in both team colors, plus every HUD icon.
+- [x] **Maps:** Twin Rivers and Forest Pass (96×96, §8.3), both with a ready-made scenario, generated by `tools/maps/generate-twin-rivers.ts` and `generate-forest-pass.ts`. The generator helpers moved to `tools/maps/mapgen.ts` (Green Valley regenerates byte for byte the same); `npm run maps:generate` writes all three.
+- [x] Tests: pace presets and rules (`tests/shared/rules.test.ts`, `tests/engine/pace.test.ts`), surrender (`victory.test.ts`), grid regions and the pocket-tree fix (`pathing.test.ts`, `economy.test.ts`), no placeholder icons or models (`tests/ui/art.test.ts`), settings storage (`tests/ui/settings.test.ts`), setup URL (`tests/host/setupUrl.test.ts`), the AI on the new maps (`tests/ai/maps.test.ts`). 234 tests; `npm run check` takes about 26 s (was 40 s).
+
+*Implementation notes:*
+- **Engine fix found by the new maps:** workers sent to a tree whose only free neighbour is a pocket enclosed by other trees searched A* to its 6000-node cap, failed, and retried several hundred times a minute. That used up the whole path budget every tick (one simulated minute took 10–20 s on Forest Pass). `Grid.regionAt()` now labels connected land (recomputed lazily after blockers change), and `approachPoint()` only offers tiles in the unit's own region, so such trees are skipped. Green Valley had the same problem on a smaller scale: the test suite went from 25 s to 11 s.
+- Leaving a match (Restart, Play again, Quit) **reloads the page**, with the match URL or `/`. That is the simplest way to be sure no WebGL context, AI worker or listener of the old match survives. The match URL is written into the address bar when a match starts, so a browser refresh restarts the same match.
+- Headless results after the change (scenario start, seeds 1–8): a novice beats Easy 8/8 on Green Valley, 7/8 on Twin Rivers and 6/8 on Forest Pass. The other games were still running at the 20-minute cutoff, and the novice never lost. Normal beats Easy 3/3 on every map (standard start, at 8–10 min).
+- The pause menu stops every key in the capture phase while it is open, and the camera ignores edge scrolling then. Surrender closes the menu first, because commands only apply while time runs.
+- Shadows are switched with `sun.castShadow`; three.js swaps the shaders by itself. Render quality Low uses a pixel ratio of 0.75.
+
 ### Later: Remaining content (was M6)
 - [ ] Eras and all techs.
 - [ ] Blacksmith, Siege Workshop, Castle; Catapult. (Archer, Scout Rider, Knight and the Stable are done in M6.5; the Barracks trains Archers, so there is no Archery Range.)
@@ -1356,8 +1380,8 @@ User decisions (2026-11-07): the Barracks trains Archers too; a new Stable train
 
 ### M7: Fog, victory, screens & pace setup (M)
 - [ ] Visibility, explored areas, ghosts, the fog-of-war shader chunk, and the fog-filtered `PlayerView`.
-- [ ] VictorySystem, surrender, MatchStats.
-- [ ] Main Menu, **Match Setup (including pace presets and custom sliders)**, Loading, Pause, Settings, Result, How to Play (text).
+- [x] VictorySystem (M6) and surrender (M7a). [ ] MatchStats beyond the four counters (kills, resources gathered, army graph).
+- [x] Main Menu, Match Setup with pace presets, Loading, Pause, Settings, Result, How to Play (text): done in M7a. [ ] Custom pace sliders.
 
 **Done when:** a full match can be played from the menu to the result screen at any pace preset (against an idle opponent).
 
@@ -1378,15 +1402,16 @@ User decisions (2026-11-07): the Barracks trains Archers too; a new Stable train
 **Done when:** the §6.9 quality targets are met in the simulator.
 
 ### M10: Final art, audio & polish (L)
-- [ ] Final models and polish: Scout Rider, Catapult and every remaining building with stages; decor; effects (dust, sparks, fire, smoke); icons and portraits for everything; cursors; model viewer page.
-- [ ] Graphics settings (shadows, render scale, pixel filter) tested on a low-end GPU.
+- [x] Catapult model, own icons for everything, model viewer page (`/?models`): done in M7a.
+- [ ] Remaining polish: decor; cursors; portraits; per-building construction stages (for now one generic construction site, a user decision of 2026-11-06).
+- [x] Shadows and render quality settings (M7a). [ ] Pixel filter; test on a low-end GPU.
 - [ ] All sfx presets; music tracks (menu, 2 in-game loops, stingers).
 - [ ] Illustrated How to Play, first-match tips, colorblind team colors.
 
 **Done when:** no placeholder art remains, you have reviewed and approved the model viewer, and a new player can win an Easy match without help.
 
 ### M11: Maps, balance & release (M)
-- [ ] Finish Green Valley, Twin Rivers and Forest Pass.
+- [x] Twin Rivers and Forest Pass exist (M7a, generated, validated, with scenarios). [ ] Finish all three (decor, balance from playtests).
 - [ ] Balance pass using simulator statistics and playtests at every pace preset; performance profiling.
 - [ ] Production build and deploy.
 
@@ -1428,7 +1453,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Difficulties | Easy / Normal / Hard. No cheating level |
 | Language | English |
 | Name | **Banners of Dawn** |
-| Pace | Configurable later (presets plus Custom). **For now fixed in `src/data/game.json`; no setup UI** (2026-11-06) |
+| Pace | Configurable (presets plus Custom). Fixed in `src/data/game.json` until 2026-11-08; since M7a the four presets of `src/data/pace.json` are picked in Match Setup. Custom sliders not yet |
 | Data-driven design | **Config first, no hard-coding** (2026-11-06): interactions, info panels, actions, train/build lists, costs and times all live in `src/data/*.json` (§9). One shared "interacting" animation for every unit |
 | Priorities | Game logic and units first; map polish later (2026-11-06) |
 | Construction | **No workers needed**: Build button → build menu from `game.json` → place → the site builds itself; one generic construction-site visual for all buildings (2026-11-06) |
@@ -1437,9 +1462,11 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Combat config | Every entity is configurable (2026-11-07): attacks, bonuses, projectiles, behavior near enemies, target priority and combat rules live in `src/data/*.json` (§9.5); code stays generic |
 | Eras | **None, a single era** (2026-11-07). Everything is available once its production building exists |
 | Machine player | Plays by default, decides from the current situation (no scripted build order); full vision, no fog; **losing the Town Hall loses** (2026-11-07). **Each mode has its own config file** `src/ai/profiles/<mode>.json` (2026-11-07): Easy = a primary-school child anyone can beat (default), Normal = the earlier careful logic. Rules and the configuration table: `docs/ai-modes.md` |
-| Default start for testing | The map's `scenario` (§8.1) is the default start (2026-11-07): built-up bases, gathering workers, an army each; the enemy army stands away from its base so it can be fought without base fire. `/?setup=standard` = plain start |
+| Default start for testing | The map's `scenario` (§8.1) is the default start (2026-11-07): built-up bases, gathering workers, an army each; the enemy army stands away from its base so it can be fought without base fire. `/?setup=standard` = plain start. Since M7a it is the default of the Start option in Match Setup |
+| Menus and settings | (2026-11-08, M7a) `/` opens a Main Menu; Match Setup picks map, opponent (Easy / Normal / Idle), start, pace preset and game speed; simple settings only (edge scroll, scroll speed, shadows, render quality, FPS line, machine's plan line). Pace = presets only for now (no custom sliders). Leaving a match reloads the page |
+| Placeholder art | (2026-11-08, M7a) Every entity has its own HUD icon and model (a test enforces it); `/?models` shows them all for review |
 
-### Current status (updated 2026-11-07)
+### Current status (updated 2026-11-08)
 | Milestone | State |
 |---|---|
 | M0 setup, M0.5 style preview, M1 maps, M2 units & movement | ✅ done and committed |
@@ -1448,11 +1475,12 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | M5 Combat | ✅ done (2026-11-07) |
 | Test scenario start (map `scenario`, §8.1) | ✅ done (2026-11-07) |
 | M6 Play against the machine (Easy) | ✅ done (2026-11-07) |
-| M6.5 Army roster (Barracks: Militia + Archer; new Stable: Scout Rider + Knight) | ✅ done (2026-11-07), waiting for review; details in `docs/plans/m6.5-army-roster.md`, units in `docs/units.md` |
-| **Next** | user's choice: e.g. a Farm for infinite food, more difficulties, fog, menus |
+| M6.5 Army roster (Barracks: Militia + Archer; new Stable: Scout Rider + Knight) | ✅ done (2026-11-07); details in `docs/plans/m6.5-army-roster.md`, units in `docs/units.md` |
+| M7a Menus & match settings, art clean-up, Twin Rivers + Forest Pass | ✅ done (2026-11-08), waiting for review; details in `docs/plans/m7-menus-art-maps.md`, screenshots `docs/milestones/m7-*.png` |
+| **Next** | user's choice: e.g. a Farm for infinite food, a Hard mode, fog of war, custom pace sliders, sound |
 
 **How to resume:**
-1. `nvm use && npm install && npm run dev`, then open `/`: it starts from Green Valley's ready-made scenario (built bases, gathering workers, an army each; the enemy army waits mid-map). `/?setup=standard` = plain start; `/?army=20&enemy=20` adds extra test units.
+1. `nvm use && npm install && npm run dev`, then open `/`: the **Main Menu**. Play → Match Setup (map, opponent, start, pace, speed), or Quick start with the last setup. For quick testing, `/?play` starts the last setup at once and any match parameter does too: `/?map=forest_pass`, `/?ai=normal` (or `off`), `/?setup=standard`, `/?pace=blitz`, `/?speed=2`, `/?army=20&enemy=20`. `/?models` = model viewer, `/?preview` = style diorama.
 2. `npm run check` must stay green (typecheck, lint with module boundaries, map validation, tests).
 3. Continue with the first unchecked milestone in §12.
 4. After each milestone: tick its checklist, add implementation notes under it, update this table, commit.
@@ -1460,8 +1488,8 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**Where we are (2026-11-07):** a match against the machine works from `/` (scenario start) and `/?setup=standard`. Modes: `/?ai=easy` (default, a child anyone can beat), `/?ai=normal`, `/?ai=off` (idle). Each mode's numbers are in `src/ai/profiles/<mode>.json`; `docs/ai-modes.md` explains the logic and has the configuration table.
+**Where we are (2026-11-08):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.5×–2× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json`; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all.
 
 **Army (M6.5, 2026-11-07):** the Barracks trains Militia and Archers, and the new Stable (build menu A) trains Scout Riders and Knights. Each unit's role, weakness and best situation are in `docs/units.md`; `tests/engine/balance.test.ts` proves the counter cycle. Normal picks counters to what it sees; Easy only presses the Militia button.
 
-**Next:** ask the user. Open points: Farm (food is still finite, berries now 200 each); more difficulties; fog; menus. No eras (decision 2026-11-07).
+**Next:** ask the user. Open points: Farm (food is still finite, berries now 200 each); a Hard mode (the menu lists modes from `src/ai/profiles/` by itself); fog of war; custom pace sliders and AI timings scaled by pace; sound and music; illustrated How to Play. No eras (decision 2026-11-07).

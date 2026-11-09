@@ -5,9 +5,12 @@ import { InlineAIController } from '../../src/host/aiController';
 import type { AIMode } from '../../src/ai';
 import { decodeMap, TICK_RATE, type MapFile, type PlayerId } from '../../src/shared';
 
-export const GREEN_VALLEY = JSON.parse(
-  readFileSync(new URL('../../maps/green_valley.json', import.meta.url), 'utf8'),
-) as MapFile;
+/** A shipped map file from maps/. */
+export function mapFile(id: string): MapFile {
+  return JSON.parse(readFileSync(new URL(`../../maps/${id}.json`, import.meta.url), 'utf8')) as MapFile;
+}
+
+export const GREEN_VALLEY = mapFile('green_valley');
 
 export interface Match {
   game: Game;
@@ -19,6 +22,8 @@ export interface Match {
 }
 
 export function match(opts: {
+  /** Default Green Valley. */
+  map?: MapFile;
   scenario: boolean;
   ai: PlayerId[];
   /** Mode for every AI player, or per player. Default easy. */
@@ -26,7 +31,7 @@ export function match(opts: {
   seed?: number;
   testArmy?: number;
 }): Match {
-  const game = createGame(decodeMap(GREEN_VALLEY), {
+  const game = createGame(decodeMap(opts.map ?? GREEN_VALLEY), {
     seed: opts.seed ?? 5,
     scenario: opts.scenario,
     testArmy: opts.testArmy,

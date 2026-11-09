@@ -1,0 +1,56 @@
+{
+  "note": "Match pace presets (PLAN §2.11, docs/plans/m7-menus-art-maps.md §3), picked in Match Setup and fixed for the match. gatherRate, buildSpeed and trainSpeed multiply the base rates (1.0 = the numbers in units.json / buildings.json). startingResources names a set below. The 'standard' preset must equal game.json (startingResources, popCap, pace): a test keeps them in sync. Game speed (1x, 2x) is separate: it only scales time.",
+  "default": "standard",
+  "startingResources": {
+    "low": { "food": 100, "wood": 100, "gold": 0 },
+    "standard": { "food": 200, "wood": 200, "gold": 100 },
+    "high": { "food": 500, "wood": 500, "gold": 300 },
+    "veryHigh": { "food": 1000, "wood": 1000, "gold": 600 }
+  },
+  "presets": [
+    {
+      "id": "relaxed",
+      "name": "Relaxed",
+      "length": "20-30 min",
+      "description": "Everything takes a little longer. Time to think.",
+      "gatherRate": 0.8,
+      "buildSpeed": 0.8,
+      "trainSpeed": 0.8,
+      "startingResources": "standard",
+      "popCap": 100
+    },
+    {
+      "id": "standard",
+      "name": "Standard",
+      "length": "12-20 min",
+      "description": "The normal pace.",
+      "gatherRate": 1.0,
+      "buildSpeed": 1.0,
+      "trainSpeed": 1.0,
+      "startingResources": "standard",
+      "popCap": 100
+    },
+    {
+      "id": "fast",
+      "name": "Fast",
+      "length": "8-12 min",
+      "description": "Half again as fast, with a bigger stockpile.",
+      "gatherRate": 1.5,
+      "buildSpeed": 1.5,
+      "trainSpeed": 1.5,
+      "startingResources": "high",
+      "popCap": 100
+    },
+    {
+      "id": "blitz",
+      "name": "Blitz",
+      "length": "5-8 min",
+      "description": "Twice as fast, a huge stockpile and room for more units.",
+      "gatherRate": 2.0,
+      "buildSpeed": 2.5,
+      "trainSpeed": 2.0,
+      "startingResources": "veryHigh",
+      "popCap": 125
+    }
+  ]
+}

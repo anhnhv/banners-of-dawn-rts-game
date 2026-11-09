@@ -1,6 +1,7 @@
 /** Everything the systems read and write during a tick. */
 import type {
   EntityId,
+  MatchRules,
   GameEvent,
   MatchResult,
   PlayerId,
@@ -24,10 +25,14 @@ export interface PlayerState {
   stats: PlayerStats;
   /** Has owned a game.json → victory.defeatWhenLost building (only such players can lose). */
   hadKeyBuilding: boolean;
+  /** Gave up (the `surrender` command); defeated at the end of the tick. */
+  surrendered: boolean;
 }
 
 export interface GameState {
   tick: number;
+  /** The match's pace, pop cap and starting resources (shared/rules.ts), fixed for the match. */
+  rules: MatchRules;
   grid: Grid;
   rng: Rng;
   players: Map<PlayerId, PlayerState>;
