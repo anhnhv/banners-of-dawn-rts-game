@@ -1,0 +1,139 @@
+/* HUD gallery (`/?hud`): the HUD pictures of one collection at a time. */
+
+.gallery {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  font-family: 'Pixelify Sans', monospace;
+  background: #1b1f2c;
+}
+
+.gallery-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 12px;
+  background: #141722;
+  border-right: 3px solid #0f111a;
+}
+
+.gallery-nav,
+.gallery-art {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gallery-art {
+  padding-bottom: 16px;
+  border-bottom: 3px solid #0f111a;
+}
+
+.gallery-nav-btn {
+  font-family: inherit;
+  font-size: 17px;
+  text-align: left;
+  padding: 6px 10px;
+  color: #f4ecdc;
+  background: #232839;
+  border: 2px solid #0f111a;
+  box-shadow: inset 0 0 0 2px #2f3650;
+  cursor: pointer;
+}
+
+.gallery-nav-btn:hover {
+  background: #2d3349;
+}
+
+.gallery-nav-btn.current {
+  color: #2a1a0c;
+  background: #d9a24a;
+  box-shadow:
+    inset -3px -3px 0 #8c5d22,
+    inset 3px 3px 0 #f5cf7a;
+}
+
+/* Reuse the HUD's look (.hud colors, .px-btn, .sel-portrait, .hp-bar) on a scrolling page. */
+.gallery-main.hud {
+  position: relative;
+  inset: auto;
+  pointer-events: auto;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.gallery-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.gallery-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  min-height: 120px;
+  box-sizing: border-box;
+  background: rgba(30, 34, 52, 0.9);
+  border: 3px solid #0f111a;
+  box-shadow: inset 0 0 0 3px #4a5578;
+}
+
+.gallery-tile .sel-portrait {
+  width: 120px;
+  height: 120px;
+}
+
+.gallery-model {
+  width: 120px;
+  height: 120px;
+}
+
+.gallery-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gallery-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 40px);
+  gap: 6px;
+}
+
+.gallery-buttons:empty {
+  display: none;
+}
+
+.gallery-buttons .px-btn {
+  width: 40px;
+  height: 40px;
+  cursor: default;
+}
+
+.gallery-buttons .px-btn .px-icon {
+  width: 28px;
+  height: 28px;
+}
+
+@media (max-width: 600px) {
+  .gallery {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .gallery-side {
+    border-right: none;
+    border-bottom: 3px solid #0f111a;
+  }
+  .gallery-nav,
+  .gallery-art {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .gallery-main.hud {
+    padding: 16px;
+  }
+}

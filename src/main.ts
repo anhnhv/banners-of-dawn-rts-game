@@ -10,15 +10,19 @@
  *   /?enemy=<n>   → dev: n enemy units between the bases, to test combat
  *   /?preview     → the style-preview diorama (keys 1 2 3 switch views)
  *   /?models      → the model viewer (every model and HUD icon)
+ *   /?hud         → the HUD gallery (units, buildings, construction, resources; #collection)
+ *   ?art=<id>     → draw everything with that art collection (src/ui/art/collections), any page
  * Any match parameter skips the menu; unspecified options come from the last setup.
  */
 import { startApp } from './host';
-import { startModelViewer, startStylePreview } from './ui';
+import { setArtCollection, startHudGallery, startModelViewer, startStylePreview } from './ui';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container in index.html');
 
 const params = new URLSearchParams(window.location.search);
+setArtCollection(params.get('art'));
 if (params.has('preview')) startStylePreview(container);
 else if (params.has('models')) startModelViewer(container);
+else if (params.has('hud')) startHudGallery(container);
 else void startApp(container, window.location.search);

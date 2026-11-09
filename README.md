@@ -10,8 +10,18 @@ Twin Rivers and Forest Pass. Everything is driven by the JSON in `src/data/` (se
 
 URL shortcuts (they skip the menu): `/?play` (last setup), `/?map=twin_rivers`, `/?ai=normal|easy|off`,
 `/?setup=standard|scenario`, `/?pace=relaxed|standard|fast|blitz`, `/?speed=2`, `/?army=50&enemy=20` (test units).
-`/?models` shows every model and HUD icon; `/?preview` is the style-preview diorama (keys `1` `2` `3` switch views).
+`/?models` shows every model and HUD icon; `/?hud` is the HUD gallery (3D models, icons, buttons and bars of units,
+buildings, construction, terrain, map objects and resources, one section at a time, e.g. `/?hud#terrain`);
+`?art=<id>` draws any page with another art collection (see below); `/?preview` is the style-preview diorama (keys `1` `2` `3` switch views).
 Screenshots: [docs/preview/](docs/preview/) and [docs/milestones/](docs/milestones/).
+
+## Art collections
+
+All drawing data (palette, HUD icons, every voxel model) lives in [src/ui/art/collections/](src/ui/art/collections/).
+`classic/` defines everything; another collection only lists what it changes and takes the rest from
+classic ([autumn.ts](src/ui/art/collections/autumn.ts) is a small example). To make one, copy `autumn.ts`, then add it to
+`ART_COLLECTIONS` in `collections/index.ts`. Review it in `/?hud` (switch at the top of the sidebar, or `,` / `.`)
+and play with it via `?art=<id>`.
 
 ## Setup
 

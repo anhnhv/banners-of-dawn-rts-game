@@ -36,6 +36,9 @@ const BASE = import.meta.env.BASE_URL;
 export async function startApp(container: HTMLElement, search: string): Promise<void> {
   try {
     const params = new URLSearchParams(search);
+    // the art collection (?art=, read in main.ts) survives the URL rewrite, restart and quit
+    const art = params.get('art');
+    const artQuery = art ? `art=${encodeURIComponent(art)}` : '';
     const pace = parsePaceFile(paceJson);
     const index = await loadMapIndex();
     const maps: MapChoice[] = [];
@@ -110,7 +113,11 @@ export async function startApp(container: HTMLElement, search: string): Promise<
         start: asked.start === 'scenario' && !choice.hasScenario ? 'standard' : asked.start,
       };
       saveLastSetup(setup);
-      window.history.replaceState(null, '', `${BASE}${setupQuery(setup, dev)}`);
+      window.history.replaceState(
+        null,
+        '',
+        `${BASE}${setupQuery(setup, dev)}${artQuery ? `&${artQuery}` : ''}`,
+      );
       const hide = showLoading(container, `Loading ${choice.name}…`);
       // let the loading panel paint before building the 3D scene
       requestAnimationFrame(() =>
@@ -124,7 +131,7 @@ export async function startApp(container: HTMLElement, search: string): Promise<
               settings,
               onSettings,
               onRestart: () => window.location.reload(),
-              onQuit: () => window.location.assign(BASE),
+              onQuit: () => window.location.assign(artQuery ? `${BASE}?${artQuery}` : BASE),
             });
           } catch (err) {
             showFatalError(container, 'The game could not start', [

@@ -10,6 +10,7 @@ import './style.css';
 import './hud/hud.css';
 import './screens/menu.css';
 import type { DecodedMap } from '../shared';
+import { HudGallery } from './preview/HudGallery';
 import { ModelViewer } from './preview/ModelViewer';
 import { StylePreview } from './preview/StylePreview';
 import { GameScreen, type GameScreenOptions, type MatchControls } from './screens/GameScreen';
@@ -24,6 +25,7 @@ import type { Settings } from './settings';
 
 export type { GameScreen, GameScreenOptions, MatchControls, MapChoice, MenuChoice, MenuData, Settings };
 
+export { ART_COLLECTIONS, setArtCollection } from './art/collections';
 export { showFatalError } from './screens/ErrorScreen';
 export { showLoading } from './screens/MainMenu';
 export { loadLastSetup, loadSettings, saveLastSetup, saveSettings } from './settings';
@@ -38,6 +40,13 @@ export function startStylePreview(container: HTMLElement): StylePreview {
 /** The model viewer: every model and icon for review (open the game with `?models`). */
 export function startModelViewer(container: HTMLElement): ModelViewer {
   const app = new ModelViewer(container);
+  app.start();
+  return app;
+}
+
+/** The HUD gallery: the HUD pictures of one collection at a time (open the game with `?hud`). */
+export function startHudGallery(container: HTMLElement): HudGallery {
+  const app = new HudGallery(container);
   app.start();
   return app;
 }

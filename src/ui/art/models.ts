@@ -1,5 +1,6 @@
 /**
- * Voxel model definitions (PLAN §7). All art is made in code from boxes + roofs + pixel textures.
+ * Voxel models (PLAN §7): turns the active art collection's drawings (src/ui/art/collections)
+ * into geometry. All art is made in code from boxes + roofs + pixel textures.
  *
  * Conventions (1 world unit = 1 map tile):
  *  - Buildings / resources: origin at the footprint's min corner, footprint w×d tiles on +x/+z.
@@ -7,20 +8,25 @@
  *  - Colors are palette ids; 'team', 'team-light', 'team-dark' are swapped per player.
  */
 import * as THREE from 'three';
+import { art, type LegPart, type UnitKit } from './collections';
+import type { BuildingModel, TeamName, TreeModel, UnitModel, WallAxis } from './collections';
+import { classic } from './collections/classic';
 import { voxelMaterial } from './materials';
-import { resolveColor, type TeamName } from './palette';
+import { resolveColor } from './palette';
 import { VoxelBuilder, type BuiltGeometry } from './VoxelBuilder';
 
-export type BuildingModel =
-  'townHall' | 'house' | 'barracks' | 'stable' | 'farm' | 'tower' | 'goldMine' | 'berryBush';
-export type WallAxis = 'x' | 'z';
-export type UnitModel = 'worker' | 'militia' | 'archer' | 'scoutRider' | 'knight' | 'catapult';
-export type TreeModel = 'oak' | 'oakTall' | 'pine' | 'pineSmall';
+export type { BuildingModel, LegPart, TreeModel, UnitModel, WallAxis };
 
 function builder(team: TeamName): VoxelBuilder {
   return new VoxelBuilder().setColorFilter((c) =>
     typeof c === 'string' && !c.startsWith('#') ? resolveColor(c, team) : c,
   );
+}
+
+function draw(fn: (b: VoxelBuilder) => void, team: TeamName = 'blue'): BuiltGeometry {
+  const b = builder(team);
+  fn(b);
+  return b.build();
 }
 
 export function meshFrom(built: BuiltGeometry): THREE.Mesh {
@@ -35,209 +41,7 @@ export function meshFrom(built: BuiltGeometry): THREE.Mesh {
 
 // ---- Buildings ----------------------------------------------------------------------------------
 
-const BUILDINGS: Record<BuildingModel, (b: VoxelBuilder) => void> = {
-  townHall: (b) => {
-    b.box(0.1, 0, 0.1, 2.8, 0.25, 2.8, 'bricks', 'stone', { top: 'rock', topColor: 'stone-light' });
-    b.box(1.1, 0, 2.6, 0.8, 0.12, 0.35, 'rock', 'stone'); // steps
-    b.box(0.35, 0.25, 0.45, 2.3, 1.0, 2.1, 'plain', 'plaster');
-    // timber frame
-    for (const x of [0.33, 1.42, 2.6]) b.box(x, 0.25, 2.53, 0.08, 1.0, 0.04, 'planks', 'wood-dark');
-    for (const z of [0.43, 1.45, 2.47]) b.box(2.63, 0.25, z, 0.04, 1.0, 0.08, 'planks', 'wood-dark');
-    b.box(0.33, 0.86, 2.53, 2.35, 0.07, 0.04, 'planks', 'wood-dark');
-    b.box(2.63, 0.86, 0.43, 0.04, 0.07, 2.12, 'planks', 'wood-dark');
-    b.box(1.22, 0.25, 2.54, 0.56, 0.62, 0.05, 'planks', 'wood-dark'); // door
-    b.box(0.55, 0.5, 2.54, 0.42, 0.28, 0.04, 'plain', 'shadow'); // windows
-    b.box(1.98, 0.5, 2.54, 0.42, 0.28, 0.04, 'plain', 'shadow');
-    b.box(2.64, 0.5, 0.75, 0.04, 0.28, 0.42, 'plain', 'shadow');
-    b.box(2.64, 0.5, 1.8, 0.04, 0.28, 0.42, 'plain', 'shadow');
-    b.gableRoof(0.35, 1.25, 0.45, 2.3, 2.1, 0.95, 'x', 'shingles', 'roof-red', 'plain', 'plaster', 0.16);
-    // central bell tower with a team-colored spire
-    b.box(1.05, 1.25, 1.05, 0.9, 1.5, 0.9, 'bricks', 'stone');
-    b.box(1.25, 2.25, 1.94, 0.5, 0.35, 0.03, 'plain', 'shadow');
-    b.box(1.94, 2.25, 1.25, 0.03, 0.35, 0.5, 'plain', 'shadow');
-    b.box(0.98, 2.75, 0.98, 1.04, 0.1, 1.04, 'rock', 'stone-dark');
-    b.pyramidRoof(1.0, 2.85, 1.0, 1.0, 1.0, 0.95, 'shingles', 'team', 0.06);
-    // banner
-    b.box(2.72, 0.25, 2.72, 0.06, 1.7, 0.06, 'bark', 'wood-dark');
-    b.box(2.78, 1.45, 2.73, 0.46, 0.32, 0.03, 'cloth', 'team');
-  },
-
-  house: (b) => {
-    b.box(0.15, 0, 0.15, 1.7, 0.16, 1.7, 'bricks', 'stone-dark', { top: 'rock', topColor: 'stone' });
-    b.box(0.28, 0.16, 0.3, 1.44, 0.72, 1.36, 'planks', 'wood-light');
-    for (const x of [0.26, 1.66]) b.box(x, 0.16, 1.62, 0.08, 0.72, 0.08, 'planks', 'wood-dark');
-    b.box(0.86, 0.16, 1.66, 0.3, 0.48, 0.04, 'planks', 'wood-dark'); // door
-    b.box(0.42, 0.42, 1.665, 0.26, 0.2, 0.04, 'plain', 'shadow'); // window
-    b.box(1.72, 0.42, 0.62, 0.04, 0.2, 0.3, 'plain', 'shadow');
-    b.box(0.78, 0.66, 1.66, 0.46, 0.05, 0.2, 'cloth', 'team'); // awning
-    b.gableRoof(0.28, 0.88, 0.3, 1.44, 1.36, 0.72, 'z', 'thatch', 'straw', 'planks', 'wood', 0.13);
-    b.box(1.22, 0.95, 0.5, 0.22, 0.95, 0.22, 'bricks', 'brick'); // chimney
-  },
-
-  barracks: (b) => {
-    b.box(0.1, 0, 0.1, 2.8, 0.2, 2.8, 'rock', 'stone-dark', { topColor: 'stone' });
-    b.box(0.25, 0.2, 0.55, 2.5, 0.6, 1.95, 'bricks', 'stone');
-    b.box(0.25, 0.8, 0.55, 2.5, 0.42, 1.95, 'planks', 'wood');
-    b.box(1.12, 0.2, 2.48, 0.76, 0.78, 0.05, 'planks', 'wood-dark'); // gate
-    b.box(1.1, 0.98, 2.47, 0.8, 0.08, 0.06, 'rock', 'stone-dark');
-    b.box(0.45, 0.42, 2.505, 0.3, 0.68, 0.03, 'cloth', 'team'); // banners
-    b.box(2.25, 0.42, 2.505, 0.3, 0.68, 0.03, 'cloth', 'team');
-    b.box(0.45, 0.38, 2.505, 0.3, 0.05, 0.035, 'plain', 'gold');
-    b.box(2.25, 0.38, 2.505, 0.3, 0.05, 0.035, 'plain', 'gold');
-    b.gableRoof(
-      0.25,
-      1.22,
-      0.55,
-      2.5,
-      1.95,
-      0.9,
-      'x',
-      'shingles',
-      'roof-slate',
-      'planks',
-      'wood-light',
-      0.16,
-    );
-    // weapon rack on the side
-    b.box(2.78, 0.2, 0.9, 0.06, 0.55, 0.06, 'planks', 'wood-dark');
-    b.box(2.78, 0.2, 2.0, 0.06, 0.55, 0.06, 'planks', 'wood-dark');
-    b.box(2.78, 0.62, 0.9, 0.06, 0.06, 1.16, 'planks', 'wood-dark');
-    for (let i = 0; i < 4; i++) {
-      const z = 1.05 + i * 0.26;
-      b.box(2.86, 0.2, z, 0.03, 0.95, 0.03, 'bark', 'wood');
-      b.box(2.85, 1.12, z - 0.01, 0.05, 0.1, 0.05, 'plain', 'iron');
-    }
-  },
-
-  // long low barn with open horse stalls and a small paddock in front (reads differently from the
-  // tall stone Barracks: lower, wooden, thatched, horses looking out)
-  stable: (b) => {
-    b.box(0.1, 0, 0.1, 2.8, 0.12, 2.8, 'soil', 'dirt-dark', { top: 'soil', topColor: 'dirt' });
-    b.box(0.2, 0.12, 0.35, 2.6, 0.12, 1.6, 'rock', 'stone-dark', { topColor: 'stone' }); // footing
-    b.box(0.25, 0.24, 0.4, 2.5, 0.7, 1.5, 'planks', 'wood');
-    // three open stalls on the front, two with a horse looking out
-    for (const [i, x] of [0.42, 1.2, 1.98].entries()) {
-      b.box(x, 0.24, 1.9, 0.6, 0.56, 0.03, 'plain', 'shadow');
-      b.box(x, 0.24, 1.91, 0.6, 0.2, 0.04, 'planks', 'wood-light'); // half door
-      if (i !== 1) {
-        b.box(x + 0.2, 0.5, 1.88, 0.2, 0.2, 0.2, 'plain', i === 0 ? 'horse' : 'horse-dark'); // head
-        b.box(x + 0.23, 0.7, 1.98, 0.04, 0.07, 0.04, 'plain', 'horse-dark'); // ears
-        b.box(x + 0.33, 0.7, 1.98, 0.04, 0.07, 0.04, 'plain', 'horse-dark');
-      }
-    }
-    for (const x of [0.25, 1.06, 1.84, 2.66]) b.box(x, 0.24, 1.88, 0.09, 0.72, 0.06, 'planks', 'wood-dark');
-    b.box(0.25, 0.86, 1.88, 2.5, 0.08, 0.06, 'planks', 'wood-dark'); // lintel
-    b.gableRoof(0.25, 0.94, 0.4, 2.5, 1.5, 0.62, 'x', 'thatch', 'straw', 'planks', 'wood-light', 0.14);
-    b.box(0.12, 1.53, 1.1, 2.76, 0.07, 0.1, 'cloth', 'team'); // team-colored ridge
-    // paddock fence along the front, open in the middle
-    for (const x of [0.14, 0.78, 2.14, 2.78]) b.box(x, 0.12, 2.76, 0.08, 0.36, 0.08, 'bark', 'wood-dark');
-    for (const [x0, x1] of [
-      [0.14, 0.86],
-      [2.14, 2.86],
-    ] as const) {
-      b.box(x0, 0.24, 2.78, x1 - x0, 0.05, 0.04, 'planks', 'wood-light');
-      b.box(x0, 0.38, 2.78, x1 - x0, 0.05, 0.04, 'planks', 'wood-light');
-    }
-    // hay bale, water trough and a banner
-    b.box(2.25, 0.12, 2.15, 0.45, 0.3, 0.35, 'thatch', 'straw-light');
-    b.box(0.3, 0.12, 2.25, 0.55, 0.2, 0.25, 'planks', 'wood-dark');
-    b.box(0.35, 0.2, 2.3, 0.45, 0.05, 0.15, 'plain', 'water');
-    b.box(2.82, 0.12, 0.42, 0.06, 1.7, 0.06, 'bark', 'wood-dark');
-    b.box(2.88, 1.35, 0.43, 0.4, 0.3, 0.03, 'cloth', 'team');
-  },
-
-  farm: (b) => {
-    b.box(0.1, 0, 0.1, 1.8, 0.05, 1.8, 'soil', 'soil');
-    for (let i = 0; i < 5; i++) {
-      const ripe = i % 2 === 0;
-      b.box(0.2, 0.05, 0.22 + i * 0.33, 1.6, ripe ? 0.16 : 0.12, 0.17, 'leaves', ripe ? 'crop-ripe' : 'crop');
-    }
-    for (const [x, z] of [
-      [0.04, 0.04],
-      [1.88, 0.04],
-      [0.04, 1.88],
-      [1.88, 1.88],
-    ] as const)
-      b.box(x, 0, z, 0.08, 0.3, 0.08, 'bark', 'wood');
-    b.box(0.04, 0.18, 0.06, 1.92, 0.05, 0.04, 'planks', 'wood-light');
-    b.box(0.06, 0.18, 0.04, 0.04, 0.05, 1.92, 'planks', 'wood-light');
-    // scarecrow in team colors
-    b.box(1.55, 0.05, 1.55, 0.05, 0.6, 0.05, 'bark', 'wood');
-    b.box(1.38, 0.45, 1.555, 0.4, 0.05, 0.04, 'bark', 'wood');
-    b.box(1.47, 0.32, 1.53, 0.21, 0.22, 0.1, 'cloth', 'team');
-    b.box(1.5, 0.55, 1.53, 0.15, 0.13, 0.1, 'thatch', 'straw-light');
-  },
-
-  tower: (b) => {
-    b.box(-0.08, 0, -0.08, 1.16, 2.05, 1.16, 'bricks', 'stone');
-    b.box(0.42, 0.9, 1.085, 0.16, 0.42, 0.03, 'plain', 'shadow'); // arrow slits
-    b.box(1.085, 0.9, 0.42, 0.03, 0.42, 0.16, 'plain', 'shadow');
-    b.box(0.38, 0, 1.08, 0.24, 0.5, 0.04, 'planks', 'wood-dark'); // door
-    b.box(-0.16, 2.05, -0.16, 1.32, 0.12, 1.32, 'rock', 'stone-dark', { topColor: 'stone' });
-    for (const [x, z] of [
-      [-0.16, -0.16],
-      [0.86, -0.16],
-      [-0.16, 0.86],
-      [0.86, 0.86],
-      [0.35, -0.16],
-      [0.35, 0.86],
-      [-0.16, 0.35],
-      [0.86, 0.35],
-    ] as const)
-      b.box(x, 2.17, z, 0.3, 0.26, 0.3, 'bricks', 'stone');
-    for (const [x, z] of [
-      [-0.02, -0.02],
-      [0.94, -0.02],
-      [-0.02, 0.94],
-      [0.94, 0.94],
-    ] as const)
-      b.box(x, 2.17, z, 0.08, 0.5, 0.08, 'planks', 'wood-dark');
-    b.pyramidRoof(-0.1, 2.67, -0.1, 1.2, 1.2, 0.8, 'shingles', 'team', 0.08);
-    b.box(0.47, 3.4, 0.47, 0.05, 0.5, 0.05, 'bark', 'wood-dark');
-    b.box(0.52, 3.62, 0.48, 0.32, 0.2, 0.03, 'cloth', 'team-light');
-  },
-
-  goldMine: (b) => {
-    b.box(0.15, 0, 0.2, 1.1, 0.75, 1.0, 'rock', 'stone');
-    b.box(0.9, 0, 0.15, 0.95, 0.55, 0.95, 'rock', 'stone-dark');
-    b.box(0.3, 0, 1.0, 0.8, 0.45, 0.85, 'rock', 'stone');
-    b.box(0.35, 0.75, 0.35, 0.6, 0.35, 0.6, 'rock', 'stone-light');
-    // gold veins
-    for (const [x, y, z, s] of [
-      [0.5, 0.4, 1.19, 0.16],
-      [0.8, 0.6, 1.19, 0.12],
-      [1.24, 0.35, 0.5, 0.14],
-      [1.84, 0.3, 0.6, 0.12],
-      [0.62, 1.05, 0.62, 0.15],
-      [1.3, 0.42, 1.09, 0.14],
-      [0.95, 0.2, 1.84, 0.13],
-    ] as const)
-      b.box(x, y, z, s, s, s, 'plain', 'gold');
-    // timber mine entrance
-    b.box(1.15, 0, 1.15, 0.08, 0.6, 0.08, 'planks', 'wood');
-    b.box(1.65, 0, 1.15, 0.08, 0.6, 0.08, 'planks', 'wood');
-    b.box(1.1, 0.6, 1.12, 0.68, 0.1, 0.14, 'planks', 'wood-dark');
-    b.box(1.23, 0, 1.12, 0.42, 0.55, 0.04, 'plain', 'ink');
-    b.box(1.3, 0, 1.6, 0.35, 0.18, 0.28, 'planks', 'wood'); // ore cart
-    b.box(1.32, 0.18, 1.62, 0.31, 0.06, 0.24, 'plain', 'gold');
-  },
-
-  berryBush: (b) => {
-    b.box(0.15, 0, 0.18, 0.7, 0.42, 0.65, 'leaves', 'leaf');
-    b.box(0.25, 0.42, 0.26, 0.5, 0.14, 0.48, 'leaves', 'leaf-light');
-    for (const [x, y, z] of [
-      [0.3, 0.3, 0.83],
-      [0.6, 0.18, 0.83],
-      [0.45, 0.48, 0.74],
-      [0.85, 0.25, 0.4],
-      [0.85, 0.12, 0.7],
-      [0.65, 0.56, 0.4],
-    ] as const)
-      b.box(x, y, z, 0.07, 0.07, 0.03, 'plain', 'berry');
-  },
-};
-
-const UNIT_MODELS: readonly UnitModel[] = ['worker', 'militia', 'archer', 'scoutRider', 'knight', 'catapult'];
+const UNIT_MODELS = Object.keys(classic.units) as UnitModel[];
 
 /** Resolve a config `model` name to a known unit model (unknown names fall back to militia). */
 export function unitModel(name: string): UnitModel {
@@ -246,97 +50,34 @@ export function unitModel(name: string): UnitModel {
 
 /** Resolve a config `model` name to a known building model, or null if there is none yet. */
 export function buildingModel(name: string): BuildingModel | null {
-  return name in BUILDINGS ? (name as BuildingModel) : null;
+  return name in classic.buildings ? (name as BuildingModel) : null;
 }
 
 export function buildingGeometry(model: BuildingModel, team: TeamName): BuiltGeometry {
-  const b = builder(team);
-  BUILDINGS[model](b);
-  return b.build();
+  return draw(art().buildings[model], team);
 }
 
 /** One 1×1 wall segment running along `axis`, with merlons. */
 export function wallGeometry(axis: WallAxis): BuiltGeometry {
-  const b = builder('blue');
-  if (axis === 'x') {
-    b.box(0, 0, 0.22, 1, 0.95, 0.56, 'bricks', 'stone', { top: 'rock', topColor: 'stone-dark' });
-    b.box(0.05, 0.95, 0.22, 0.34, 0.24, 0.56, 'bricks', 'stone');
-    b.box(0.6, 0.95, 0.22, 0.34, 0.24, 0.56, 'bricks', 'stone');
-  } else {
-    b.box(0.22, 0, 0, 0.56, 0.95, 1, 'bricks', 'stone', { top: 'rock', topColor: 'stone-dark' });
-    b.box(0.22, 0.95, 0.05, 0.56, 0.24, 0.34, 'bricks', 'stone');
-    b.box(0.22, 0.95, 0.6, 0.56, 0.24, 0.34, 'bricks', 'stone');
-  }
-  return b.build();
+  return draw((b) => art().wall(b, axis));
 }
 
-// ---- Trees ---------------------------------------------------------------------------------------
+// ---- Trees and rocks ----------------------------------------------------------------------------
 
 export function treeGeometry(model: TreeModel): BuiltGeometry {
-  const b = builder('blue');
-  switch (model) {
-    case 'oak':
-      b.boxC(0, 0, 0, 0.2, 0.55, 0.2, 'bark', 'bark');
-      b.boxC(0, 0.42, 0, 0.86, 0.55, 0.86, 'leaves', 'leaf');
-      b.boxC(0.06, 0.97, -0.04, 0.6, 0.32, 0.6, 'leaves', 'leaf-light');
-      break;
-    case 'oakTall':
-      b.boxC(0, 0, 0, 0.22, 0.75, 0.22, 'bark', 'bark');
-      b.boxC(0, 0.6, 0, 0.95, 0.6, 0.95, 'leaves', 'leaf-dark');
-      b.boxC(-0.05, 1.2, 0.05, 0.7, 0.4, 0.7, 'leaves', 'leaf');
-      b.boxC(0.05, 1.6, 0, 0.36, 0.2, 0.36, 'leaves', 'leaf-light');
-      break;
-    case 'pine':
-      b.boxC(0, 0, 0, 0.16, 0.4, 0.16, 'bark', 'bark');
-      b.boxC(0, 0.3, 0, 0.82, 0.38, 0.82, 'leaves', 'pine');
-      b.boxC(0, 0.68, 0, 0.62, 0.36, 0.62, 'leaves', 'pine');
-      b.boxC(0, 1.04, 0, 0.42, 0.34, 0.42, 'leaves', 'leaf-dark');
-      b.boxC(0, 1.38, 0, 0.2, 0.22, 0.2, 'leaves', 'leaf-dark');
-      break;
-    case 'pineSmall':
-      b.boxC(0, 0, 0, 0.14, 0.3, 0.14, 'bark', 'bark');
-      b.boxC(0, 0.22, 0, 0.6, 0.3, 0.6, 'leaves', 'pine');
-      b.boxC(0, 0.52, 0, 0.42, 0.28, 0.42, 'leaves', 'pine');
-      b.boxC(0, 0.8, 0, 0.22, 0.22, 0.22, 'leaves', 'leaf-dark');
-      break;
-  }
-  return b.build();
+  return draw(art().trees[model]);
 }
 
 /** Boulder block that fills one 'rock' terrain tile (3 variants). Origin: tile center. */
 export function rockBlockGeometry(variant: 0 | 1 | 2): BuiltGeometry {
-  const b = builder('blue');
-  if (variant === 0) {
-    b.boxC(0, 0, 0, 0.98, 0.5, 0.98, 'rock', 'stone', { topColor: 'stone-light' });
-    b.boxC(0.12, 0.5, -0.06, 0.62, 0.32, 0.6, 'rock', 'stone', { topColor: 'stone-light' });
-    b.boxC(-0.2, 0.82, 0.05, 0.3, 0.16, 0.3, 'rock', 'stone-light');
-  } else if (variant === 1) {
-    b.boxC(0, 0, 0, 0.98, 0.34, 0.98, 'rock', 'stone-dark', { topColor: 'stone' });
-    b.boxC(-0.15, 0.34, 0.1, 0.56, 0.42, 0.58, 'rock', 'stone', { topColor: 'stone-light' });
-    b.boxC(0.28, 0.34, -0.25, 0.32, 0.22, 0.34, 'rock', 'stone');
-  } else {
-    b.boxC(0, 0, 0, 0.98, 0.7, 0.98, 'rock', 'stone', { topColor: 'stone-light' });
-    b.boxC(0.05, 0.7, 0.05, 0.7, 0.4, 0.66, 'rock', 'stone-dark', { topColor: 'stone' });
-    b.boxC(-0.06, 1.1, -0.04, 0.36, 0.2, 0.36, 'rock', 'stone');
-  }
-  return b.build();
+  return draw(art().rockBlocks[variant]);
 }
 
 export function rockGeometry(): BuiltGeometry {
-  const b = builder('blue');
-  b.boxC(0, 0, 0, 0.5, 0.3, 0.42, 'rock', 'stone');
-  b.boxC(0.12, 0.3, -0.02, 0.28, 0.16, 0.26, 'rock', 'stone-light');
-  b.boxC(-0.22, 0, 0.15, 0.22, 0.16, 0.2, 'rock', 'stone-dark');
-  return b.build();
+  return draw(art().boulder);
 }
 
 // ---- Units ---------------------------------------------------------------------------------------
-
-/** Leg (or horse leg) geometry with its pivot point (hip) in model space. */
-export interface LegPart {
-  geometry: BuiltGeometry;
-  pivot: [number, number, number];
-}
 
 /** The pieces of a unit model: a rigid body plus legs that swing when walking. */
 export interface UnitPartGeometry {
@@ -346,151 +87,16 @@ export interface UnitPartGeometry {
   arms: LegPart[];
 }
 
-/** One arm hanging from the shoulder pivot (x, y, 0), with the hand and an optional tool. */
-function arm(team: TeamName, color: string, x: number, y: number, tool?: (b: VoxelBuilder) => void): LegPart {
-  const b = builder(team);
-  b.boxC(0, -0.17, 0, 0.07, 0.17, 0.09, 'cloth', color);
-  b.boxC(0, -0.2, 0, 0.065, 0.04, 0.085, 'plain', 'skin');
-  tool?.(b);
-  return { geometry: b.build(), pivot: [x, y, 0] };
-}
-
 /** A unit as a scene-graph group (used by the style preview). */
 export interface UnitParts {
   group: THREE.Group;
   legs: THREE.Object3D[];
 }
 
-/** Torso and head of a person. Arms are separate parts (see arm()) so they can swing. */
-function humanoid(b: VoxelBuilder, y0: number, torso: string): void {
-  b.boxC(0, y0, 0, 0.26, 0.2, 0.16, 'cloth', torso);
-  b.boxC(0, y0 + 0.03, 0, 0.27, 0.035, 0.17, 'plain', 'leather');
-  b.boxC(0, y0 + 0.2, 0, 0.21, 0.2, 0.2, 'plain', 'skin');
-  b.boxC(0.05, y0 + 0.28, 0.1, 0.035, 0.045, 0.01, 'plain', 'ink');
-  b.boxC(-0.05, y0 + 0.28, 0.1, 0.035, 0.045, 0.01, 'plain', 'ink');
-}
-
-function leg(
-  team: TeamName,
-  color: string,
-  w: number,
-  h: number,
-  d: number,
-  x: number,
-  y: number,
-  z: number,
-): LegPart {
-  const b = builder(team);
-  b.box(-w / 2, -h, -d / 2, w, h, d, 'plain', color);
-  return { geometry: b.build(), pivot: [x, y, z] };
-}
-
-function horse(b: VoxelBuilder, team: TeamName, coat: string, dark: string, legs: LegPart[]): void {
-  b.boxC(0, 0.3, 0, 0.3, 0.26, 0.62, 'plain', coat);
-  b.boxC(0, 0.3, 0, 0.34, 0.15, 0.5, 'cloth', 'team');
-  b.boxC(0, 0.45, 0.27, 0.18, 0.3, 0.18, 'plain', coat);
-  b.boxC(0, 0.65, 0.39, 0.16, 0.14, 0.28, 'plain', coat);
-  b.boxC(0, 0.72, 0.3, 0.05, 0.12, 0.2, 'plain', dark); // mane
-  b.boxC(0, 0.42, -0.34, 0.06, 0.22, 0.08, 'plain', dark); // tail
-  for (const [x, z] of [
-    [0.1, 0.22],
-    [-0.1, 0.22],
-    [0.1, -0.22],
-    [-0.1, -0.22],
-  ] as const)
-    legs.push(leg(team, dark, 0.08, 0.3, 0.08, x, 0.3, z));
-}
-
 export function unitParts(model: UnitModel, team: TeamName): UnitPartGeometry {
-  const b = builder(team);
-  const legs: LegPart[] = [];
-  const arms: LegPart[] = [];
-  const hip = 0.17;
-
-  if (model === 'catapult') {
-    // a siege engine: no legs or arms, it rolls (the walk cycle only bobs it a little)
-    b.boxC(0, 0.12, 0, 0.42, 0.07, 0.84, 'planks', 'wood'); // deck
-    b.boxC(0.22, 0.1, 0, 0.06, 0.08, 0.92, 'planks', 'wood-dark'); // side beams
-    b.boxC(-0.22, 0.1, 0, 0.06, 0.08, 0.92, 'planks', 'wood-dark');
-    for (const [x, z] of [
-      [0.28, 0.27],
-      [-0.28, 0.27],
-      [0.28, -0.27],
-      [-0.28, -0.27],
-    ] as const) {
-      b.boxC(x, 0, z, 0.06, 0.26, 0.26, 'bark', 'wood-dark'); // wheel
-      b.boxC(x + Math.sign(x) * 0.035, 0.1, z, 0.02, 0.06, 0.06, 'plain', 'iron'); // hub
-    }
-    b.boxC(0.15, 0.19, 0.08, 0.06, 0.4, 0.06, 'planks', 'wood'); // uprights
-    b.boxC(-0.15, 0.19, 0.08, 0.06, 0.4, 0.06, 'planks', 'wood');
-    b.boxC(0, 0.55, 0.08, 0.36, 0.06, 0.07, 'cloth', 'team'); // padded crossbar
-    // the throwing arm, raised toward the back, in four steps
-    for (let i = 0; i < 4; i++)
-      b.boxC(0, 0.22 + i * 0.13, 0.12 - i * 0.12, 0.06, 0.15, 0.08, 'bark', 'wood-light');
-    b.boxC(0, 0.68, -0.36, 0.17, 0.06, 0.17, 'planks', 'wood-dark'); // bucket
-    b.boxC(0, 0.74, -0.36, 0.11, 0.1, 0.11, 'rock', 'stone');
-    b.boxC(0, 0.19, -0.3, 0.22, 0.14, 0.16, 'rock', 'stone-dark'); // ballast
-    b.boxC(0, 0.19, 0.36, 0.2, 0.12, 0.1, 'cloth', 'team-dark'); // team banner box
-  } else if (model === 'knight') {
-    horse(b, team, 'horse', 'horse-dark', legs);
-    b.boxC(0, 0.56, -0.02, 0.26, 0.2, 0.18, 'plain', 'iron');
-    b.boxC(0, 0.56, 0.0, 0.27, 0.06, 0.19, 'cloth', 'team');
-    b.boxC(0.16, 0.58, 0, 0.07, 0.17, 0.09, 'plain', 'iron-dark');
-    b.boxC(-0.16, 0.58, 0, 0.07, 0.17, 0.09, 'plain', 'iron-dark');
-    b.boxC(0, 0.76, -0.02, 0.22, 0.21, 0.21, 'plain', 'iron');
-    b.boxC(0, 0.83, 0.09, 0.16, 0.035, 0.01, 'plain', 'ink'); // visor slit
-    b.boxC(0, 0.97, -0.02, 0.05, 0.08, 0.16, 'cloth', 'team-light'); // plume
-    b.boxC(0.2, 0.62, 0.25, 0.04, 0.04, 0.9, 'bark', 'wood'); // lance
-    b.boxC(0.2, 0.61, 0.72, 0.06, 0.06, 0.1, 'plain', 'iron');
-    b.boxC(-0.21, 0.5, 0.02, 0.04, 0.24, 0.2, 'planks', 'team'); // shield
-  } else if (model === 'scoutRider') {
-    horse(b, team, 'wood-light', 'wood', legs);
-    b.boxC(0, 0.56, -0.02, 0.25, 0.19, 0.17, 'plain', 'leather');
-    b.boxC(0, 0.6, -0.11, 0.27, 0.22, 0.03, 'cloth', 'team'); // cape
-    b.boxC(0.16, 0.58, 0, 0.07, 0.16, 0.09, 'cloth', 'team-dark');
-    b.boxC(-0.16, 0.58, 0, 0.07, 0.16, 0.09, 'cloth', 'team-dark');
-    b.boxC(0, 0.75, -0.02, 0.2, 0.19, 0.19, 'plain', 'skin');
-    b.boxC(0.045, 0.83, 0.075, 0.03, 0.04, 0.01, 'plain', 'ink');
-    b.boxC(-0.045, 0.83, 0.075, 0.03, 0.04, 0.01, 'plain', 'ink');
-    b.boxC(0, 0.92, -0.02, 0.22, 0.06, 0.22, 'cloth', 'team-light'); // cap
-    b.boxC(0.2, 0.55, 0.12, 0.03, 0.03, 0.55, 'bark', 'wood'); // short spear
-    b.boxC(0.2, 0.545, 0.42, 0.05, 0.05, 0.08, 'plain', 'iron');
-  } else {
-    const torso = model === 'worker' ? 'team-light' : 'team';
-    humanoid(b, hip, torso);
-    const sleeve = model === 'worker' ? 'cloth' : 'team-dark';
-    const shoulder = hip + 0.2;
-    const axe = (a: VoxelBuilder): void => {
-      a.boxC(0.035, -0.22, 0.07, 0.03, 0.3, 0.03, 'bark', 'wood'); // handle
-      a.boxC(0.035, 0.02, 0.11, 0.03, 0.08, 0.08, 'plain', 'iron'); // head
-    };
-    arms.push(arm(team, sleeve, -0.165, shoulder));
-    arms.push(arm(team, sleeve, 0.165, shoulder, model === 'worker' ? axe : undefined));
-    if (model === 'worker') {
-      b.boxC(0, hip + 0.4, 0, 0.32, 0.035, 0.32, 'thatch', 'straw');
-      b.boxC(0, hip + 0.435, 0, 0.17, 0.06, 0.17, 'thatch', 'straw');
-    } else if (model === 'militia') {
-      b.boxC(0, hip + 0.37, 0, 0.23, 0.09, 0.23, 'plain', 'iron');
-      b.boxC(0, hip + 0.33, 0, 0.26, 0.03, 0.26, 'plain', 'iron-dark');
-      b.boxC(0.2, hip - 0.1, 0.07, 0.03, 0.82, 0.03, 'bark', 'wood'); // spear
-      b.boxC(0.2, hip + 0.72, 0.07, 0.05, 0.1, 0.05, 'plain', 'iron');
-      b.boxC(-0.21, hip - 0.02, 0.02, 0.04, 0.22, 0.19, 'planks', 'team'); // shield
-      b.boxC(-0.235, hip + 0.07, 0.02, 0.02, 0.05, 0.05, 'plain', 'iron');
-    } else {
-      // archer
-      b.boxC(0, hip + 0.33, -0.01, 0.23, 0.13, 0.23, 'cloth', 'team-dark');
-      b.boxC(0, hip + 0.38, -0.12, 0.12, 0.06, 0.04, 'cloth', 'team-dark');
-      b.boxC(-0.22, hip - 0.08, 0.06, 0.03, 0.46, 0.03, 'bark', 'wood-light'); // bow
-      b.boxC(-0.22, hip + 0.38, 0.03, 0.03, 0.04, 0.06, 'bark', 'wood-light');
-      b.boxC(-0.22, hip - 0.12, 0.03, 0.03, 0.04, 0.06, 'bark', 'wood-light');
-      b.boxC(0.06, hip + 0.03, -0.11, 0.08, 0.24, 0.06, 'plain', 'leather'); // quiver
-      b.boxC(0.06, hip + 0.27, -0.11, 0.06, 0.05, 0.04, 'plain', 'cloth');
-    }
-    const legColor = model === 'militia' ? 'iron-dark' : 'leather';
-    legs.push(leg(team, legColor, 0.09, hip, 0.1, 0.065, hip, 0));
-    legs.push(leg(team, legColor, 0.09, hip, 0.1, -0.065, hip, 0));
-  }
-  return { body: b.build(), legs, arms };
+  const kit: UnitKit = { body: builder(team), team, part: () => builder(team), legs: [], arms: [] };
+  art().units[model](kit);
+  return { body: kit.body.build(), legs: kit.legs, arms: kit.arms };
 }
 
 /** Unit as a scene-graph group with separate leg meshes (style preview). */
@@ -508,83 +114,25 @@ export function buildUnit(model: UnitModel, team: TeamName): UnitParts {
   return { group, legs };
 }
 
-// ---- Construction site (one generic look for every building) --------------------------------
+// ---- Construction site, projectiles and rubble -------------------------------------------------
 
-/**
- * Static part of a construction site for a w×h footprint: a dirt-and-plank foundation, scaffold
- * posts at the corners (and along long sides) and rails at two heights. Used for EVERY building
- * type while it is being built.
- */
+/** Static part of a construction site for a w×h footprint (the same for every building type). */
 export function constructionSiteGeometry(w: number, h: number, height: number): BuiltGeometry {
-  const b = builder('blue');
-  b.box(0.05, 0, 0.05, w - 0.1, 0.08, h - 0.1, 'soil', 'dirt', { top: 'planks', topColor: 'wood-light' });
-  const posts: Array<[number, number]> = [];
-  for (let x = 0; x <= w; x += Math.max(1, w / Math.ceil(w / 1.5))) {
-    posts.push([x, 0], [x, h]);
-  }
-  for (let z = 0; z <= h; z += Math.max(1, h / Math.ceil(h / 1.5))) {
-    posts.push([0, z], [w, z]);
-  }
-  for (const [px, pz] of posts) {
-    const x = Math.min(w - 0.12, Math.max(0.04, px - 0.04));
-    const z = Math.min(h - 0.12, Math.max(0.04, pz - 0.04));
-    b.box(x, 0.08, z, 0.08, height, 0.08, 'planks', 'wood');
-  }
-  for (const y of [height * 0.45, height]) {
-    b.box(0.04, y, 0.04, w - 0.08, 0.06, 0.06, 'planks', 'wood-dark');
-    b.box(0.04, y, h - 0.1, w - 0.08, 0.06, 0.06, 'planks', 'wood-dark');
-    b.box(0.04, y, 0.04, 0.06, 0.06, h - 0.08, 'planks', 'wood-dark');
-    b.box(w - 0.1, y, 0.04, 0.06, 0.06, h - 0.08, 'planks', 'wood-dark');
-  }
-  // a few stacked planks and stones as building material
-  b.box(0.2, 0.08, 0.2, Math.min(0.7, w * 0.3), 0.12, 0.25, 'planks', 'wood-light');
-  b.box(w - 0.55, 0.08, h - 0.5, 0.35, 0.18, 0.3, 'rock', 'stone');
-  return b.build();
+  return draw((b) => art().constructionSite(b, w, h, height));
 }
 
 /** The part that grows with progress: a unit-height block (scaled in y by the renderer). */
 export function constructionCoreGeometry(w: number, h: number): BuiltGeometry {
-  const b = builder('blue');
-  b.box(0.25, 0, 0.25, w - 0.5, 1, h - 0.5, 'planks', 'wood-light', { top: 'planks', topColor: 'straw' });
-  return b.build();
+  return draw((b) => art().constructionCore(b, w, h));
 }
-
-// ---- Projectiles (projectiles.json → model) and rubble ----------------------------------------
 
 /** Projectile pointing along +z, centered on its origin. Unknown names fall back to the arrow. */
 export function projectileGeometry(model: string): BuiltGeometry {
-  const b = builder('blue');
-  if (model === 'stone') {
-    b.boxC(0, -0.08, 0, 0.16, 0.16, 0.16, 'rock', 'stone');
-    b.boxC(0.03, -0.04, 0.02, 0.1, 0.1, 0.1, 'rock', 'stone-light');
-  } else {
-    b.boxC(0, -0.012, -0.03, 0.025, 0.025, 0.42, 'bark', 'wood-light'); // shaft
-    b.boxC(0, -0.02, 0.2, 0.04, 0.04, 0.07, 'plain', 'iron'); // tip
-    b.boxC(0, -0.02, -0.22, 0.05, 0.04, 0.08, 'cloth', 'plaster'); // fletching
-  }
-  return b.build();
+  const p = art().projectiles;
+  return draw(p[model] ?? p.arrow);
 }
 
-/**
- * Rubble left by ANY destroyed building (one generic look, sized from the footprint): scorched
- * ground, broken stones and charred beams.
- */
+/** Rubble left by ANY destroyed building (one generic look, sized from the footprint). */
 export function rubbleGeometry(w: number, h: number): BuiltGeometry {
-  const b = builder('blue');
-  b.box(0.05, 0, 0.05, w - 0.1, 0.05, h - 0.1, 'soil', 'dirt');
-  let seed = w * 31 + h * 17;
-  const rnd = (): number => {
-    seed = (seed * 16807) % 2147483647;
-    return seed / 2147483647;
-  };
-  const pieces = Math.round(w * h * 3);
-  for (let i = 0; i < pieces; i++) {
-    const s = 0.12 + rnd() * 0.22;
-    const x = 0.1 + rnd() * (w - 0.2 - s);
-    const z = 0.1 + rnd() * (h - 0.2 - s);
-    const beam = rnd() < 0.3;
-    if (beam) b.box(x, 0.05, z, s * 2.2, 0.08, 0.08, 'planks', 'wood-dark');
-    else b.box(x, 0.05, z, s, s * (0.4 + rnd() * 0.5), s, 'rock', rnd() < 0.5 ? 'stone' : 'stone-dark');
-  }
-  return b.build();
+  return draw((b) => art().rubble(b, w, h));
 }
