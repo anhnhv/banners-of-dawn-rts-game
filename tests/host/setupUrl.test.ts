@@ -1,7 +1,7 @@
 /** Match setup ⇄ URL (docs/plans/m7-menus-art-maps.md §2.8). */
 import { describe, expect, it } from 'vitest';
 import { devFromParams, setupFromParams, setupQuery, wantsDirectStart } from '../../src/host/setupUrl';
-import type { MatchSetup } from '../../src/shared';
+import { DEFAULT_GAME_SPEED, GAME_SPEEDS, type MatchSetup } from '../../src/shared';
 
 const BASE: MatchSetup = {
   map: 'green_valley',
@@ -31,7 +31,7 @@ describe('setup URL', () => {
       opponent: 'off',
       start: 'standard',
       pace: 'blitz',
-      speed: 1.5,
+      speed: 3,
     };
     const q = params(setupQuery(setup, { army: 20, enemy: 0 }));
     expect(setupFromParams(q, BASE, CHOICES)).toEqual(setup);
@@ -43,7 +43,16 @@ describe('setup URL', () => {
     expect(
       setupFromParams(params('?map=moon&ai=godlike&setup=x&pace=warp&speed=abc'), BASE, CHOICES),
     ).toEqual(BASE);
-    expect(setupFromParams(params('?speed=1.4'), BASE, CHOICES).speed).toBe(1.5);
+    expect(setupFromParams(params('?speed=2.6'), BASE, CHOICES).speed).toBe(3);
+    expect(setupFromParams(params('?speed=0.5'), BASE, CHOICES).speed).toBe(0.8);
     expect(devFromParams(params('?army=9999&enemy=-3'))).toEqual({ army: 400, enemy: 0 });
+  });
+});
+
+describe('game speeds', () => {
+  it('offers 0.8× to 8× and starts new setups at 2×', () => {
+    expect(GAME_SPEEDS).toEqual([0.8, 1, 2, 3, 4, 5, 8]);
+    expect(GAME_SPEEDS).toContain(DEFAULT_GAME_SPEED);
+    expect(DEFAULT_GAME_SPEED).toBe(2);
   });
 });

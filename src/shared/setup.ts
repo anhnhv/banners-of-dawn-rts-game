@@ -16,12 +16,14 @@ export interface MatchSetup {
 }
 
 /** Game speeds offered in Match Setup and in the match (+ / -). */
-export const GAME_SPEEDS: readonly number[] = [0.5, 1, 1.5, 2];
+export const GAME_SPEEDS: readonly number[] = [0.8, 1, 2, 3, 4, 5, 8];
+/** The game speed a new setup starts with (user decision 2026-11-09). */
+export const DEFAULT_GAME_SPEED = 2;
 
 /** The opponent id that means "no machine player". */
 export const IDLE_OPPONENT = 'off';
 
-/** "1.5×" */
+/** "0.8×" */
 export function formatSpeed(speed: number): string {
   return `${speed}×`;
 }

@@ -25,6 +25,41 @@
     linear-gradient(180deg, #9fd0ea 0%, #cfe6f2 55%, #8fbf6a 55%, #6fa152 78%, #567f40 100%);
 }
 
+/* the picture in the green area under the main page: fills the space left, keeps its shape */
+.menu-hero {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/*
+ * Inside the green area (it starts at 55% of the height, see .menu's background): at the bottom,
+ * at most 45vh - 56px tall so its top stays below the horizon, at most 860 px or 88% wide, and
+ * never taller than the room left under the menu. The picture keeps its shape.
+ */
+.menu-hero img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(860px, 88vw);
+  max-height: min(100%, calc(45vh - 56px));
+  border: 4px solid #0f111a;
+  box-shadow:
+    0 0 0 3px #8c5d22,
+    0 0 0 7px #0f111a,
+    0 10px 0 7px rgba(0, 0, 0, 0.22);
+  user-select: none;
+}
+
+@media (max-height: 560px) {
+  .menu-hero {
+    display: none;
+  }
+}
+
 .menu-loading {
   justify-content: center;
 }
@@ -311,6 +346,15 @@
   height: 50px;
 }
 
+.hud-help-btn {
+  position: absolute;
+  top: 12px;
+  right: 70px;
+  width: 50px;
+  height: 50px;
+}
+
+.hud-help-btn .px-icon,
 .hud-menu-btn .px-icon {
   width: 30px;
   height: 30px;

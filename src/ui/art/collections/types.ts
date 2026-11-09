@@ -58,6 +58,7 @@ export type IconName =
   | 'catapult'
   | 'farm'
   | 'workshop'
+  | 'help'
   | 'menu';
 
 /** Leg (or arm) geometry with its pivot point (hip / shoulder) in model space. */

@@ -7,6 +7,7 @@
 import paceJson from '../data/pace.json';
 import {
   decodeMap,
+  DEFAULT_GAME_SPEED,
   GAME_SPEEDS,
   IDLE_OPPONENT,
   MapFormatError,
@@ -90,7 +91,7 @@ export async function startApp(container: HTMLElement, search: string): Promise<
       opponent: DEFAULT_AI_MODE,
       start: 'scenario',
       pace: pace.default,
-      speed: 1,
+      speed: DEFAULT_GAME_SPEED,
     };
     const valid = {
       maps: maps.map((m) => m.id),
@@ -148,7 +149,14 @@ export async function startApp(container: HTMLElement, search: string): Promise<
       begin(setupFromParams(params, last, valid), devFromParams(params));
       return;
     }
-    const data: MenuData = { maps, opponents, paces, speeds: GAME_SPEEDS, setup: last };
+    const data: MenuData = {
+      maps,
+      opponents,
+      paces,
+      speeds: GAME_SPEEDS,
+      setup: last,
+      heroImage: `${BASE}assets/menu/hero.webp`,
+    };
     const menu = createMainMenu(container, data, settings, {
       onStart: (setup) => {
         menu.dispose();

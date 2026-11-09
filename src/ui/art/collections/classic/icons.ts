@@ -414,6 +414,22 @@ ICONS.workshop = [
   '..kkkk..kkk.',
 ];
 
+/** The in-game help button (show / hide the controls): a question mark. */
+ICONS.help = [
+  '............',
+  '....kkkk....',
+  '...kYYYYk...',
+  '..kYykkYYk..',
+  '..kkk..kYk..',
+  '......kYYk..',
+  '.....kYYk...',
+  '.....kYk....',
+  '.....kkk....',
+  '.....kYk....',
+  '.....kkk....',
+  '............',
+];
+
 /** The in-game menu button: three brass bars. */
 ICONS.menu = [
   '............',

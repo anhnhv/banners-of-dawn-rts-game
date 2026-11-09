@@ -198,7 +198,7 @@ Counter triangle, checked against the numbers above:
 ### 2.11 Match pace (configurable)
 > **Current state (2026-11-08, M7a):** the four presets below are in `src/data/pace.json` and are picked in Match Setup (or `/?pace=fast`). They set gather, build and train speed, starting resources and pop cap; there are no research or era columns (no eras), and **no Custom sliders yet**. `src/data/game.json` → `pace`, `startingResources`, `popCap` stay as the engine default and must equal the Standard preset (a test checks it). The engine keeps the chosen rules in its state (`GameOptions.rules`); the machine player receives game data with them already applied (`applyRules`), and the HUD shows the real times. The AI does not yet scale its own timings by pace. Details: `docs/plans/m7-menus-art-maps.md` §3.
 
-Pace is chosen in Match Setup and **fixed for the whole match**. It is separate from **game speed** (1×, 1.5×, 2×), which is a time scale you can change at any moment during play.
+Pace is chosen in Match Setup and **fixed for the whole match**. It is separate from **game speed** (0.8×, 1×, 2×, 3×, 4×, 5×, 8×; was 0.5×–2× until 2026-11-09; **2× by default**), which is a time scale you can change at any moment during play. The camera also starts four wheel notches further out than before (distance ≈ 38.8, was 24). The minimap moved from the top-left corner to the bottom-right corner, over the bottom bar (the command grid sits left of it); the idle-worker and Build buttons moved up to the top-left corner (2026-11-09). The controls box is hidden until the new **?** button (left of the menu button) or **H**; the machine's plan and FPS lines (Settings) have their own box left of those two buttons, and the controls box opens below them. The Main Menu shows a picture in its green area (`assets/menu/hero.webp`: the `/?preview` diorama, which now has a small skirmish at the town gate with arrows and fallen soldiers, taken with `/?preview&view=hero&clean`; a 960 px copy `hero-960.webp` for smaller screens). It always sits inside the green area: bottom-aligned, at most 45vh − 56px tall and 860 px / 88vw wide, shrinking when the menu leaves less room, hidden below 560 px of height.
 
 **Presets**
 | Preset | Gather rate | Build speed | Train speed | Research speed | Era cost | Starting resources | Pop cap | Target length |
@@ -862,7 +862,7 @@ Locked buttons are greyed out with a lock icon. Unaffordable buttons are drawn w
 | Mouse wheel | Zoom |
 | Esc | Cancel placement, targeting or the build menu; otherwise open the pause menu (M7a) |
 | F1 / F3 | How to play / debug overlay (dev) |
-| + / − | Game speed (0.5×, 1×, 1.5×, 2×) (M7a) |
+| + / − | Game speed (0.8×, 1×, 2×, 3×, 4×, 5×, 8×; 2026-11-09) |
 | P / Pause | Pause (M7a) |
 
 ### 7.12 Screens & flow
@@ -1522,7 +1522,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**Where we are (2026-11-09):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.5×–2× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json` (app config); the AI itself is the separate top-level module `ai/` (2026-11-09), which takes one profile when a match starts; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all. Since M7b: Farms (4×4, one farmer working on the field, food forever at 0.35/s) and the Siege Workshop with the Catapult; both AI modes farm, Normal also builds Catapults.
+**Where we are (2026-11-09):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.8×–8× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json` (app config); the AI itself is the separate top-level module `ai/` (2026-11-09), which takes one profile when a match starts; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all. Since M7b: Farms (4×4, one farmer working on the field, food forever at 0.35/s) and the Siege Workshop with the Catapult; both AI modes farm, Normal also builds Catapults.
 
 **Army (M6.5, 2026-11-07):** the Barracks trains Militia and Archers, and the new Stable (build menu A) trains Scout Riders and Knights. Each unit's role, weakness and best situation are in `docs/units.md`; `tests/engine/balance.test.ts` proves the counter cycle. Normal picks counters to what it sees; Easy only presses the Militia button.
 

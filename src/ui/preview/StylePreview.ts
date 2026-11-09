@@ -11,6 +11,7 @@ import {
   buildingGeometry,
   buildUnit,
   meshFrom,
+  projectileGeometry,
   rockGeometry,
   treeGeometry,
   wallGeometry,
@@ -43,6 +44,21 @@ interface Worker {
   phase: number;
 }
 
+/** A soldier of the skirmish at the gate: lunges at the enemy in front of it. */
+interface Fighter {
+  unit: UnitParts;
+  phase: number;
+  facing: number;
+}
+
+/** An arrow looping from an archer on the wall to a target outside it. */
+interface Volley {
+  mesh: THREE.Mesh;
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  offset: number;
+}
+
 export class StylePreview {
   private readonly world: World3D;
   private readonly hud: PreviewHud;
@@ -52,6 +68,8 @@ export class StylePreview {
   private readonly walkers: Walker[] = [];
   private readonly workers: Worker[] = [];
   private readonly idlers: UnitParts[] = [];
+  private readonly fighters: Fighter[] = [];
+  private readonly volleys: Volley[] = [];
   private readonly rng = new Rng(20261106);
   private readonly camera: CameraController;
   private time = 0;
@@ -73,8 +91,11 @@ export class StylePreview {
     this.placeEnemy();
     this.placeForest();
     this.placeUnits();
+    this.placeSkirmish();
 
     this.hud = new PreviewHud(container, this.makeMinimap());
+    // `&clean`: no HUD, for pictures (the Main Menu image assets/menu/hero.webp is taken this way)
+    if (params.has('clean')) this.hud.root.style.display = 'none';
     this.camera = new CameraController(this.world.rig, this.world.canvas);
     this.bindInput();
   }
@@ -264,9 +285,9 @@ export class StylePreview {
       this.workers.push({ unit: this.spawn('worker', 'blue', x, z, f), phase: this.rng.range(0, 6) });
     }
     // archers on watch at the gate, a knight in the plaza
-    this.idlers.push(this.spawn('archer', 'blue', 20.5, 19.0, Math.PI));
-    this.idlers.push(this.spawn('archer', 'blue', 23.5, 19.0, Math.PI));
-    this.idlers.push(this.spawn('archer', 'blue', 19.6, 19.4, Math.PI));
+    this.idlers.push(this.spawn('archer', 'blue', 20.4, 22.2, Math.PI));
+    this.idlers.push(this.spawn('archer', 'blue', 23.2, 22.4, Math.PI));
+    this.idlers.push(this.spawn('archer', 'blue', 21.8, 22.8, Math.PI));
     this.idlers.push(this.spawn('knight', 'blue', 19.4, 22.8, Math.PI * 0.75));
 
     // a worker walking between the gold mine and the town hall
@@ -290,9 +311,65 @@ export class StylePreview {
         model,
         'red',
         new THREE.Vector3(22 + ox, 0, 1.5 + oz + 2.5),
-        new THREE.Vector3(22 + ox, 0, 12.5 + oz),
+        new THREE.Vector3(22 + ox, 0, 10 + oz),
         model === 'knight' ? 1.0 : 1.0,
       );
+    }
+  }
+
+  /**
+   * A small fight at the gate: blue defenders against red raiders just outside the wall, two
+   * fallen soldiers, and arrows from the archers behind the wall (for the Main Menu image).
+   */
+  private placeSkirmish(): void {
+    // red raiders have broken through the gate; blue defenders meet them just inside the wall
+    const north = Math.PI; // facing -z, toward the gate
+    const fighters: Array<[UnitModel, TeamName, number, number, number]> = [
+      ['knight', 'blue', 19.9, 19.9, north + 0.35],
+      ['militia', 'blue', 21.1, 19.8, north + 0.1],
+      ['militia', 'blue', 22.3, 19.9, north - 0.1],
+      ['militia', 'blue', 23.4, 19.6, north - 0.45],
+      ['militia', 'red', 20.2, 18.8, 0.3],
+      ['militia', 'red', 21.3, 18.7, 0.05],
+      ['knight', 'red', 22.4, 18.6, -0.1],
+      ['militia', 'red', 23.5, 18.7, -0.4],
+      ['militia', 'red', 21.8, 17.9, 0],
+    ];
+    for (const [model, team, x, z, facing] of fighters)
+      this.fighters.push({
+        unit: this.spawn(model, team, x, z, facing),
+        phase: this.rng.range(0, 6),
+        facing,
+      });
+
+    // the fallen: tipped over on their side
+    for (const [model, team, x, z, r] of [
+      ['militia', 'red', 24.5, 19.4, 0.6],
+      ['militia', 'blue', 19.0, 20.6, 2.2],
+      ['militia', 'red', 20.9, 20.9, 4.0],
+    ] as const) {
+      const u = this.spawn(model, team, x, z, r);
+      u.group.rotation.z = Math.PI / 2;
+      u.group.position.y = 0.16;
+    }
+
+    // arrows from the archers behind the line to the raiders
+    const arrow = projectileGeometry('arrow');
+    for (const [fx, fz, tx, tz, offset] of [
+      [20.4, 22.2, 21.3, 18.7, 0],
+      [23.2, 22.4, 23.5, 18.7, 0.35],
+      [21.8, 22.8, 22.4, 18.6, 0.7],
+      [23.2, 22.4, 21.8, 17.9, 0.15],
+      [20.4, 22.2, 20.2, 18.8, 0.55],
+    ] as const) {
+      const mesh = meshFrom(arrow);
+      this.world.scene.add(mesh);
+      this.volleys.push({
+        mesh,
+        from: new THREE.Vector3(fx, 0.9, fz),
+        to: new THREE.Vector3(tx, 0.6, tz),
+        offset,
+      });
     }
   }
 
@@ -393,6 +470,25 @@ export class StylePreview {
       const chop = Math.max(0, Math.sin(t * 5 + w.phase));
       w.unit.group.rotation.x = chop * chop * 0.22;
     }
+    // the skirmish: quick lunges toward the enemy, out of step with each other
+    for (const f of this.fighters) {
+      const lunge = Math.max(0, Math.sin(t * 7 + f.phase));
+      f.unit.group.rotation.x = lunge * lunge * 0.3;
+      f.unit.group.rotation.y = f.facing + Math.sin(t * 3 + f.phase) * 0.08;
+      swingLegs(f.unit, t * 4 + f.phase, 0.25);
+    }
+    // arrows: an arc from the wall to the target, then the next one
+    const point = new THREE.Vector3();
+    const ahead = new THREE.Vector3();
+    for (const v of this.volleys) {
+      const k = (t * 0.8 + v.offset) % 1;
+      const at = (s: number, out: THREE.Vector3): THREE.Vector3 =>
+        out.lerpVectors(v.from, v.to, s).setY(v.from.y + (v.to.y - v.from.y) * s + 1.4 * s * (1 - s));
+      at(k, point);
+      at(Math.min(1, k + 0.02), ahead);
+      v.mesh.position.copy(point);
+      v.mesh.lookAt(ahead);
+    }
     for (const [i, u] of this.idlers.entries()) {
       u.group.position.y = Math.max(0, Math.sin(t * 2 + i * 0.9)) * 0.012;
     }
@@ -400,12 +496,16 @@ export class StylePreview {
 
   // ---- input ------------------------------------------------------------------------------------
 
-  /** Camera presets: 1 = base overview, 2 = barracks + army close-up, 3 = enemy at the ford. */
+  /**
+   * Camera presets: 1 = base overview, 2 = barracks + army close-up, 3 = enemy at the ford,
+   * hero = the wide view of the Main Menu image (`/?preview&view=hero&clean`, see MainMenu.ts).
+   */
   private setView(view: string): void {
     const views: Record<string, [number, number, number]> = {
       '1': [24.5, 27.5, 22],
       '2': [26.2, 31.6, 11],
       '3': [21.5, 9.5, 14],
+      hero: [22, 19, 27],
     };
     const [x, z, distance] = views[view] ?? views['1'] ?? [22, 26, 22];
     this.world.rig.target.set(x, 0, z);

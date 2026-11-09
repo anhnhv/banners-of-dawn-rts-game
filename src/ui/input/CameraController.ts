@@ -7,6 +7,8 @@ import type { CameraRig } from '../three/CameraRig';
 const EDGE_SCROLL_PX = 6;
 const PAN_SPEED = 0.9; // camera distances per second
 const ZOOM_SENSITIVITY = 0.0012;
+/** Distance factor of one mouse-wheel notch (deltaY 100) zooming out. */
+export const WHEEL_STEP = Math.exp(100 * ZOOM_SENSITIVITY);
 
 export class CameraController {
   edgeScroll = true;

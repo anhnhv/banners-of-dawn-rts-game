@@ -45,7 +45,12 @@ export function settingsPanel(settings: Settings, onChange: (s: Settings) => voi
     ],
     'Low draws fewer pixels: faster on a slow graphics card, a little blurry.',
   );
-  row('Show FPS', 'showFps', ON_OFF, 'Frames per second and draw calls in the help box.');
-  row("Show the machine's plan", 'showAiStatus', ON_OFF, 'One line saying what the machine player is doing.');
+  row('Show FPS', 'showFps', ON_OFF, 'Frames per second and draw calls, top right.');
+  row(
+    "Show the machine's plan",
+    'showAiStatus',
+    ON_OFF,
+    'One line saying what the machine player is doing, top right.',
+  );
   return panel;
 }

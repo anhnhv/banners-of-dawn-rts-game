@@ -156,7 +156,8 @@
   display: flex;
   align-items: stretch;
   gap: 14px;
-  padding: 12px 16px;
+  /* the right side leaves room for the minimap (230 px canvas + 2 × 10 padding + 2 × 3 border + gap) */
+  padding: 12px 270px 12px 16px;
   box-sizing: border-box;
   border-left: none;
   border-right: none;
@@ -264,11 +265,12 @@
   color: var(--brass-hi);
 }
 
-/* ---- map view (M1) ---- */
+/* ---- map view: the minimap sits in the bottom-right corner, over the bottom bar (2026-11-09) ---- */
 .hud-minimap-live {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
   padding: 10px;
   line-height: 0;
 }
@@ -373,7 +375,7 @@
 
 .hud-idle {
   position: absolute;
-  top: 228px;
+  top: 12px;
   left: 12px;
   width: 64px;
   height: 64px;
@@ -428,10 +430,48 @@
   pointer-events: none;
 }
 
-.hud-help {
-  top: 70px;
+/* top right corner: a row [machine's plan / FPS] [?] [menu], and the controls box below it */
+.hud-topright {
+  position: absolute;
+  top: 12px;
   right: 12px;
-  bottom: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.hud-topright-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.hud-topright .px-btn {
+  position: relative;
+  top: auto;
+  right: auto;
+  pointer-events: auto;
+}
+
+.hud-help {
+  position: static;
+}
+
+/* the machine's plan and FPS: left of the ? and menu buttons, clear of the centered resource bar */
+.hud-status {
+  max-width: max(220px, calc(50vw - 440px));
+  min-height: 50px;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1.3;
+  color: #e9e3d4;
+  text-align: right;
 }
 
 .sel-sub {
@@ -508,7 +548,7 @@
 /* Build button (B): opens game.json → buildMenu in the command grid. */
 .hud-build {
   position: absolute;
-  top: 300px;
+  top: 84px;
   left: 12px;
   width: 64px;
   height: 64px;

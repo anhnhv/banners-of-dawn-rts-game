@@ -90,6 +90,11 @@ export class GameHud {
   private readonly hover: HTMLElement;
   private readonly perf: HTMLElement;
   private readonly opponent: HTMLElement;
+  /** The controls box (hidden until the ? button or H) and its button. */
+  private readonly help: HTMLElement;
+  private readonly helpBtn: HTMLButtonElement;
+  /** The machine's plan and FPS lines, when switched on in Settings. */
+  private readonly status: HTMLElement;
   private readonly speedPill: HTMLSpanElement;
   private readonly pausedBanner: HTMLElement;
   private resultShown = false;
@@ -154,16 +159,33 @@ export class GameHud {
 
     this.messages = el('div', 'hud-messages');
 
+    // top right: the controls under the buttons (hidden until the ? button or H) and, separately,
+    // left of the buttons, the status lines switched on in Settings (the machine's plan, FPS)
     const help = el('div', 'hud-help panel');
+    this.help = help;
+    help.style.display = 'none';
     help.append(
       el('div', '', `${map.name} · Right click: move / gather / rally · B: build`),
       el('div', '', 'Click / drag: select · Double click: same type · Ctrl/Alt+1-9: group'),
       el('div', '', 'Arrows / edge / middle-drag: pan · Wheel: zoom · .: idle worker'),
-      el('div', '', 'P: pause · + / -: speed · Esc: menu'),
+      el('div', '', 'P: pause · + / -: speed · H: these controls · Esc: menu'),
     );
     this.opponent = el('div', 'help-ai', '');
     this.perf = el('div', 'help-perf', '');
-    help.append(this.opponent, this.perf);
+    this.status = el('div', 'hud-status panel');
+    this.status.append(this.opponent, this.perf);
+
+    this.helpBtn = el('button', 'px-btn hud-help-btn');
+    this.helpBtn.type = 'button';
+    this.helpBtn.title = 'Controls (H)\nShow or hide the list of mouse and keyboard controls.';
+    this.helpBtn.append(iconImg('help'));
+    this.helpBtn.addEventListener('click', () => this.toggleHelp());
+
+    // top right corner: [machine's plan / FPS] [?] [menu] in a row, the controls box below it
+    const topRight = el('div', 'hud-topright');
+    const topRow = el('div', 'hud-topright-row');
+    topRow.append(this.status, this.helpBtn, menuBtn);
+    topRight.append(topRow, help);
     if (warnings.length > 0) warnings.forEach((w) => console.warn(`[map] ${w}`));
 
     this.hover = el('div', 'hud-hover panel', '');
@@ -188,8 +210,7 @@ export class GameHud {
       this.buildBtn,
       this.messages,
       this.pausedBanner,
-      menuBtn,
-      help,
+      topRight,
       this.hover,
       bottom,
     );
@@ -245,6 +266,10 @@ export class GameHud {
       this.toggleBuildMenu();
       return true;
     }
+    if (e.code === 'KeyH') {
+      this.toggleHelp();
+      return true;
+    }
     const m = /^Key([A-Z])$/.exec(e.code);
     if (!m) return false;
     const action = this.actions.find((a) => a.key === m[1]);
@@ -290,10 +315,18 @@ export class GameHud {
     this.pausedBanner.style.display = banner ? 'block' : 'none';
   }
 
-  /** Settings → show FPS / show the machine's plan. */
+  /** Settings → show FPS / show the machine's plan (their own box, apart from the controls). */
   setVisibility(showPerf: boolean, showOpponent: boolean): void {
     this.perf.style.display = showPerf ? '' : 'none';
     this.opponent.style.display = showOpponent ? '' : 'none';
+    this.status.style.display = showPerf || showOpponent ? '' : 'none';
+  }
+
+  /** Show or hide the controls box (the ? button, H). */
+  toggleHelp(): void {
+    const open = this.help.style.display === 'none';
+    this.help.style.display = open ? '' : 'none';
+    this.helpBtn.classList.toggle('active', open);
   }
 
   /** The result screen is up (Esc must not open the pause menu behind it). */

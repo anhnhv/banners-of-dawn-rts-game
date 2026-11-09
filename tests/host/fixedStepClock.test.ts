@@ -26,4 +26,12 @@ describe('FixedStepClock', () => {
     expect(clock.advance(10_000).steps).toBe(5);
     expect(clock.advance(0).steps).toBe(0);
   });
+
+  it('the cap grows with speed: 8× keeps full speed at 30 frames per second', () => {
+    const clock = new FixedStepClock(5);
+    let ticks = 0;
+    for (let i = 0; i < 30; i++) ticks += clock.advance(1000 / 30, 8).steps; // 1 s at 30 fps
+    expect(ticks).toBeGreaterThanOrEqual(159);
+    expect(clock.advance(10_000, 8).steps).toBe(40); // still capped after a stall
+  });
 });

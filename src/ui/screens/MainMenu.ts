@@ -30,6 +30,11 @@ export interface MenuData {
   speeds: readonly number[];
   /** The setup the screens start with (the last one used, or the defaults). */
   setup: MatchSetup;
+  /**
+   * Picture shown in the green area under the main page (assets/menu/hero.webp: the `/?preview`
+   * diorama taken with `/?preview&view=hero&clean`, a skirmish at the gate of a town).
+   */
+  heroImage?: string;
 }
 
 export interface MenuCallbacks {
@@ -45,6 +50,8 @@ const PREVIEW_FLATTEN = Math.sin((52 * Math.PI) / 180); // the in-game camera pi
 export class MainMenu {
   private readonly root: HTMLElement;
   private readonly body: HTMLElement;
+  /** The picture in the green area (main page only). */
+  private readonly hero: HTMLElement;
   private setup: MatchSetup;
   private settings: Settings;
   private readonly previews = new Map<string, HTMLCanvasElement>();
@@ -64,7 +71,18 @@ export class MainMenu {
       el('div', 'menu-tagline', 'A 1v1 strategy game against the machine'),
     );
     this.body = el('div', 'menu-body');
-    this.root.append(title, this.body);
+    this.hero = el('div', 'menu-hero');
+    if (data.heroImage) {
+      const img = document.createElement('img');
+      img.src = data.heroImage;
+      // a smaller copy (same name + -960) for small screens
+      img.srcset = `${data.heroImage.replace(/\.webp$/, '-960.webp')} 960w, ${data.heroImage} 1472w`;
+      img.sizes = 'min(860px, 88vw)';
+      img.alt = 'Blue defenders hold the gate of their town against a red raid';
+      img.draggable = false;
+      this.hero.append(img);
+    }
+    this.root.append(title, this.body, this.hero);
     container.append(this.root);
     this.show('main');
   }
@@ -75,6 +93,7 @@ export class MainMenu {
 
   private show(view: View): void {
     this.body.replaceChildren();
+    this.hero.style.display = view === 'main' && this.data.heroImage ? '' : 'none';
     if (view === 'main') this.mainView();
     else if (view === 'setup') this.setupView();
     else if (view === 'settings')

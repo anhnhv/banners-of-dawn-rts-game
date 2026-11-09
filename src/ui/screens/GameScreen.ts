@@ -21,7 +21,7 @@ import { buildMapScene, tileKey, type MapScene } from '../art/mapScene';
 import { DATA, displayName } from '../data';
 import { GameHud } from '../hud/GameHud';
 import { Minimap } from '../hud/Minimap';
-import { CameraController } from '../input/CameraController';
+import { CameraController, WHEEL_STEP } from '../input/CameraController';
 import { PlacementController } from '../input/PlacementController';
 import { SelectionController } from '../input/SelectionController';
 import { BuildingRenderer } from '../render/BuildingRenderer';
@@ -60,6 +60,12 @@ export interface GameScreenOptions {
   /** A setting was changed in the pause menu (the host saves it). */
   onSettings(settings: Settings): void;
 }
+
+/**
+ * Camera distance at the start of a match: 24 plus four mouse-wheel notches out (≈ 38.8).
+ * The user found 24 too close (2026-11-09: two notches out, then two more).
+ */
+const DEFAULT_ZOOM = 24 * WHEEL_STEP ** 4;
 
 const CORNERS: Array<[number, number]> = [
   [-1, 1],
@@ -150,7 +156,7 @@ export class GameScreen {
       0,
       home ? home.y + home.h / 2 : map.height / 2,
     );
-    rig.distance = 24;
+    rig.distance = DEFAULT_ZOOM;
     rig.update();
 
     this.camera = new CameraController(rig, this.world.canvas);
