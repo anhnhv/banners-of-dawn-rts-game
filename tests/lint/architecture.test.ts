@@ -16,9 +16,12 @@ async function ruleIds(file: string, code: string): Promise<string[]> {
   return (result?.messages ?? []).map((m) => m.ruleId ?? `fatal: ${m.message}`);
 }
 
-beforeAll(() => {
+// The first lint loads every plugin and the TypeScript import resolver (seconds, much longer on a
+// busy machine). Pay that once here, with its own timeout, so no single test carries it.
+beforeAll(async () => {
   eslint = new ESLint({ cwd: ROOT });
-});
+  await ruleIds('src/shared/__warmup__.ts', 'export const warm = 1;\n');
+}, 120_000);
 
 const BOUNDARY = 'boundaries/dependencies';
 
