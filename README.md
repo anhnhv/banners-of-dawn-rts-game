@@ -1,19 +1,61 @@
-# Banners of Dawn
+<h1 align="center">Banners of Dawn</h1>
 
-3D voxel-style (low-poly with pixel textures) 1v1 real-time strategy game in the browser, played against a local
-machine player. The full design is in [PLAN.md](PLAN.md).
+<p align="center">
+  <b>A voxel real-time strategy (RTS) game you can play right in your browser.</b><br>
+  Gather resources, build a town, raise an army and crush the machine player in a 1v1 match.
+</p>
 
-`npm run dev` opens the **Main Menu**: Play → Match Setup (map, opponent Easy / Normal / Idle, ready-made battle or
-standard start, pace, game speed), Quick start, Settings and How to Play. In a match, `Esc` opens the pause menu
-(speed, settings, restart, surrender, quit), `P` pauses and `+` / `-` change the speed. Three maps: Green Valley,
-Twin Rivers and Forest Pass. Everything is driven by the JSON in `src/data/` (see PLAN.md §9).
+<p align="center">
+  <a href="https://banners-of-dawn.web.app/"><b>▶ Play now at banners-of-dawn.web.app</b></a>
+</p>
 
-URL shortcuts (they skip the menu): `/?play` (last setup), `/?map=twin_rivers`, `/?ai=normal|easy|off`,
-`/?setup=standard|scenario`, `/?pace=relaxed|standard|fast|blitz`, `/?speed=2`, `/?army=50&enemy=20` (test units).
-`/?models` shows every model and HUD icon; `/?hud` is the HUD gallery (3D models, icons, buttons and bars of units,
-buildings, construction, terrain, map objects and resources, one section at a time, e.g. `/?hud#terrain`);
-`?art=<id>` draws any page with another art collection (see below); `/?preview` is the style-preview diorama (keys `1` `2` `3` switch views).
-Screenshots: [docs/preview/](docs/preview/) and [docs/milestones/](docs/milestones/).
+<p align="center">
+  <a href="https://banners-of-dawn.web.app/">
+    <img src="docs/milestones/m6.5-stable-in-base.png" alt="Banners of Dawn: a voxel town with a Town Hall, houses and a Stable at the edge of a forest" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <img src="docs/milestones/scenario-fight.png" alt="Militia, archers and riders fighting near a gold mine" width="49%">
+  <img src="docs/preview/view1-base.png" alt="Town Hall, Barracks and farms seen from above" width="49%">
+</p>
+
+## About the game
+
+Banners of Dawn is a classic-style **real-time strategy game** with a 3D voxel look (low-poly models with pixel
+textures). You play a 1v1 match against a local machine player, with no install, no account and no server:
+
+- **Economy**: workers gather food, wood and gold, build houses, farms and production buildings.
+- **Army**: train Militia and Archers at the Barracks, Scout Riders and Knights at the Stable
+  (see [docs/units.md](docs/units.md)).
+- **Battle**: box-select, control groups, rally points, and siege the enemy Town Hall to win.
+- **Opponent**: a rule-based machine player (Easy, Normal or Idle) that runs fully in your browser.
+- **Maps**: Green Valley, Twin Rivers and Forest Pass, each validated to be fair and symmetric.
+
+The full design is in [PLAN.md](PLAN.md).
+
+## Play online
+
+| Link                                                                        | What it opens                                                         |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [banners-of-dawn.web.app](https://banners-of-dawn.web.app/)                 | Main Menu: Play, Quick start, Settings, How to Play                   |
+| [/?play](https://banners-of-dawn.web.app/?play)                             | Jump straight into a match with your last setup                       |
+| [/?map=twin_rivers](https://banners-of-dawn.web.app/?map=twin_rivers)       | Play on a specific map (`green_valley`, `twin_rivers`, `forest_pass`) |
+| [/?ai=normal](https://banners-of-dawn.web.app/?ai=normal)                   | Pick the opponent: `normal`, `easy` or `off`                          |
+| [/?setup=scenario](https://banners-of-dawn.web.app/?setup=scenario)         | Start with a ready-made battle instead of a standard start            |
+| [/?pace=blitz&speed=2](https://banners-of-dawn.web.app/?pace=blitz&speed=2) | Pace (`relaxed`, `standard`, `fast`, `blitz`) and game speed          |
+| [/?army=50&enemy=20](https://banners-of-dawn.web.app/?army=50&enemy=20)     | Spawn test armies for a big fight                                     |
+| [/?models](https://banners-of-dawn.web.app/?models)                         | Model viewer: every voxel model and HUD icon                          |
+| [/?hud](https://banners-of-dawn.web.app/?hud)                               | HUD gallery, one section at a time (e.g. `/?hud#terrain`)             |
+| [/?preview](https://banners-of-dawn.web.app/?preview)                       | Style-preview diorama (keys `1` `2` `3` switch views)                 |
+
+Add `&art=<id>` to any link to draw it with another art collection (see below).
+
+**Controls**: right click to move / gather / rally, click or drag to select, `B` to build, `Ctrl/Alt+1-9` for
+control groups, arrows / screen edge / middle-drag to pan, wheel to zoom. `Esc` opens the pause menu (speed,
+settings, restart, surrender, quit), `P` pauses and `+` / `-` change the speed.
+
+More screenshots: [docs/preview/](docs/preview/) and [docs/milestones/](docs/milestones/).
 
 ## Art collections
 
@@ -31,6 +73,9 @@ nvm use
 npm install
 npm run dev        # http://localhost:5173
 ```
+
+The URL shortcuts above work locally too, e.g. `http://localhost:5173/?play`. Everything is driven by the JSON in
+`src/data/` (see PLAN.md §9).
 
 ## Scripts
 
