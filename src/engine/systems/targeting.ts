@@ -6,8 +6,9 @@
  *    sight; either way they insert an auto attack in front of the attack-move.
  * Buildings with an attack pick through `bestTarget` too (see combatSystem).
  *
- * Choice: lowest priority first (the unit hitting me = combat.attackerPriority, otherwise
- * combat.targetPriority[class]), then nearest, then lowest id — deterministic.
+ * Choice: lowest priority first (the unit hitting me = combat.attackerPriority, otherwise the
+ * unit's own units.json → combat.targetPriority[class], else game.json → combat.targetPriority),
+ * then nearest, then lowest id — deterministic.
  */
 import { TICK_RATE, type AttackDef } from '../../shared';
 import { DATA } from '../data';
@@ -60,7 +61,9 @@ export function bestTarget(
   attack: AttackDef,
   radius: number,
 ): Combatant | null {
-  const { attackerPriority, targetPriority, defaultPriority } = DATA.game.combat;
+  const { attackerPriority, defaultPriority } = DATA.game.combat;
+  const own = isUnit(self) ? DATA.units[self.type]?.combat.targetPriority : undefined;
+  const targetPriority = own ?? DATA.game.combat.targetPriority;
   const lastHitBy = isUnit(self) ? self.lastHitBy : null;
   const minRange = attack.minRange ?? 0;
   let best: Combatant | null = null;

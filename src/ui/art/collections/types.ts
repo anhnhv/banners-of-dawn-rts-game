@@ -18,7 +18,15 @@ export type TeamName = 'blue' | 'red';
 export type TeamSlot = 'team' | 'team-light' | 'team-dark';
 
 export type BuildingModel =
-  'townHall' | 'house' | 'barracks' | 'stable' | 'farm' | 'tower' | 'goldMine' | 'berryBush';
+  | 'townHall'
+  | 'house'
+  | 'barracks'
+  | 'stable'
+  | 'farm'
+  | 'siegeWorkshop'
+  | 'tower'
+  | 'goldMine'
+  | 'berryBush';
 export type UnitModel = 'worker' | 'militia' | 'archer' | 'scoutRider' | 'knight' | 'catapult';
 export type TreeModel = 'oak' | 'oakTall' | 'pine' | 'pineSmall';
 export type WallAxis = 'x' | 'z';
@@ -48,6 +56,8 @@ export type IconName =
   | 'berryBush'
   | 'goldMine'
   | 'catapult'
+  | 'farm'
+  | 'workshop'
   | 'menu';
 
 /** Leg (or arm) geometry with its pivot point (hip / shoulder) in model space. */

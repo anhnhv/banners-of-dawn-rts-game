@@ -214,34 +214,132 @@ const buildings: ArtCollectionParts['buildings'] = {
     banner(b, 2.75, 0.42, 0.65, 1.15, 'team-light');
   },
 
+  // A big 4×4 field (M7b): thatched barn in the back corner, three crop bands of tapered tufts,
+  // a fence all round with a gate on the front (+z) side, hay bales and a team scarecrow.
   farm: (b) => {
-    b.box(0.08, 0, 0.08, 1.84, 0.07, 1.84, 'soil', 'dirt');
-    for (let row = 0; row < 5; row++) {
-      const z = 0.22 + row * 0.34;
-      b.box(0.18, 0.07, z, 1.62, 0.05, 0.12, 'soil', 'dirt-dark');
-      for (let col = 0; col < 5; col++) {
-        const x = 0.28 + col * 0.31;
+    b.box(0.05, 0, 0.05, 3.9, 0.07, 3.9, 'soil', 'dirt-dark', { top: 'soil', topColor: 'soil' });
+    // barn
+    taperedPrism(b, 0.9, 0.07, 0.85, 1.36, 1.2, 1.3, 1.14, 0.12, 'rock', 'stone-dark', 'stone');
+    taperedPrism(b, 0.9, 0.19, 0.85, 1.2, 1.04, 1.12, 0.98, 0.64, 'planks', 'wood');
+    b.box(0.69, 0.19, 1.36, 0.42, 0.5, 0.04, 'planks', 'wood-dark');
+    windowInset(b, 0.42, 0.5, 1.37, 0.18, 0.16);
+    b.gableRoof(0.34, 0.83, 0.36, 1.12, 0.98, 0.55, 'x', 'thatch', 'straw', 'planks', 'wood-light', 0.14);
+    b.box(0.22, 1.36, 0.8, 1.36, 0.06, 0.1, 'cloth', 'team');
+    // band 1: ripe wheat tufts beside the barn
+    for (let row = 0; row < 4; row++) {
+      const z = 0.4 + row * 0.27;
+      b.box(1.78, 0.07, z - 0.07, 1.94, 0.03, 0.15, 'soil', 'dirt-dark');
+      for (let col = 0; col < 7; col++)
         taperedPrism(
           b,
-          x,
+          1.92 + col * 0.27,
+          0.1,
+          z,
+          0.16,
           0.12,
-          z + 0.04,
-          0.12,
-          0.12,
-          0.07,
-          0.07,
-          0.32 + ((row + col) % 2) * 0.12,
+          0.06,
+          0.05,
+          0.3 + ((row + col) % 2) * 0.06,
           'leaves',
-          (row + col) % 3 === 0 ? 'crop-ripe' : 'crop',
+          'crop-ripe',
+          'straw-light',
+        );
+    }
+    // band 2: leafy green crops
+    for (let row = 0; row < 3; row++) {
+      const z = 1.72 + row * 0.32;
+      b.box(0.3, 0.07, z - 0.09, 3.4, 0.03, 0.18, 'soil', 'dirt-dark');
+      for (let col = 0; col < 11; col++)
+        taperedPrism(
+          b,
+          0.42 + col * 0.3,
+          0.1,
+          z,
+          0.18,
+          0.18,
+          0.1,
+          0.1,
+          0.16 + ((row + col) % 3) * 0.04,
+          'leaves',
+          (row + col) % 4 === 0 ? 'leaf' : 'crop',
           'leaf-light',
         );
-      }
     }
-    // Tall scarecrow silhouette.
-    b.box(1.55, 0.08, 1.55, 0.055, 0.78, 0.055, 'bark', 'wood-dark');
-    b.box(1.24, 0.62, 1.55, 0.66, 0.07, 0.07, 'bark', 'wood');
-    taperedPrism(b, 1.55, 0.4, 1.55, 0.34, 0.2, 0.25, 0.16, 0.38, 'cloth', 'team');
-    b.pyramidRoof(1.43, 1.12, 1.43, 0.24, 0.24, 0.25, 'thatch', 'straw-light', 0.02);
+    // band 3: young sprouts near the gate
+    for (let row = 0; row < 3; row++) {
+      const z = 2.78 + row * 0.27;
+      b.box(1.0, 0.07, z - 0.06, 2.72, 0.02, 0.13, 'soil', 'dirt-dark');
+      for (let col = 0; col < 9; col++)
+        taperedPrism(b, 1.12 + col * 0.3, 0.09, z, 0.08, 0.08, 0.03, 0.03, 0.1, 'leaves', 'leaf-light');
+    }
+    // hay bales
+    taperedPrism(b, 0.52, 0.07, 2.92, 0.44, 0.34, 0.4, 0.3, 0.28, 'thatch', 'straw-light');
+    taperedPrism(b, 0.55, 0.07, 3.32, 0.44, 0.34, 0.4, 0.3, 0.28, 'thatch', 'straw');
+    taperedPrism(b, 0.54, 0.35, 3.12, 0.38, 0.3, 0.32, 0.26, 0.24, 'thatch', 'straw-light');
+    // scarecrow: wide stick arms with straw tufts, a sack head and a dark hat (not a worker look-alike)
+    b.boxC(3.22, 0.07, 2.05, 0.06, 1.02, 0.06, 'bark', 'wood-dark');
+    b.box(2.86, 0.76, 2.03, 0.74, 0.06, 0.05, 'bark', 'wood');
+    taperedPrism(b, 2.86, 0.68, 2.05, 0.06, 0.06, 0.14, 0.1, 0.16, 'thatch', 'straw-light');
+    taperedPrism(b, 3.6, 0.68, 2.05, 0.06, 0.06, 0.14, 0.1, 0.16, 'thatch', 'straw-light');
+    taperedPrism(b, 3.22, 0.46, 2.05, 0.36, 0.16, 0.26, 0.12, 0.36, 'cloth', 'team');
+    b.boxC(3.22, 0.84, 2.05, 0.18, 0.17, 0.15, 'cloth', 'cloth');
+    b.boxC(3.22, 1.0, 2.05, 0.32, 0.03, 0.3, 'plain', 'wood-dark');
+    b.boxC(3.22, 1.03, 2.05, 0.17, 0.11, 0.15, 'plain', 'wood-dark');
+    // fence with a gate gap on the front side
+    const posts: Array<[number, number]> = [];
+    for (let i = 0; i <= 4; i++) {
+      const t = Math.min(3.9, i * 0.97 + 0.04);
+      posts.push([t, 0.04], [0.04, t], [3.9, t]);
+      if (t < 1.6 || t > 2.4) posts.push([t, 3.9]);
+    }
+    posts.push([1.56, 3.9], [2.38, 3.9]);
+    for (const [x, z] of posts)
+      taperedPrism(b, x + 0.04, 0, z + 0.04, 0.09, 0.09, 0.06, 0.06, 0.42, 'bark', 'wood-dark');
+    for (const y of [0.17, 0.32]) {
+      b.box(0.04, y, 0.06, 3.92, 0.045, 0.04, 'planks', 'wood-light');
+      b.box(0.06, y, 0.04, 0.04, 0.045, 3.92, 'planks', 'wood-light');
+      b.box(3.92, y, 0.04, 0.04, 0.045, 3.92, 'planks', 'wood-light');
+      b.box(0.04, y, 3.92, 1.56, 0.045, 0.04, 'planks', 'wood-light');
+      b.box(2.42, y, 3.92, 1.54, 0.045, 0.04, 'planks', 'wood-light');
+    }
+    banner(b, 2.42, 3.94, 0.1, 1.0, 'team');
+  },
+
+  // Siege Workshop (M7b): open timber shed on a stone footing, a half-built catapult frame inside,
+  // a log pile, a spare wheel and a team banner.
+  siegeWorkshop: (b) => {
+    taperedPrism(b, 1.5, 0, 1.5, 2.9, 2.9, 2.7, 2.7, 0.16, 'rock', 'stone-dark', 'stone');
+    b.box(0.3, 0.16, 0.3, 2.4, 0.92, 0.12, 'planks', 'wood');
+    b.box(0.3, 0.16, 0.3, 0.12, 0.92, 1.85, 'planks', 'wood');
+    for (const [x, z] of [
+      [0.36, 2.1],
+      [1.5, 2.1],
+      [2.64, 2.1],
+      [2.64, 0.36],
+    ] as const)
+      taperedPrism(b, x, 0.16, z, 0.16, 0.16, 0.11, 0.11, 0.92, 'planks', 'wood-dark');
+    b.box(0.28, 1.04, 2.03, 2.44, 0.09, 0.14, 'planks', 'wood-dark');
+    b.gableRoof(0.3, 1.1, 0.3, 2.4, 1.88, 0.62, 'x', 'shingles', 'roof-slate', 'planks', 'wood-light', 0.16);
+    b.box(0.16, 1.7, 1.18, 2.68, 0.07, 0.1, 'cloth', 'team');
+    // half-built catapult frame
+    b.box(0.85, 0.26, 0.85, 1.3, 0.1, 0.12, 'planks', 'wood-light');
+    b.box(0.85, 0.26, 1.55, 1.3, 0.1, 0.12, 'planks', 'wood-light');
+    taperedPrism(b, 1.05, 0.36, 1.27, 0.12, 0.8, 0.08, 0.6, 0.5, 'planks', 'wood');
+    b.box(1.3, 0.62, 1.22, 0.9, 0.08, 0.08, 'bark', 'wood-dark');
+    for (const [x, z] of [
+      [0.95, 0.8],
+      [2.05, 0.8],
+      [0.95, 1.72],
+      [2.05, 1.72],
+    ] as const)
+      b.boxC(x, 0.16, z, 0.24, 0.24, 0.1, 'planks', 'wood-dark');
+    // log pile, spare wheel, banner
+    for (const z of [2.32, 2.5, 2.68])
+      taperedPrism(b, 2.3, 0.16, z, 0.9, 0.16, 0.86, 0.12, 0.16, 'bark', 'wood', 'wood-light');
+    taperedPrism(b, 2.3, 0.32, 2.41, 0.78, 0.16, 0.74, 0.12, 0.15, 'bark', 'wood', 'wood-light');
+    b.box(2.76, 0.16, 0.7, 0.08, 0.62, 0.62, 'planks', 'wood-dark');
+    b.box(2.8, 0.41, 0.95, 0.08, 0.12, 0.12, 'plain', 'iron');
+    banner(b, 0.2, 2.78, 0.16, 1.45, 'team');
   },
 
   tower: (b) => {

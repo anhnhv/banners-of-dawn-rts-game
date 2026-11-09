@@ -65,6 +65,12 @@ export function isMilitary(data: GameData, type: UnitTypeId): boolean {
   return !!data.units[type]?.attack && !isGatherer(data, type);
 }
 
+/** A siege unit (the Catapult): a soldier whose bonus against buildings is bigger than its base damage. */
+export function isSiege(data: GameData, type: UnitTypeId): boolean {
+  const a = data.units[type]?.attack;
+  return isMilitary(data, type) && !!a && (a.bonus.building ?? 0) > a.damage;
+}
+
 /** Damage per second of an attack against an average target (bonus ignored). */
 function dps(attack: { damage: number; cooldown: number } | undefined): number {
   return attack ? attack.damage / Math.max(0.1, attack.cooldown) : 0;

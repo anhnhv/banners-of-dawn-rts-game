@@ -62,6 +62,8 @@ export interface ObservedBuilding extends Rect {
   /** Unit types waiting in the production queue (first = in production). */
   queue: UnitTypeId[];
   rally: { x: number; y: number } | null;
+  /** Workers gathering from it now (buildings with `gather`, e.g. a Farm; else 0). */
+  gatherers: number;
 }
 
 export interface ObservedNode extends Rect {

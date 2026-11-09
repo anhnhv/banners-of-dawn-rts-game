@@ -138,8 +138,7 @@ export class StylePreview {
     this.addBuilding('house', 'blue', 28, 21, 2);
     this.addBuilding('house', 'blue', 29, 30, 2);
     const barracks = this.addBuilding('barracks', 'blue', 25, 28, 3);
-    this.addBuilding('farm', 'blue', 12, 30, 2);
-    this.addBuilding('farm', 'blue', 15, 31, 2);
+    this.addBuilding('farm', 'blue', 11, 29, 4);
     this.addBuilding('goldMine', 'blue', 32, 24, 2);
     for (const [x, z] of [
       [17, 19],
@@ -260,7 +259,7 @@ export class StylePreview {
       [10.9, 26.6, -Math.PI / 2],
       [31.6, 26.6, Math.PI],
       [33.1, 26.7, Math.PI],
-      [13.4, 32.4, 0],
+      [13.2, 33.45, Math.PI],
     ] as const) {
       this.workers.push({ unit: this.spawn('worker', 'blue', x, z, f), phase: this.rng.range(0, 6) });
     }

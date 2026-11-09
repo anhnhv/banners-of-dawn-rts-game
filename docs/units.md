@@ -1,26 +1,27 @@
 # Army units
 
-This file describes the four army units:
+This file describes the five army units: four field units and one siege unit, the Catapult (M7b, 2026-11-09):
 
 - what each one is for;
 - where it is strong;
 - how to beat it;
 - why none of them is the best choice everywhere.
 
-Workers are not army units. The Catapult exists in `units.json` but cannot be trained, so it is not part of this roster.
+Workers are not army units. The Catapult is different from the other four: its targets are buildings, not armies, so it is not part of the counter cycle in §1 (it loses every field battle) and has its own section, §6.
 
 - The numbers live in `src/data/units.json`, which is the source of truth.
 - `tests/docs/units.test.ts` checks that the tables in §4 and §5 match it.
-- `tests/engine/balance.test.ts` checks the matchups and situations described here.
+- `tests/engine/balance.test.ts` checks the matchups and situations described here, and the Catapult's siege tests (§6).
 
-**Overview.** The details and measurements are in §1–§5.
+**Overview.** The details and measurements are in §1–§6.
 
-| Unit            | Trained at | Role             | Strong when                                                    | Weakness to exploit                                    |
-| --------------- | ---------- | ---------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
-| **Militia**     | Barracks   | Cheap spear wall | facing cavalry; gold runs out (needs none)                     | Archers; slowest unit, cannot catch anything           |
-| **Archer**      | Barracks   | Back-line damage | facing Militia; standing behind a Militia line                 | cavalry; does only 1 damage to buildings               |
-| **Scout Rider** | Stable     | Fast raider      | raiding workers, hunting Archers; needs no gold                | Militia, Knights; does only 1 damage to buildings      |
-| **Knight**      | Stable     | Heavy hammer     | breaking Archers and Scouts; attacking a base under tower fire | Militia; costs gold, uses 2 population, trains slowest |
+| Unit            | Trained at     | Role             | Strong when                                                    | Weakness to exploit                                          |
+| --------------- | -------------- | ---------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Militia**     | Barracks       | Cheap spear wall | facing cavalry; gold runs out (needs none)                     | Archers; slowest unit, cannot catch anything                 |
+| **Archer**      | Barracks       | Back-line damage | facing Militia; standing behind a Militia line                 | cavalry; does only 1 damage to buildings                     |
+| **Scout Rider** | Stable         | Fast raider      | raiding workers, hunting Archers; needs no gold                | Militia, Knights; does only 1 damage to buildings            |
+| **Knight**      | Stable         | Heavy hammer     | breaking Archers and Scouts; attacking a base under tower fire | Militia; costs gold, uses 2 population, trains slowest       |
+| **Catapult**    | Siege Workshop | Siege engine     | towers and bases: it outranges them; clumps standing still     | cavalry; anything within 2 tiles; slowest and most expensive |
 
 ## 1. The counter cycle
 
@@ -120,6 +121,7 @@ Workers are not army units. The Catapult exists in `units.json` but cannot be tr
 | Scout Rider | A 15 s raid on 8 gathering workers with 400 resources of raiders           | Scout Riders kill 4 workers, Knights 3                                                        |
 | Scout Rider | A Militia or a Knight chases a Scout Rider that runs away                  | never catches it                                                                              |
 | Knight      | Razing a House next to a Town Hall and a tower, 600 resources of attackers | army value lost per point of damage: Knight 0.20, Militia 0.28, Archer 1.45, Scout Rider 2.17 |
+| Catapult    | see §6                                                                     |                                                                                               |
 
 ## 3. Why no unit is the best choice everywhere
 
@@ -147,31 +149,32 @@ No mix wins everything either. Each army below loses an equal-cost fight to the 
 
 Damage = max(1, attack + bonus against the target's class − target armor) (`game.json → combat.minDamage` = 1).
 
-| Attacker ↓ / target → | Militia | Archer | Scout Rider | Knight | Worker | Building |
-| --------------------- | ------: | -----: | ----------: | -----: | -----: | -------: |
-| **Militia**           |       3 |      4 |          10 |      8 |      4 |        3 |
-| **Archer**            |       9 |      4 |           4 |      2 |      4 |        1 |
-| **Scout Rider**       |       3 |      9 |           4 |      2 |      8 |        1 |
-| **Knight**            |       9 |     12 |          10 |      8 |     10 |        9 |
+| Attacker ↓ / target → | Militia | Archer | Scout Rider | Knight | Catapult | Worker | Building |
+| --------------------- | ------: | -----: | ----------: | -----: | -------: | -----: | -------: |
+| **Militia**           |       3 |      4 |          10 |      8 |        3 |      4 |        3 |
+| **Archer**            |       9 |      4 |           4 |      2 |        3 |      4 |        1 |
+| **Scout Rider**       |       3 |      9 |           4 |      2 |        9 |      8 |        1 |
+| **Knight**            |       9 |     12 |          10 |      8 |        9 |     10 |        9 |
+| **Catapult**          |      11 |     12 |          12 |     10 |       11 |     12 |       41 |
 
 "Building" includes towers. Buildings and towers have armor 1, and the −2 bonus of the Archer and the Scout Rider is set for both classes (`building` and `tower`).
 
 ## 5. Stats
 
-The bonuses are listed in the order of `units.json`. The Scout Rider's +6 against siege only matters if the Catapult is ever made trainable.
+The bonuses are listed in the order of `units.json`. The Catapult's attack also has a minimum range of 2 and a 1-tile splash (50% at the edge); its stone lands where the target was, so moving units can dodge it.
 
-| Stat            | Militia               | Archer                                      | Scout Rider                                                          | Knight                 |
-| --------------- | --------------------- | ------------------------------------------- | -------------------------------------------------------------------- | ---------------------- |
-| Trained at      | Barracks              | Barracks                                    | Stable                                                               | Stable                 |
-| Cost            | 35 food, 20 wood      | 30 wood, 40 gold                            | 80 food                                                              | 60 food, 75 gold       |
-| Train time      | 15 s                  | 18 s                                        | 20 s                                                                 | 28 s                   |
-| Population      | 1                     | 1                                           | 1                                                                    | 2                      |
-| HP              | 45                    | 30                                          | 60                                                                   | 120                    |
-| Armor           | 1                     | 0                                           | 0                                                                    | 2                      |
-| Speed (tiles/s) | 2                     | 2.2                                         | 3.6                                                                  | 3                      |
-| Sight           | 4                     | 6                                           | 7                                                                    | 5                      |
-| Attack          | 4, melee, every 1.5 s | 4, range 5, every 1.6 s                     | 4, melee, every 1.8 s                                                | 10, melee, every 1.8 s |
-| Bonus damage    | +6 vs cavalry         | +6 vs infantry, −2 vs building, −2 vs tower | +5 vs ranged, +4 vs worker, +6 vs siege, −2 vs building, −2 vs tower | +2 vs ranged           |
+| Stat            | Militia               | Archer                                      | Scout Rider                                                          | Knight                 | Catapult                      |
+| --------------- | --------------------- | ------------------------------------------- | -------------------------------------------------------------------- | ---------------------- | ----------------------------- |
+| Trained at      | Barracks              | Barracks                                    | Stable                                                               | Stable                 | Siege Workshop                |
+| Cost            | 35 food, 20 wood      | 30 wood, 40 gold                            | 80 food                                                              | 60 food, 75 gold       | 150 wood, 120 gold            |
+| Train time      | 15 s                  | 18 s                                        | 20 s                                                                 | 28 s                   | 40 s                          |
+| Population      | 1                     | 1                                           | 1                                                                    | 2                      | 3                             |
+| HP              | 45                    | 30                                          | 60                                                                   | 120                    | 70                            |
+| Armor           | 1                     | 0                                           | 0                                                                    | 2                      | 1                             |
+| Speed (tiles/s) | 2                     | 2.2                                         | 3.6                                                                  | 3                      | 1.2                           |
+| Sight           | 4                     | 6                                           | 7                                                                    | 5                      | 9                             |
+| Attack          | 4, melee, every 1.5 s | 4, range 5, every 1.6 s                     | 4, melee, every 1.8 s                                                | 10, melee, every 1.8 s | 12, range 8, every 5 s        |
+| Bonus damage    | +6 vs cavalry         | +6 vs infantry, −2 vs building, −2 vs tower | +5 vs ranged, +4 vs worker, +6 vs siege, −2 vs building, −2 vs tower | +2 vs ranged           | +30 vs building, +30 vs tower |
 
 **Changed in M6.5** (from the earlier numbers):
 
@@ -179,3 +182,33 @@ The bonuses are listed in the order of `units.json`. The Scout Rider's +6 agains
 - Archer: bonus vs infantry +4 → +6, new −2 vs buildings and towers.
 - Scout Rider: bonus vs ranged +4 → +5 and vs workers +3 → +4, new −2 vs buildings and towers.
 - Knight: unchanged.
+
+## 6. The Catapult: siege
+
+Trained at the **Siege Workshop** (build menu D: 200 wood, 50 gold). The Catapult is not a field
+unit: it is there to take down what the other units cannot, from where it cannot be shot back.
+
+- **Role:** breaks towers and bases from outside their range. Its range is 8; the Watch Tower
+  shoots 7 and the Town Hall 6. One stone does 41 damage to a building.
+- **Target priority** (its own, `units.json → catapult.combat.targetPriority`): towers first, then
+  other buildings, then siege, then soldiers, workers last. On attack-move it shells the tower, not
+  the Militia standing next to it.
+- **Shines when:**
+  - the enemy turtles behind Watch Towers and the Town Hall;
+  - enemy units stand still in a clump (splash).
+- **Weakness you can exploit:**
+  - **Cavalry.** Scout Riders deal +6 against siege; one Scout Rider kills a lone Catapult.
+  - **Up close it is helpless:** it cannot shoot anything within 2 tiles.
+  - **Slow and expensive:** the slowest unit (1.2 tiles/s), the most expensive (270 resources,
+    3 population), and its stones miss moving units.
+- **How to beat it:** send cavalry at it before it gets in range, or catch it without an escort.
+
+### Siege, measured (2026-11-09, `tests/engine/balance.test.ts`)
+
+| Situation                                                                 | Result                                                                 |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 2 Catapults against a lone Watch Tower                                    | the tower falls in about 40 s; both Catapults are untouched            |
+| 1,100 resources of Catapults or Knights against a Town Hall with a tower  | the Catapults lose a smaller share of their value                      |
+| One stone into 4 Militia standing still                                   | at least 3 of them are hurt                                            |
+| Equal-cost field battle (810 a side) against each of the four field units | the Catapults lose every one; cavalry keeps more than 75% of its value |
+| 1 Scout Rider against a lone Catapult                                     | the Catapult dies, the Scout Rider lives                               |

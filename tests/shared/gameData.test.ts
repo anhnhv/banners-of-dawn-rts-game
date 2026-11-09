@@ -42,8 +42,41 @@ describe('game data', () => {
       const issues = (e as GameDataError).issues.join('\n');
       expect(issues).toContain('trains unknown unit "dragon"');
       expect(issues).toContain('hotkey "Q" is used twice');
-      expect(issues).toContain('gathers unknown node kind "unicorn_tree"');
+      expect(issues).toContain(
+        'gathers "unicorn_tree", which is neither a node kind nor a building with gather',
+      );
     }
+  });
+
+  it('checks gather buildings (Farm): a gather target may be one; the panel field needs gather', () => {
+    const ok = parseGameData(raw());
+    expect(ok.buildings.farm?.gather).toMatchObject({ resource: 'food', slots: 1 });
+    expect(ok.units.worker?.interactions.gather?.targets.farm).toBeGreaterThan(0);
+
+    const r = raw() as unknown as {
+      buildings: Record<string, { gather?: unknown; panel: string[] }>;
+    };
+    delete r.buildings.farm!.gather; // the worker's "farm" target is no longer a gather building
+    r.buildings.house!.panel.push('gatherers');
+    try {
+      parseGameData(r as unknown as RawGameData);
+      expect.unreachable();
+    } catch (e) {
+      const issues = (e as GameDataError).issues.join('\n');
+      expect(issues).toContain('gathers "farm", which is neither a node kind nor a building with gather');
+      expect(issues).toContain('buildings.house: panel field "gatherers" needs gather');
+      expect(issues).toContain('buildings.farm: panel field "gatherers" needs gather');
+    }
+  });
+
+  it("checks a unit's own target priority classes", () => {
+    const r = raw() as unknown as {
+      units: Record<string, { combat: { targetPriority?: Record<string, number> } }>;
+    };
+    r.units.catapult!.combat.targetPriority = { dragon: 1 };
+    expect(() => parseGameData(r as unknown as RawGameData)).toThrow(
+      /units\.catapult\.combat\.targetPriority: unknown class "dragon"/,
+    );
   });
 
   it('reports bad field values', () => {

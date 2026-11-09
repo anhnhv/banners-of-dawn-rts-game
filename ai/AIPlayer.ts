@@ -34,6 +34,7 @@ import {
   distToRect,
   isGatherer,
   isMilitary,
+  isSiege,
   unitStrength,
   type Point,
   type Situation,
@@ -213,7 +214,7 @@ export class MachinePlayer {
       const short = RESOURCES.some((r) => {
         const c = (def.cost[r] ?? 0) * (queued + 1);
         return (
-          c > 0 && obs.resources[r] + this.safeAmount(obs, sit, r) - c < this.profile.economy.armyReserve
+          c > 0 && obs.resources[r] + this.resourceLeft(obs, sit, r) - c < this.profile.economy.armyReserve
         );
       });
       if (short) missing = 0;
@@ -249,7 +250,9 @@ export class MachinePlayer {
     for (const r of requests) add(r.cost);
     // steady demand: a few soldiers of what we can train, and workers while below target
     for (const [unit] of sit.producers) {
-      if (isMilitary(this.data, unit)) add(this.data.units[unit]?.cost ?? {}, 3);
+      if (isSiege(this.data, unit))
+        add(this.data.units[unit]?.cost ?? {}, this.siegeRoom(obs, sit) > 0 ? 1 : 0);
+      else if (isMilitary(this.data, unit)) add(this.data.units[unit]?.cost ?? {}, 3);
       else if (sit.workers.length < this.profile.economy.workerTarget)
         add(this.data.units[unit]?.cost ?? {}, 2);
     }
@@ -271,7 +274,7 @@ export class MachinePlayer {
       if (w.order.kind === 'gather') assigned.set(w.order.node, (assigned.get(w.order.node) ?? 0) + 1);
     const out: Command[] = [];
     const send = (w: ObservedUnit, r: ResourceType): boolean => {
-      const node = this.nodeFor(obs, sit, w, r, assigned);
+      const node = this.sourceFor(obs, sit, w, r, assigned);
       if (!node) return false;
       assigned.set(node.id, (assigned.get(node.id) ?? 0) + 1);
       out.push({ type: 'interact', units: [w.id], target: node.id });
@@ -334,6 +337,63 @@ export class MachinePlayer {
     let n = 0;
     for (const node of obs.nodes) if (node.resource === r && this.isSafe(obs, sit, node)) n += node.amount;
     return n;
+  }
+
+  /** Own finished gather buildings (Farms) that yield `r`: they never run out. */
+  private gatherBuildings(obs: Observation, r: ResourceType): ObservedBuilding[] {
+    return obs.buildings.filter(
+      (b) => b.owner === obs.player && b.constructed && this.data.buildings[b.type]?.gather?.resource === r,
+    );
+  }
+
+  /** What can still be gathered of `r`: safe nodes, or without limit when we own a Farm for it. */
+  private resourceLeft(obs: Observation, sit: Situation, r: ResourceType): number {
+    return this.gatherBuildings(obs, r).length > 0 ? Infinity : this.safeAmount(obs, sit, r);
+  }
+
+  /**
+   * Where a worker gathers `r`: a node near home (nodeFor), or one of our gather buildings with a
+   * free slot. Nodes are preferred while there are some (berries are faster than a farm).
+   */
+  private sourceFor(
+    obs: Observation,
+    sit: Situation,
+    w: ObservedUnit,
+    r: ResourceType,
+    assigned: Map<EntityId, number>,
+  ): { id: EntityId } | null {
+    const node = this.nodeFor(obs, sit, w, r, assigned);
+    if (node) return node;
+    const rate = this.data.units[w.type]?.interactions.gather?.targets ?? {};
+    let best: ObservedBuilding | null = null;
+    let bestD = Infinity;
+    for (const b of this.gatherBuildings(obs, r)) {
+      const slots = this.data.buildings[b.type]?.gather?.slots ?? 0;
+      if ((rate[b.type] ?? 0) <= 0 || Math.max(b.gatherers, assigned.get(b.id) ?? 0) >= slots) continue;
+      const d = dist(center(b), w);
+      if (d < bestD - 1e-9) {
+        best = b;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
+  /** How many more siege units (Catapults) this mode wants now: army.maxSiege minus alive and queued. */
+  private siegeRoom(obs: Observation, sit: Situation): number {
+    let n = sit.army.filter((u) => isSiege(this.data, u.type)).length;
+    for (const b of obs.buildings)
+      if (b.owner === obs.player) n += b.queue.filter((u) => isSiege(this.data, u)).length;
+    n += this.pending.filter((p) => p.kind === 'train' && isSiege(this.data, p.unit)).length;
+    return this.profile.army.maxSiege - n;
+  }
+
+  /** An army building that trains only siege units (the Siege Workshop). */
+  private siegeOnly(type: BuildingTypeId): boolean {
+    const units = (this.data.buildings[type]?.actions ?? []).flatMap((a) =>
+      a.type === 'train' && isMilitary(this.data, a.unit) ? [a.unit] : [],
+    );
+    return units.length > 0 && units.every((u) => isSiege(this.data, u));
   }
 
   /** A node of resource `r` near home: close to home first, then to the worker, spreading workers out. */
@@ -440,15 +500,36 @@ export class MachinePlayer {
       const def = this.data.buildings[type];
       if (!def) continue;
       if (kinds++ >= p.militaryBuildingTypes || !previousStands) break;
+      const siege = this.siegeOnly(type);
+      if (siege && (sit.seconds < p.siegeAfterSeconds || this.profile.army.maxSiege <= 0)) break;
       const have = this.count(sit, type);
       const built = (sit.ownByType.get(type) ?? []).filter((b) => b.constructed);
       const allBusy = built.every((b) => b.queue.length >= militaryQueue);
       const rich = RESOURCES.every((r) => (def.cost[r] ?? 0) === 0 || obs.resources[r] > p.extraProducerBank);
       if (have === 0 && sit.workers.length >= p.firstProducerAtWorkers)
         this.pushBuild(out, obs, sit, type, prio.firstProducer, 'front', p.militaryDistance);
-      else if (have > 0 && have < p.maxProducersPerType && this.sitesOf(sit, type) === 0 && allBusy && rich)
+      else if (
+        !siege &&
+        have > 0 &&
+        have < p.maxProducersPerType &&
+        this.sitesOf(sit, type) === 0 &&
+        allBusy &&
+        rich
+      )
         this.pushBuild(out, obs, sit, type, prio.extraProducer, 'front', p.militaryDistance);
       previousStands = built.length > 0;
+    }
+
+    // farms (gather buildings), one at a time, once the safe nodes of their resource run low:
+    // as many as the workers that resource should get, up to buildings.maxFarms
+    for (const r of RESOURCES) {
+      const farm = this.cheapestBuilding((t) => this.data.buildings[t]?.gather?.resource === r);
+      if (!farm || p.maxFarms <= 0 || this.safeAmount(obs, sit, r) >= this.profile.economy.farmWhenFoodBelow)
+        continue;
+      const share = this.desiredShares(obs, sit, [])[r];
+      const want = Math.min(p.maxFarms, Math.max(1, Math.ceil(share * sit.workers.length)));
+      if (this.count(sit, farm.type) < want && this.sitesOf(sit, farm.type) === 0)
+        this.pushBuild(out, obs, sit, farm.type, prio.farm, 'back', p.farmDistance);
     }
 
     // a defensive tower once the base is going
@@ -509,22 +590,33 @@ export class MachinePlayer {
     for (const list of sit.ownByType.values()) {
       for (const b of list) {
         if (!b.constructed || (this.trainsMilitary(b.type) && !kinds.includes(b.type))) continue;
-        const options = (this.data.buildings[b.type]?.actions ?? [])
+        const trains = (this.data.buildings[b.type]?.actions ?? [])
           .filter((a) => a.type === 'train' && isMilitary(this.data, a.unit))
           .map((a) => (a.type === 'train' ? a.unit : ''));
-        if (options.length === 0) continue;
+        // siege units are not part of the counter pick: they are trained up to army.maxSiege, and
+        // not while the base is threatened (they cannot defend: minimum range, slow)
+        const siege = trains.filter((u) => isSiege(this.data, u));
+        const options = trains.filter((u) => !isSiege(this.data, u));
+        let siegeRoom = siege.length > 0 && !urgent ? this.siegeRoom(obs, sit) : 0;
+        if (options.length === 0 && siegeRoom <= 0) continue;
         let slots = this.profile.army.militaryQueue - b.queue.length - this.pendingTrains(b.id);
         while (slots-- > 0) {
-          const unit = this.pickUnit(obs, sit, options, inArmy, globalBest);
+          const unit =
+            options.length > 0
+              ? this.pickUnit(obs, sit, options, inArmy, globalBest)
+              : siegeRoom-- > 0
+                ? siege[0]
+                : undefined;
           const pop = unit ? (this.data.units[unit]?.pop ?? 1) : 1;
           if (!unit || room < pop) break;
           room -= pop;
           inArmy.set(unit, (inArmy.get(unit) ?? 0) + 1);
+          const prio = this.profile.priorities;
           const req = this.trainRequest(
             obs,
             b,
             unit,
-            urgent ? this.profile.priorities.defenceSoldier : this.profile.priorities.soldier,
+            isSiege(this.data, unit) ? prio.siege : urgent ? prio.defenceSoldier : prio.soldier,
           );
           const commit = req.commit;
           req.commit = () => {
@@ -556,7 +648,7 @@ export class MachinePlayer {
     const payable = options.filter((u) =>
       RESOURCES.every((r) => {
         const c = this.data.units[u]?.cost[r] ?? 0;
-        return c === 0 || obs.resources[r] + this.safeAmount(obs, sit, r) >= c;
+        return c === 0 || obs.resources[r] + this.resourceLeft(obs, sit, r) >= c;
       }),
     );
     const list = payable.length > 0 ? payable : options;
@@ -582,7 +674,7 @@ export class MachinePlayer {
     for (const type of kinds) {
       if (!(sit.ownByType.get(type) ?? []).some((b) => b.constructed)) continue;
       for (const a of this.data.buildings[type]?.actions ?? [])
-        if (a.type === 'train' && isMilitary(this.data, a.unit))
+        if (a.type === 'train' && isMilitary(this.data, a.unit) && !isSiege(this.data, a.unit))
           best = Math.max(best, counterScore(this.data, a.unit, sit.enemyArmy, army.counterRangedEdge));
     }
     return best;

@@ -5,8 +5,9 @@
 import { secondsToTicks, type PlayerId, type ResourceAmounts, type UnitTypeId } from '../../shared';
 import { DATA } from '../data';
 import type { Building } from '../entities/Building';
-import { gatherRate, type Unit } from '../entities/Unit';
+import type { Unit } from '../entities/Unit';
 import type { GameState } from '../GameState';
+import { sourceFor } from './gatherSources';
 import { approachPoint } from './reach';
 
 export function populationOf(state: GameState, player: PlayerId): { pop: number; popCap: number } {
@@ -66,21 +67,17 @@ export function productionSystem(
   }
 }
 
-/** New units go to the rally point; workers rallied onto a resource start gathering it. */
+/**
+ * New units go to the rally point; workers rallied onto a resource (a node, or an own gather
+ * building such as a farm) start gathering it. A taken farm sends them on to a free source.
+ */
 function applyRally(state: GameState, b: Building, u: Unit): void {
   const r = b.rally;
   if (!r) return;
-  const node = r.target !== undefined ? state.nodes.get(r.target) : undefined;
-  if (node && gatherRate(u.type, node.kind) > 0) {
+  const src = r.target !== undefined ? sourceFor(state, r.target, u) : null;
+  if (src) {
     u.orders = [
-      {
-        kind: 'gather',
-        target: node.id,
-        resource: node.resource,
-        phase: 'toNode',
-        lastX: node.x,
-        lastY: node.y,
-      },
+      { kind: 'gather', target: src.id, resource: src.resource, phase: 'toNode', lastX: src.x, lastY: src.y },
     ];
     return;
   }

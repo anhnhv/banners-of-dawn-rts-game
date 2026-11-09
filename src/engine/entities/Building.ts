@@ -35,6 +35,9 @@ export interface Building extends Rect {
   /** Current target of its own attack. */
   target: EntityId | null;
   strikeTick: number;
+  // ---- gathering (buildings with `gather` in buildings.json, e.g. a Farm) ----
+  /** Workers holding its gather slots this tick (systems/gatherSources.ts). */
+  gatherers: EntityId[];
 }
 
 export interface ResourceNode extends Rect {

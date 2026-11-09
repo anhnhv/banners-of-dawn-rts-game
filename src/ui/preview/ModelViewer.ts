@@ -129,7 +129,6 @@ export class ModelViewer {
   private rows(): Array<{ title: string; entries: Array<[string, THREE.Object3D]> }> {
     const buildings: Array<[string, BuildingModel]> = [
       ...Object.entries(DATA.buildings).map(([, d]) => [d.name, d.model] as [string, BuildingModel]),
-      ['Farm (unused)', 'farm'],
     ];
     const nodes: Array<[string, BuildingModel]> = [
       [displayName('gold_mine'), 'goldMine'],

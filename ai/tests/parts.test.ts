@@ -52,6 +52,7 @@ describe('TileMap placement', () => {
       constructed: true,
       queue: [],
       rally: null,
+      gatherers: 0,
     });
     const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
     for (let i = 0; i < 10; i++) {

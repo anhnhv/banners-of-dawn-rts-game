@@ -1,5 +1,5 @@
 {
-  "note": "Unit definitions (PLAN §2.4). Times in seconds, speed in tiles/second, radius in tiles. 'interactions' say what the unit can do with other entities (right-click): gather lists the node kinds it can harvest and the rate per second (harvested resources go straight to the stockpile). 'actions' drive the command grid; 'panel' lists info fields shown when selected. 'attack' is the unit's attack (range 0 = melee; bonus = extra damage by target class; ranged attacks name a projectile from projectiles.json; a negative bonus makes a unit weak against that class, never below game.json → combat.minDamage); 'combat' says how it behaves near enemies (autoAttack, starting stance, fleeWhenHit); interactions.attack.targets says what a right-click on an enemy attacks (PLAN §9.5).",
+  "note": "Unit definitions (PLAN §2.4). Times in seconds, speed in tiles/second, radius in tiles. 'interactions' say what the unit can do with other entities (right-click): gather lists the node kinds (and gather buildings such as the Farm) it can harvest and the rate per second (harvested resources go straight to the stockpile). 'actions' drive the command grid; 'panel' lists info fields shown when selected. 'attack' is the unit's attack (range 0 = melee; bonus = extra damage by target class; ranged attacks name a projectile from projectiles.json; a negative bonus makes a unit weak against that class, never below game.json → combat.minDamage); 'combat' says how it behaves near enemies (autoAttack, starting stance, fleeWhenHit, and an optional own targetPriority by class that replaces game.json → combat.targetPriority); interactions.attack.targets says what a right-click on an enemy attacks (PLAN §9.5).",
   "units": {
     "worker": {
       "name": "Worker",
@@ -19,7 +19,7 @@
       "combat": { "autoAttack": false, "stance": "aggressive", "fleeWhenHit": 4 },
       "interactions": {
         "gather": {
-          "targets": { "tree": 0.4, "pine": 0.4, "berry_bush": 0.45, "gold_mine": 0.35 }
+          "targets": { "tree": 0.4, "pine": 0.4, "berry_bush": 0.45, "gold_mine": 0.35, "farm": 0.35 }
         },
         "attack": { "targets": ["unit", "building"] }
       },
@@ -139,7 +139,7 @@
     },
     "catapult": {
       "name": "Catapult",
-      "description": "Siege engine. Smashes buildings from range.",
+      "description": "Siege engine that breaks towers and bases from out of their range. Strong vs buildings, towers and clumped units. Weak up close (min range 2), slow, and easy prey for Scout Riders.",
       "model": "catapult",
       "icon": "catapult",
       "class": "siege",
@@ -160,7 +160,19 @@
         "projectile": "stone",
         "splash": { "radius": 1, "edge": 0.5 }
       },
-      "combat": { "autoAttack": true, "stance": "aggressive" },
+      "combat": {
+        "autoAttack": true,
+        "stance": "aggressive",
+        "targetPriority": {
+          "tower": 1,
+          "building": 2,
+          "siege": 3,
+          "infantry": 4,
+          "ranged": 4,
+          "cavalry": 4,
+          "worker": 5
+        }
+      },
       "interactions": { "attack": { "targets": ["unit", "building"] } },
       "panel": ["hp", "armor", "speed", "attack", "stance", "task"],
       "actions": [

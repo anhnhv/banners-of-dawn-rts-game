@@ -4,7 +4,7 @@
  * its info panel shows, which buttons it has — comes from here, not from code.
  *
  * parseGameData() validates the shape AND the cross-references (a train action must name a real
- * unit, a gather target must be a real node kind, …) and throws listing every problem.
+ * unit, a gather target must be a real node kind or gather building, …) and throws listing every problem.
  */
 import { z } from 'zod';
 
@@ -26,6 +26,8 @@ export const PANEL_FIELDS = [
   'construction',
   'attack',
   'stance',
+  /** Workers in the building's gather slots, e.g. "Farmer 1/1" (buildings with `gather`). */
+  'gatherers',
 ] as const;
 export type PanelField = (typeof PANEL_FIELDS)[number];
 
@@ -99,11 +101,16 @@ export const UnitDefSchema = z.object({
       stance: z.enum(STANCES).default('aggressive'),
       /** Tiles to run away when hit while idle (0 = stand). */
       fleeWhenHit: z.number().min(0).default(0),
+      /** Own target priority by class (lower = first); replaces game.json → combat.targetPriority. */
+      targetPriority: z.record(z.string(), z.number()).optional(),
     })
     .prefault({}),
   interactions: z
     .object({
-      /** Node kinds this unit can harvest, with the rate (resource per second) for each. */
+      /**
+       * What this unit can harvest, with the rate (resource per second) for each: resource node
+       * kinds, and building types that have `gather` (e.g. a Farm).
+       */
       gather: z.object({ targets: z.record(z.string(), z.number().positive()) }).optional(),
       /** Right-click on an enemy entity of these kinds attacks it (needs `attack`). */
       attack: z.object({ targets: z.array(z.enum(ATTACK_TARGETS)).min(1) }).optional(),
@@ -125,6 +132,22 @@ export const BuildingDefSchema = z.object({
   sight: z.number().positive().default(6),
   /** Finished buildings with an attack shoot enemies in range by themselves. */
   attack: AttackSchema.optional(),
+  /**
+   * The finished building is a resource source its owner's workers can gather (e.g. a Farm): it
+   * never runs out, and at most `slots` workers gather at a time. Rates are on the unit
+   * (units.json → interactions.gather.targets[building type]).
+   */
+  gather: z
+    .object({
+      resource: z.enum(RESOURCE_TYPES),
+      slots: z.number().int().positive(),
+      /**
+       * Tiles the worker steps INTO the footprint to work (e.g. a farmer on the field). The
+       * building still blocks everyone else; 0 = it works from the edge, like at a node.
+       */
+      workInside: z.number().min(0).max(0.9).default(0),
+    })
+    .optional(),
 });
 export type BuildingDef = z.infer<typeof BuildingDefSchema>;
 
@@ -246,10 +269,18 @@ export function parseGameData(raw: RawGameData): GameData {
   for (const [id, u] of Object.entries(units)) {
     checkActions(`units.${id}`, u.actions);
     for (const target of Object.keys(u.interactions.gather?.targets ?? {})) {
-      if (!nodes[target]) issues.push(`units.${id}: gathers unknown node kind "${target}"`);
+      if (!nodes[target] && !buildings[target]?.gather)
+        issues.push(
+          `units.${id}: gathers "${target}", which is neither a node kind nor a building with gather`,
+        );
     }
   }
-  for (const [id, b] of Object.entries(buildings)) checkActions(`buildings.${id}`, b.actions);
+  for (const [id, b] of Object.entries(buildings)) {
+    checkActions(`buildings.${id}`, b.actions);
+    if (b.panel.includes('gatherers') && !b.gather)
+      issues.push(`buildings.${id}: panel field "gatherers" needs gather`);
+    if (nodes[id] && b.gather) issues.push(`buildings.${id}: the id is also a node kind`);
+  }
 
   // combat: classes named by bonuses and priorities must exist; projectiles must exist
   const classes = new Set([
@@ -269,6 +300,8 @@ export function parseGameData(raw: RawGameData): GameData {
     if (u.interactions.attack && !u.attack) issues.push(`units.${id}: interactions.attack needs an attack`);
     const usesAttack = u.actions.some((a) => a.type === 'attackMove' || a.type === 'stance');
     if (usesAttack && !u.attack) issues.push(`units.${id}: attackMove/stance actions need an attack`);
+    for (const c of Object.keys(u.combat.targetPriority ?? {}))
+      if (!classes.has(c)) issues.push(`units.${id}.combat.targetPriority: unknown class "${c}"`);
   }
   for (const [id, b] of Object.entries(buildings)) checkAttack(`buildings.${id}`, b.attack);
   for (const c of Object.keys(game.combat.targetPriority))

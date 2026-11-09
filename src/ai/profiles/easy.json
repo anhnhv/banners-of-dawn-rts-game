@@ -11,7 +11,8 @@
     "idleWorkersPerThink": 1,
     "gatherRadius": 14,
     "rebalanceSeconds": 0,
-    "plentyStock": 500
+    "plentyStock": 500,
+    "farmWhenFoodBelow": 150
   },
   "buildings": {
     "houseBuffer": 0,
@@ -24,7 +25,10 @@
     "towerAfterSeconds": 99999,
     "houseDistance": [5, 10],
     "militaryDistance": [7, 12],
-    "towerDistance": [5, 9]
+    "towerDistance": [5, 9],
+    "maxFarms": 2,
+    "farmDistance": [5, 14],
+    "siegeAfterSeconds": 99999
   },
   "priorities": {
     "defenceSoldier": 95,
@@ -33,7 +37,9 @@
     "firstProducer": 70,
     "soldier": 60,
     "extraProducer": 45,
-    "tower": 40
+    "tower": 40,
+    "farm": 40,
+    "siege": 0
   },
   "army": {
     "trainEverySeconds": 40,
@@ -44,7 +50,8 @@
     "unitChoice": "first",
     "counterShare": 0,
     "counterRangedEdge": 1,
-    "counterMinShare": 0
+    "counterMinShare": 0,
+    "maxSiege": 0
   },
   "attack": {
     "earliestAttackSeconds": 360,

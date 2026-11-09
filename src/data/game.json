@@ -13,7 +13,9 @@
     { "building": "barracks", "hotkey": "W" },
     { "building": "town_hall", "hotkey": "E" },
     { "building": "watch_tower", "hotkey": "R" },
-    { "building": "stable", "hotkey": "A" }
+    { "building": "stable", "hotkey": "A" },
+    { "building": "farm", "hotkey": "S" },
+    { "building": "siege_workshop", "hotkey": "D" }
   ],
   "construction": { "startHpFraction": 0.1 },
   "combat": {

@@ -112,26 +112,121 @@ export const buildings: ArtCollectionParts['buildings'] = {
     b.box(2.88, 1.35, 0.43, 0.4, 0.3, 0.03, 'cloth', 'team');
   },
 
+  // A big 4×4 field (M7b): a thatched barn in the back corner, three crop bands in long furrows,
+  // a fence all round with a gate on the front (+z) side, hay bales and a team scarecrow.
   farm: (b) => {
-    b.box(0.1, 0, 0.1, 1.8, 0.05, 1.8, 'soil', 'soil');
-    for (let i = 0; i < 5; i++) {
-      const ripe = i % 2 === 0;
-      b.box(0.2, 0.05, 0.22 + i * 0.33, 1.6, ripe ? 0.16 : 0.12, 0.17, 'leaves', ripe ? 'crop-ripe' : 'crop');
+    b.box(0.06, 0, 0.06, 3.88, 0.06, 3.88, 'soil', 'dirt-dark', { top: 'soil', topColor: 'soil' });
+    // barn (back-left corner)
+    b.box(0.25, 0.06, 0.25, 1.3, 0.12, 1.15, 'rock', 'stone-dark', { topColor: 'stone' });
+    b.box(0.32, 0.18, 0.32, 1.16, 0.62, 1.0, 'planks', 'wood');
+    b.box(0.68, 0.18, 1.31, 0.44, 0.48, 0.03, 'planks', 'wood-dark'); // door
+    b.box(0.69, 0.42, 1.33, 0.42, 0.04, 0.02, 'planks', 'wood-light'); // door brace
+    b.gableRoof(0.32, 0.8, 0.32, 1.16, 1.0, 0.5, 'x', 'thatch', 'straw', 'planks', 'wood-light', 0.12);
+    b.box(0.22, 1.27, 0.78, 1.36, 0.06, 0.08, 'cloth', 'team'); // ridge
+    // band 1: ripe wheat beside the barn
+    for (let i = 0; i < 4; i++) {
+      const z = 0.32 + i * 0.28;
+      b.box(1.8, 0.06, z, 1.9, 0.04, 0.16, 'soil', 'dirt-dark');
+      b.box(1.84, 0.1, z + 0.02, 1.82, 0.24 + (i % 2) * 0.04, 0.12, 'leaves', 'crop-ripe');
     }
+    // band 2: leafy green crops across the field
+    for (let i = 0; i < 3; i++) {
+      const z = 1.62 + i * 0.32;
+      b.box(0.3, 0.06, z, 3.4, 0.04, 0.18, 'soil', 'dirt-dark');
+      for (let c = 0; c < 10; c++)
+        b.box(0.34 + c * 0.34, 0.1, z + 0.02, 0.22, 0.16 + ((c + i) % 2) * 0.04, 0.14, 'leaves', 'crop');
+    }
+    // band 3: young sprouts near the gate
+    for (let i = 0; i < 3; i++) {
+      const z = 2.66 + i * 0.28;
+      b.box(1.0, 0.06, z, 2.7, 0.03, 0.14, 'soil', 'dirt-dark');
+      for (let c = 0; c < 9; c++)
+        b.box(1.08 + c * 0.3, 0.09, z + 0.03, 0.08, 0.08, 0.08, 'leaves', 'leaf-light');
+    }
+    // hay bales by the gate
+    b.box(0.3, 0.06, 2.75, 0.42, 0.28, 0.32, 'thatch', 'straw-light');
+    b.box(0.32, 0.06, 3.15, 0.42, 0.28, 0.32, 'thatch', 'straw');
+    b.box(0.36, 0.34, 2.95, 0.36, 0.24, 0.3, 'thatch', 'straw-light');
+    // scarecrow in the green band: wide stick arms with straw tufts, a sack head and a dark hat
+    // (so it does not read as a worker standing in the field)
+    b.box(3.2, 0.06, 2.0, 0.06, 1.0, 0.06, 'bark', 'wood');
+    b.box(2.86, 0.74, 2.01, 0.74, 0.05, 0.04, 'bark', 'wood');
+    b.box(2.8, 0.7, 1.99, 0.08, 0.12, 0.08, 'thatch', 'straw-light');
+    b.box(3.58, 0.7, 1.99, 0.08, 0.12, 0.08, 'thatch', 'straw-light');
+    b.box(3.08, 0.5, 1.98, 0.3, 0.3, 0.1, 'cloth', 'team');
+    b.box(3.14, 0.82, 1.97, 0.18, 0.16, 0.14, 'cloth', 'cloth');
+    b.box(3.08, 0.98, 1.93, 0.3, 0.03, 0.22, 'plain', 'wood-dark');
+    b.box(3.15, 1.01, 1.98, 0.16, 0.1, 0.12, 'plain', 'wood-dark');
+    // fence: posts every tile, two rails, gate gap at x 1.6–2.4 on the front side
+    const posts: Array<[number, number]> = [];
+    for (let i = 0; i <= 4; i++) {
+      const t = Math.min(3.9, i * 0.97 + 0.02);
+      posts.push([t, 0.02], [0.02, t], [3.9, t]);
+      if (t < 1.6 || t > 2.4) posts.push([t, 3.9]);
+    }
+    posts.push([1.55, 3.9], [2.37, 3.9]);
+    for (const [x, z] of posts) b.box(x, 0, z, 0.08, 0.38, 0.08, 'bark', 'wood-dark');
+    for (const y of [0.16, 0.3]) {
+      b.box(0.02, y, 0.04, 3.96, 0.04, 0.04, 'planks', 'wood-light');
+      b.box(0.04, y, 0.02, 0.04, 0.04, 3.96, 'planks', 'wood-light');
+      b.box(3.92, y, 0.02, 0.04, 0.04, 3.96, 'planks', 'wood-light');
+      b.box(0.02, y, 3.92, 1.56, 0.04, 0.04, 'planks', 'wood-light');
+      b.box(2.4, y, 3.92, 1.56, 0.04, 0.04, 'planks', 'wood-light');
+    }
+    // team pennant on the gate post
+    b.box(2.39, 0.38, 3.91, 0.04, 0.6, 0.04, 'bark', 'wood-dark');
+    b.box(2.43, 0.78, 3.92, 0.3, 0.16, 0.02, 'cloth', 'team');
+  },
+
+  // Siege Workshop (M7b): an open timber shed on a stone footing with a half-built catapult frame
+  // inside, a log pile, a spare wheel leaning on the wall and a team banner.
+  siegeWorkshop: (b) => {
+    b.box(0.1, 0, 0.1, 2.8, 0.14, 2.8, 'rock', 'stone-dark', { topColor: 'stone' });
+    b.box(0.25, 0.14, 0.25, 2.5, 0.9, 0.12, 'planks', 'wood'); // back wall
+    b.box(0.25, 0.14, 0.25, 0.12, 0.9, 1.9, 'planks', 'wood'); // side wall
     for (const [x, z] of [
-      [0.04, 0.04],
-      [1.88, 0.04],
-      [0.04, 1.88],
-      [1.88, 1.88],
+      [0.25, 2.05],
+      [2.63, 0.25],
+      [2.63, 2.05],
+      [1.44, 2.05],
     ] as const)
-      b.box(x, 0, z, 0.08, 0.3, 0.08, 'bark', 'wood');
-    b.box(0.04, 0.18, 0.06, 1.92, 0.05, 0.04, 'planks', 'wood-light');
-    b.box(0.06, 0.18, 0.04, 0.04, 0.05, 1.92, 'planks', 'wood-light');
-    // scarecrow in team colors
-    b.box(1.55, 0.05, 1.55, 0.05, 0.6, 0.05, 'bark', 'wood');
-    b.box(1.38, 0.45, 1.555, 0.4, 0.05, 0.04, 'bark', 'wood');
-    b.box(1.47, 0.32, 1.53, 0.21, 0.22, 0.1, 'cloth', 'team');
-    b.box(1.5, 0.55, 1.53, 0.15, 0.13, 0.1, 'thatch', 'straw-light');
+      b.box(x, 0.14, z, 0.12, 0.9, 0.12, 'planks', 'wood-dark'); // posts
+    b.box(0.25, 0.98, 2.05, 2.5, 0.08, 0.12, 'planks', 'wood-dark'); // lintel
+    b.gableRoof(
+      0.25,
+      1.04,
+      0.25,
+      2.5,
+      1.92,
+      0.6,
+      'x',
+      'shingles',
+      'roof-slate',
+      'planks',
+      'wood-light',
+      0.14,
+    );
+    b.box(0.14, 1.62, 1.16, 2.72, 0.07, 0.1, 'cloth', 'team'); // ridge
+    // half-built catapult frame inside
+    b.box(0.85, 0.24, 0.85, 1.3, 0.1, 0.12, 'planks', 'wood-light');
+    b.box(0.85, 0.24, 1.55, 1.3, 0.1, 0.12, 'planks', 'wood-light');
+    b.box(1.0, 0.34, 0.9, 0.1, 0.5, 0.75, 'planks', 'wood');
+    b.box(1.35, 0.6, 1.2, 0.85, 0.08, 0.08, 'bark', 'wood-dark'); // arm, lying across
+    for (const [x, z] of [
+      [0.85, 0.74],
+      [2.0, 0.74],
+      [0.85, 1.67],
+      [2.0, 1.67],
+    ] as const)
+      b.box(x, 0.14, z, 0.2, 0.2, 0.1, 'planks', 'wood-dark'); // wheels
+    // log pile and a spare wheel outside
+    for (const z of [2.3, 2.48, 2.66]) b.box(1.85, 0.14, z, 0.9, 0.16, 0.16, 'bark', 'wood');
+    b.box(2.0, 0.3, 2.39, 0.7, 0.15, 0.15, 'bark', 'wood');
+    b.box(2.76, 0.14, 0.7, 0.08, 0.6, 0.6, 'planks', 'wood-dark');
+    b.box(2.79, 0.38, 0.94, 0.08, 0.12, 0.12, 'plain', 'iron');
+    // banner
+    b.box(0.15, 0.14, 2.75, 0.06, 1.5, 0.06, 'bark', 'wood-dark');
+    b.box(0.21, 1.15, 2.76, 0.42, 0.3, 0.03, 'cloth', 'team');
   },
 
   tower: (b) => {

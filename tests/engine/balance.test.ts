@@ -1,5 +1,6 @@
 /**
- * Army balance (docs/units.md). The four rules for the army units, as tests:
+ * Army balance (docs/units.md). The four rules for the army units, as tests (the Catapult, a siege
+ * unit, has its own section at the end: its matchups are buildings, not armies):
  *   1. a clear role and 3. a situation where it has the advantage: one situation test per unit;
  *   2. an exploitable weakness: the matrix losses and the building-damage check;
  *   4. no unit is best everywhere: every unit loses at least one equal-cost matchup.
@@ -340,3 +341,98 @@ describe('where each unit shines (docs/units.md §2)', () => {
 // keep the UnitTypeId import meaningful for type checks of ARMY
 const _check: readonly UnitTypeId[] = ARMY;
 void _check;
+
+describe('Catapult: siege (docs/units.md §6)', () => {
+  /** Attack a target with `n` units of `type` standing `dist` tiles south of it; seconds until it falls. */
+  const siege = (
+    type: string,
+    budget: number,
+    defences: (game: Game) => EntityId,
+  ): { seconds: number; lost: number; army: number } => {
+    const game = createGame(openMap(50, 40), { seed: 3 });
+    const target = defences(game);
+    const n = Math.max(1, Math.round(budget / value(type)));
+    const army = Array.from({ length: n }, (_, i) =>
+      game.debugSpawn(0, type, 20 + (i % 4) * 0.8, 32 + Math.floor(i / 4) * 0.8),
+    );
+    game.enqueue({ player: 0, tick: 0, cmd: { type: 'interact', units: army, target } });
+    let t = 0;
+    for (; t < 240 * 20 && game.buildings.has(target); t++) {
+      game.step();
+      if (t % 20 === 0) {
+        const idle = army.filter((id) => game.units.get(id)?.orders.length === 0);
+        if (idle.length && game.buildings.has(target))
+          game.enqueue({ player: 0, tick: game.tick, cmd: { type: 'interact', units: idle, target } });
+      }
+    }
+    return {
+      seconds: game.buildings.has(target) ? Infinity : t / 20,
+      lost: n * value(type) - valueLeft(game, army),
+      army: n * value(type),
+    };
+  };
+
+  it('outranges the Watch Tower and the Town Hall', () => {
+    const range = U.catapult!.attack!.range;
+    for (const b of ['watch_tower', 'town_hall'])
+      expect(range, b).toBeGreaterThan(GAME_DATA.buildings[b]!.attack!.range);
+  });
+
+  it('two Catapults destroy a Watch Tower from out of its range and both survive', () => {
+    const r = siege('catapult', 2 * value('catapult'), (g) => g.debugBuilding(1, 'watch_tower', 21, 12));
+    if (process.env.BALANCE_LOG) console.log('2 catapults vs tower', r);
+    expect(r.seconds).toBeLessThan(60);
+    expect(r.lost).toBe(0);
+  });
+
+  it('against a Town Hall guarded by a tower, Catapults lose far less value than the same cost of Knights', () => {
+    const base = (g: Game): EntityId => {
+      g.debugBuilding(1, 'watch_tower', 26, 13);
+      return g.debugBuilding(1, 'town_hall', 20, 10);
+    };
+    const cat = siege('catapult', 1100, base);
+    const knight = siege('knight', 1100, base);
+    if (process.env.BALANCE_LOG) console.log('town hall siege', { cat, knight });
+    expect(cat.seconds).toBeLessThan(Infinity);
+    expect(cat.lost / cat.army).toBeLessThan(knight.lost / knight.army);
+  });
+
+  it('one stone hurts every Militia of a clump standing still (splash)', () => {
+    const game = createGame(openMap(40, 30), { seed: 3 });
+    const c = game.debugSpawn(0, 'catapult', 10, 15);
+    const clump = [0, 1, 2, 3].map((i) =>
+      game.debugSpawn(1, 'militia', 16.6 + (i % 2) * 0.55, 14.7 + Math.floor(i / 2) * 0.55),
+    );
+    game.enqueue({ player: 0, tick: 0, cmd: { type: 'interact', units: [c], target: clump[0]! } });
+    game.enqueue({ player: 1, tick: 0, cmd: { type: 'setStance', units: clump, stance: 'hold' } });
+    for (let t = 0; t < 3 * 20; t++) game.step();
+    const hurt = clump.filter((id) => (game.units.get(id)?.hp ?? 0) < U.militia!.hp);
+    expect(hurt.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('weak: it loses every equal-cost field battle, and cavalry crushes it', () => {
+    for (const other of ARMY) {
+      const r = fight([['catapult' as ArmyUnit, 1]], [[other, 1]], 810);
+      expect(r.winner, other).toBe('b');
+      if (other === 'scout_rider' || other === 'knight') expect(r.left, other).toBeGreaterThan(0.75);
+    }
+  });
+
+  it('weak: one Scout Rider kills a lone Catapult (it cannot shoot within its minimum range)', () => {
+    const game = createGame(openMap(40, 30), { seed: 3 });
+    const c = game.debugSpawn(0, 'catapult', 10, 15);
+    const s = game.debugSpawn(1, 'scout_rider', 25, 15);
+    game.enqueue({ player: 1, tick: 0, cmd: { type: 'interact', units: [s], target: c } });
+    for (let t = 0; t < 30 * 20 && game.units.has(c); t++) game.step();
+    expect(game.units.has(c)).toBe(false);
+    expect(game.units.has(s)).toBe(true);
+  });
+
+  it('weak: the slowest unit, and the most expensive', () => {
+    for (const [type, def] of Object.entries(U)) {
+      if (type === 'catapult') continue;
+      expect(def.speed, type).toBeGreaterThan(U.catapult!.speed);
+      expect(value(type), type).toBeLessThan(value('catapult'));
+    }
+  });
+});

@@ -87,7 +87,7 @@ Multiplayer, campaign, multiple factions, naval units, garrisoning, trading, alt
 
 - **No carrying, no drop-off (decided 2026-11-06):** every unit of resource a worker harvests goes **straight into the stockpile**. Workers stay at the node until it runs out. There are no drop sites.
 - When a node runs out, the worker automatically looks for the nearest node of the same type within **8 tiles**. If none is found, the worker goes idle and the idle-worker indicator lights up.
-- A farm takes **1 worker** and never runs out. Farms are **walkable**.
+- A farm takes **1 worker** and never runs out. **Built in M7b (2026-11-09):** a **4×4** field, 60 W, 25 s, 400 HP, 0.35 food/s (slower than berries, so berries stay worth using). It blocks like any building; only its farmer steps onto it (`gather.workInside` 0.45 tiles) to work.
 - **Starting state (Standard):** 200 Food, 200 Wood, 100 Gold, 1 Town Hall, 3 Workers, 1 Scout Rider.
 
 ### 2.2 Population
@@ -136,7 +136,7 @@ Counter triangle, checked against the numbers above:
 | Town Hall | 3×3 | I (start) / II (extra) | 300 W, 150 G | 90 s | 1500 | Trains Worker, researches Eras, +5 pop, shoots arrows (4 dmg, range 6, every 2 s) |
 | House | 2×2 | I | 30 W | 15 s | 300 | +5 pop |
 | Storehouse | 2×2 | I | 80 W | 20 s | 400 | Economy techs (no drop-off role any more) |
-| Farm | 2×2 | I | 60 W | 15 s | 200 | Infinite food, 1 worker, walkable |
+| Farm | 2×2 | I | 60 W | 15 s | 200 | Infinite food, 1 worker, walkable. **Built in M7b:** 4×4, 60 W, 25 s, 400 HP, blocks; its farmer works on the field |
 | Barracks | 3×3 | I | 150 W | 40 s | 1000 | Trains Militia |
 | Archery Range | 3×3 | II | 150 W | 40 s | 1000 | Trains Archer (requires Barracks) |
 | Stable | 3×3 | II | 150 W | 40 s | 1000 | Trains Scout Rider, Knight (III). **Built in M6.5:** 175 W, 45 s, 900 HP, no era or prerequisite; the Barracks trains Archers, so there is no Archery Range |
@@ -144,7 +144,7 @@ Counter triangle, checked against the numbers above:
 | Watch Tower | 1×1 | II | 125 W, 50 G | 35 s | 500 | 6 dmg, range 7, every 2 s, sight 9 |
 | Wall | 1×1 per segment | II | 3 W per segment | 4 s per segment | 250 | Drag to place a line along a grid axis |
 | Gate | 3×1 or 1×3 | II | 30 W | 15 s | 600 | Opens for its owner only; blocks the enemy |
-| Siege Workshop | 3×3 | III | 200 W | 50 s | 1000 | Trains Catapult |
+| Siege Workshop | 3×3 | III | 200 W | 50 s | 1000 | Trains Catapult. **Built in M7b:** 200 W + 50 G, 50 s, 1000 HP, no era or prerequisite |
 | Castle | 4×4 | III | 400 W, 300 G | 100 s | 3000 | Shoots 3 arrows (6 dmg, range 8), +10 pop |
 
 \***Construction needs no workers (decided 2026-11-06).** The player presses **Build**, picks a building from the build menu and places it. The cost is paid immediately and the construction site finishes on its own after `buildTime` seconds (× `pace.buildSpeed`).
@@ -1387,6 +1387,20 @@ User request (2026-11-09): later, players should customize their own AI for auto
 - **Proof nothing changed:** two fixed 5-minute AI-vs-AI matches (Green Valley scenario, Twin Rivers standard; Normal vs Easy, seed 5) give the same 150 commands and the same hash before and after the move. 32 test files / 254 tests pass. Production build and dev server both start the AI worker (Normal and Easy status lines in headless Chrome, no console errors). The main bundle went from 859 kB to 840 kB and the worker from 131 kB to 127 kB (mode JSONs no longer in the worker).
 - **Next for custom AIs** (not built): a Custom AI editor in Match Setup (profile saved in `localStorage`, checked with `parseAIProfile()`, passed in `boot.ts`); the same AI as auto play for the human side; other AI modules implementing `ai/contract.ts`.
 
+### M7b: Farm and Catapult in play (M) ✅ done 2026-11-09, details in `docs/plans/m7b-farm-catapult.md`
+User decisions (2026-11-09): a much bigger Farm, **4×4**, **1 worker** each, never runs out (no re-planting), and **slower per worker than berries**; farms block like other buildings (easy implementation), but **the farmer goes onto the field to work** (asked while it was being built); the Catapult is trained at a new **Siege Workshop**; Normal uses farms and Catapults, Easy builds a late farm and no Catapults.
+- [x] Data (config only): `buildings.json` → `farm` (4×4, 60 W, 25 s, 400 HP, `gather: { resource: food, slots: 1, workInside: 0.45 }`, panel `gatherers`) and `siege_workshop` (3×3, 200 W + 50 G, 50 s, 1000 HP, trains Catapult); worker `gather.targets.farm` 0.35 (berries 0.45); Catapult gets its own `combat.targetPriority` (towers, then buildings, then siege, soldiers, workers) and a new description; build menu S = Farm, D = Siege Workshop.
+- [x] Schema: building `gather` (resource, slots, workInside), unit `combat.targetPriority`, panel field `gatherers`; a gather target may be a node kind or a building with `gather`; cross-checks.
+- [x] Engine (generic, never says "farm"): `systems/gatherSources.ts`: a gather source is a node or an own finished gather building; slots are recounted every tick from the workers' current orders (`Building.gatherers`), extra workers look for another source; `findSource()` (was `findNode`) also returns free farms, so farmers move on when berries run out or a farm is destroyed; right-click and Town Hall rally on a farm; `gatherers` in the view, the observation and the state hash. The farmer walks straight in `workInside` tiles from the edge to work, and walks back out before any other order; the field still blocks everyone else. A melee unit chasing a unit inside a building aims just outside the nearest edge, so farmers can be raided. Per-unit target priority in `bestTarget`.
+- [x] Art: new **4×4 Farm** model in both collections (thatched barn, three crop bands, fence with a gate, hay bales, team pennant, a scarecrow with a dark hat so it does not look like a worker); Siege Workshop model (open timber shed, half-built catapult, logs, spare wheel, banner); icons `farm` (wheat sheaf) and `workshop` (wheel and hammer). `/?models` no longer says "Farm (unused)"; the `/?preview` diorama has one 4×4 farm.
+- [x] UI: build menu buttons, "Workers 1/1" panel field, worker gather rate includes farms, How to Play lines.
+- [x] AI (`ai/` + profiles): farms when safe berry food drops below `economy.farmWhenFoodBelow`, about one per food worker up to `buildings.maxFarms` (placed at `buildings.farmDistance` to the back); free farms are used like food nodes (berries first); a farm makes food "never short". Siege units are detected from the data (bonus vs buildings > base damage), not by name: the Workshop comes after `buildings.siegeAfterSeconds`, never doubled; Catapults up to `army.maxSiege` at `priorities.siege`, outside the counter pick. New settings: `economy.farmWhenFoodBelow`, `buildings.maxFarms`, `buildings.farmDistance`, `buildings.siegeAfterSeconds`, `priorities.farm`, `priorities.siege`, `army.maxSiege`; Normal now uses 3 army building kinds. `docs/ai-modes.md` updated.
+- [x] Tests: `tests/engine/farm.test.ts` (11: rate, slots, overflow, slot freeing, berries → farm, destroyed farm, site / enemy farm, rally, farmer on the field and back out, field blocks others, raiders reach a farmer, determinism); Catapult balance section in `balance.test.ts` (outranges tower and Town Hall; 2 Catapults kill a Watch Tower in ~40 s with no losses; cheaper Town Hall siege than Knights; splash; loses every equal-cost field fight, cavalry keeps > 75%; one Scout Rider kills a lone Catapult; slowest and most expensive); per-unit priority in `combat.test.ts`; schema tests; `ai/tests/farms-siege.test.ts` (Normal vs Normal 20 min: berries gone by 12:00, ≥ 3 worked farms a side, armies keep growing, a Workshop and Catapults; Easy never builds siege, ≤ 2 farms; room for 6 farms around both bases on every map). `docs/units.md` covers five army units (§6 the Catapult).
+- **Results:** 279 tests. The food stall is gone: Normal vs Normal armies grow from ~28 to ~52 between 12:00 and 20:00 after the last berry. A novice still beats Easy 8/8 (Green Valley), 7/8 (Twin Rivers), 6/8 (Forest Pass), the rest unfinished at 20:00, never lost (same as before).
+- **Found while testing:** ordinary units sometimes stand on a blocked tile for a moment (a water corner, a building edge); the walk-out rule therefore only applies inside a gather building with `workInside`, otherwise it broke attacks.
+- **Screenshots:** `docs/milestones/m7b-*.png` (build menu, farm, farmer on the field, Catapult ready, model viewer).
+- **Review fixes (2026-11-09):** a Town Hall rally clicked onto an own farm now sends the farm as its target from the UI too (before, only resource nodes did); farm slots go first to workers already harvesting, so a lower-id newcomer (e.g. a queued order) can never take a working farmer's slot (test added); a chase only uses the tight re-path rule when it really aims beside a field; the AI never trains Catapults while its base is threatened. 280 tests.
+
 ### Later: Remaining content (was M6)
 - [ ] Eras and all techs.
 - [ ] Blacksmith, Siege Workshop, Castle; Catapult. (Archer, Scout Rider, Knight and the Stable are done in M6.5; the Barracks trains Archers, so there is no Archery Range.)
@@ -1481,6 +1495,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Default start for testing | The map's `scenario` (§8.1) is the default start (2026-11-07): built-up bases, gathering workers, an army each; the enemy army stands away from its base so it can be fought without base fire. `/?setup=standard` = plain start. Since M7a it is the default of the Start option in Match Setup |
 | Menus and settings | (2026-11-08, M7a) `/` opens a Main Menu; Match Setup picks map, opponent (Easy / Normal / Idle), start, pace preset and game speed; simple settings only (edge scroll, scroll speed, shadows, render quality, FPS line, machine's plan line). Pace = presets only for now (no custom sliders). Leaving a match reloads the page |
 | Placeholder art | (2026-11-08, M7a) Every entity has its own HUD icon and model (a test enforces it); `/?models` shows them all for review |
+| Farm and Catapult | (2026-11-09, M7b) Farm: 4×4, 1 farmer, infinite, 0.35 food/s (slower than berries), blocks like any building but the farmer works on the field. Catapult: trained at a new Siege Workshop. Normal uses both, Easy only a late farm |
 | AI module | (2026-11-09) The AI is a self-contained top-level module `ai/` (like a third-party module: own contract, worker protocol, settings schema, tests in `ai/tests/`, may use `zod`). It holds no configuration; the app's difficulty modes stay in `src/ai/profiles/` and are passed in `init(info, profile, seed)`. Goal: players customize their own AI for auto play later |
 
 ### Current status (updated 2026-11-09)
@@ -1494,7 +1509,8 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | M6 Play against the machine (Easy) | ✅ done (2026-11-07) |
 | M6.5 Army roster (Barracks: Militia + Archer; new Stable: Scout Rider + Knight) | ✅ done (2026-11-07); details in `docs/plans/m6.5-army-roster.md`, units in `docs/units.md` |
 | M7a Menus & match settings, art clean-up, Twin Rivers + Forest Pass | ✅ done (2026-11-08); details in `docs/plans/m7-menus-art-maps.md`, screenshots `docs/milestones/m7-*.png` |
-| AI module extraction (`ai/` at the top level, configs stay in `src/ai/profiles/`) | ✅ done (2026-11-09), waiting for review; details in `docs/plans/ai-engine-extract.md`, `ai/README.md` |
+| AI module extraction (`ai/` at the top level, configs stay in `src/ai/profiles/`) | ✅ done (2026-11-09); details in `docs/plans/ai-engine-extract.md`, `ai/README.md` |
+| M7b Farm (4×4, one farmer on the field) and Catapult (Siege Workshop) | ✅ done (2026-11-09), waiting for review; details in `docs/plans/m7b-farm-catapult.md`, screenshots `docs/milestones/m7b-*.png` |
 | **Next** | user's choice: e.g. a Farm for infinite food, a Hard mode, fog of war, custom pace sliders, sound |
 
 **How to resume:**
@@ -1506,8 +1522,8 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**Where we are (2026-11-08):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.5×–2× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json` (app config); the AI itself is the separate top-level module `ai/` (2026-11-09), which takes one profile when a match starts; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all.
+**Where we are (2026-11-09):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.5×–2× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json` (app config); the AI itself is the separate top-level module `ai/` (2026-11-09), which takes one profile when a match starts; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all. Since M7b: Farms (4×4, one farmer working on the field, food forever at 0.35/s) and the Siege Workshop with the Catapult; both AI modes farm, Normal also builds Catapults.
 
 **Army (M6.5, 2026-11-07):** the Barracks trains Militia and Archers, and the new Stable (build menu A) trains Scout Riders and Knights. Each unit's role, weakness and best situation are in `docs/units.md`; `tests/engine/balance.test.ts` proves the counter cycle. Normal picks counters to what it sees; Easy only presses the Militia button.
 
-**Next:** ask the user. The user wants players to customize their own AI for auto play (2026-11-09); the next step there is a Custom AI profile editor (see the AI module extraction notes in §12). Other open points: Farm (food is still finite, berries now 200 each); a Hard mode (the menu lists modes from `src/ai/profiles/` by itself); fog of war; custom pace sliders and AI timings scaled by pace; sound and music; illustrated How to Play. No eras (decision 2026-11-07).
+**Next:** ask the user. The user wants players to customize their own AI for auto play (2026-11-09); the next step there is a Custom AI profile editor (see the AI module extraction notes in §12). Other open points: a Hard mode (the menu lists modes from `src/ai/profiles/` by itself); fog of war; custom pace sliders and AI timings scaled by pace; sound and music; illustrated How to Play. No eras (decision 2026-11-07).

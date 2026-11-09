@@ -32,6 +32,8 @@ export const AIProfileSchema = z.object({
     /** 0 = never moves workers between resources. */
     rebalanceSeconds: num,
     plentyStock: num,
+    /** Build the first gather building (a Farm) once the food left in safe nodes drops below this. */
+    farmWhenFoodBelow: num,
   }),
   buildings: z.object({
     houseBuffer: z.number().int(),
@@ -47,6 +49,11 @@ export const AIProfileSchema = z.object({
     houseDistance: span,
     militaryDistance: span,
     towerDistance: span,
+    /** At most this many gather buildings (Farms); 0 = never builds one. */
+    maxFarms: z.number().int().min(0),
+    farmDistance: span,
+    /** No army building that trains only siege units (the Siege Workshop) before this. */
+    siegeAfterSeconds: num,
   }),
   priorities: z.object({
     defenceSoldier: z.number(),
@@ -56,6 +63,9 @@ export const AIProfileSchema = z.object({
     soldier: z.number(),
     extraProducer: z.number(),
     tower: z.number(),
+    farm: z.number(),
+    /** Siege units (Catapults), up to army.maxSiege. */
+    siege: z.number(),
   }),
   army: z.object({
     militaryQueue: z.number().int().min(0),
@@ -79,6 +89,8 @@ export const AIProfileSchema = z.object({
      * best answer of all its army buildings (0 = always trains). Keeps Stables idle against spears.
      */
     counterMinShare: chance,
+    /** Siege units (Catapults) alive or queued at a time; 0 = never trains one. */
+    maxSiege: z.number().int().min(0),
   }),
   attack: z.object({
     earliestAttackSeconds: num,

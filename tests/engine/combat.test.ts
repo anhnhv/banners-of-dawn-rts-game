@@ -343,3 +343,24 @@ describe('determinism', () => {
     expect(play()).toBe(play());
   });
 });
+
+describe("a unit's own target priority (units.json → combat.targetPriority)", () => {
+  it('a Catapult on attack-move shoots the Watch Tower, not the Militia standing next to it', () => {
+    const game = createGame(openMap(40, 30), { seed: 1 });
+    const tower = game.debugBuilding(1, 'watch_tower', 20, 15);
+    game.debugSpawn(1, 'militia', 19.5, 14.2);
+    game.debugSpawn(1, 'militia', 21.5, 14.2);
+    const c = game.debugSpawn(0, 'catapult', 12.5, 15.5);
+    send(game, 0, { type: 'attackMove', units: [c], to: { x: 30, y: 15.5 } });
+    let first: EntityId | null = null;
+    for (let t = 0; t < 10 * 20 && first === null; t++) {
+      game.step();
+      const o = game.units.get(c)?.orders[0];
+      if (o?.kind === 'attack') first = o.target;
+    }
+    expect(first).toBe(tower);
+    expect(U.catapult!.combat.targetPriority?.tower).toBeLessThan(
+      U.catapult!.combat.targetPriority!.infantry!,
+    );
+  });
+});

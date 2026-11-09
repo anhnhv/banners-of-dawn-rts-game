@@ -1,5 +1,5 @@
 {
-  "note": "Building definitions (PLAN §2.5). 'actions' drive the command grid of a finished building (what it trains, with hotkeys); costs and times of trained units come from units.json. 'panel' lists the info fields shown when selected. Which buildings the player can place is listed in game.json → buildMenu; construction takes buildTime seconds (× pace.buildSpeed) and needs no workers. 'class' is used by damage bonuses and target priority; a finished building with an 'attack' shoots enemies in range by itself (PLAN §9.5).",
+  "note": "Building definitions (PLAN §2.5). 'actions' drive the command grid of a finished building (what it trains, with hotkeys); costs and times of trained units come from units.json. 'panel' lists the info fields shown when selected. Which buildings the player can place is listed in game.json → buildMenu; construction takes buildTime seconds (× pace.buildSpeed) and needs no workers. 'class' is used by damage bonuses and target priority; a finished building with an 'attack' shoots enemies in range by itself (PLAN §9.5). A finished building with 'gather' is a resource source for its owner's workers that never runs out, with at most 'slots' workers at a time (the rate is on the unit: units.json → interactions.gather.targets); its workers step 'workInside' tiles into the footprint to work (the building still blocks everyone else).",
   "buildings": {
     "town_hall": {
       "name": "Town Hall",
@@ -75,6 +75,38 @@
       "actions": [
         { "type": "train", "unit": "scout_rider", "hotkey": "Q" },
         { "type": "train", "unit": "knight", "hotkey": "W" },
+        { "type": "setRally", "hotkey": "Z" }
+      ]
+    },
+    "farm": {
+      "name": "Farm",
+      "description": "A big field. One worker gathers food here, a little slower than at berries, but it never runs out.",
+      "model": "farm",
+      "icon": "farm",
+      "footprint": [4, 4],
+      "hp": 400,
+      "armor": 0,
+      "popProvided": 0,
+      "cost": { "wood": 60 },
+      "buildTime": 25,
+      "gather": { "resource": "food", "slots": 1, "workInside": 0.45 },
+      "panel": ["hp", "armor", "gatherers"],
+      "actions": []
+    },
+    "siege_workshop": {
+      "name": "Siege Workshop",
+      "description": "Builds Catapults.",
+      "model": "siegeWorkshop",
+      "icon": "workshop",
+      "footprint": [3, 3],
+      "hp": 1000,
+      "armor": 1,
+      "popProvided": 0,
+      "cost": { "wood": 200, "gold": 50 },
+      "buildTime": 50,
+      "panel": ["hp", "armor", "queue"],
+      "actions": [
+        { "type": "train", "unit": "catapult", "hotkey": "Q" },
         { "type": "setRally", "hotkey": "Z" }
       ]
     },

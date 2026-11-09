@@ -210,7 +210,12 @@ export class GameScreen {
           !!DATA.buildings[b.type]?.actions.some((a) => a.type === 'setRally')
         );
       },
-      isResource: (id) => !!this.lastView?.resources.has(id),
+      isResource: (id) => {
+        const v = this.lastView;
+        if (v?.resources.has(id)) return true;
+        const b = v?.buildings.find((x) => x.id === id);
+        return !!b && b.owner === options.player && b.constructed && !!DATA.buildings[b.type]?.gather;
+      },
       isEnemy: (id) => {
         const v = this.lastView;
         const owner =

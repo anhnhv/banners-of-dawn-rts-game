@@ -383,6 +383,36 @@ ICONS.catapult = [
   'knBk...knBk.',
   '.kk.....kk..',
 ];
+/** A tied wheat sheaf (the Farm): three ears on stems, a red band, the stalks spread below. */
+ICONS.farm = [
+  '.kk..kk..kk.',
+  'kYykkYykkYyk',
+  'kyykkyykkyyk',
+  'kYykkYykkYyk',
+  '.kok.kok.kok',
+  '..kokkokkok.',
+  '...koooook..',
+  '...krrrrrk..',
+  '...koooook..',
+  '..kokookok..',
+  '.kok.kk.kok.',
+  '.kk......kk.',
+];
+/** A hammer beside a spoked wheel (the Siege Workshop). */
+ICONS.workshop = [
+  '.......kkkkk',
+  '.......kXXIk',
+  '.......kkkkk',
+  '........kbk.',
+  '..kkkk..kbk.',
+  '.kbbbbk.kbk.',
+  'kbkbbkbkkbk.',
+  'kbbnnbbkkbk.',
+  'kbbnnbbkkbk.',
+  'kbkbbkbkkbk.',
+  '.kbbbbk.kbk.',
+  '..kkkk..kkk.',
+];
 
 /** The in-game menu button: three brass bars. */
 ICONS.menu = [

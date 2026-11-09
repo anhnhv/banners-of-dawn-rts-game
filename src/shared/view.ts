@@ -57,6 +57,8 @@ export interface BuildingView {
   maxHp: number;
   /** False while it is still a construction site. */
   constructed: boolean;
+  /** Workers in its gather slots (buildings with `gather`, e.g. a Farm; else 0). */
+  gatherers: number;
   /** Construction progress 0..1 (1 when finished). */
   buildProgress: number;
   queue: readonly QueueItemView[];

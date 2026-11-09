@@ -51,7 +51,8 @@ import {
   constructionSystem,
   inBuildMenu,
 } from './systems/construction';
-import { describeTask, orderSystem } from './systems/orders';
+import { gatherSlotSystem, hasFreeSlot, sourceFor } from './systems/gatherSources';
+import { describeTask, findSource, orderSystem } from './systems/orders';
 import { victorySystem } from './systems/victory';
 import { canTrain, populationOf, productionSystem, shortOf, trainTicks } from './systems/production';
 
@@ -205,6 +206,7 @@ export class Game {
     productionSystem(s, (owner, type, x, y) => this.addUnit(owner, type, x, y));
     targetingSystem(s);
     combatSystem(s, (b, attack) => bestTarget(s, b, attack, attack.range));
+    gatherSlotSystem(s);
     orderSystem(s);
     pathfindingSystem(s);
     movementSystem(s);
@@ -261,6 +263,7 @@ export class Game {
         queue: b.queue.map((q) => ({ unit: q.unit, progress: q.total > 0 ? q.progress / q.total : 1 })),
         popBlocked: b.popBlocked,
         rally: b.rally ? { ...b.rally } : null,
+        gatherers: b.gatherers.length,
       });
     }
     const projectiles: ProjectileView[] = [];
@@ -339,6 +342,7 @@ export class Game {
         constructed: b.constructed,
         queue: b.queue.map((q) => q.unit),
         rally: b.rally ? { x: b.rally.x, y: b.rally.y } : null,
+        gatherers: b.gatherers.length,
       });
     }
     const nodes: ObservedNode[] = [];
@@ -432,6 +436,7 @@ export class Game {
     for (const b of this.state.buildings.values()) {
       mix(b.id);
       mix(b.hp);
+      for (const g of b.gatherers) mix(g);
     }
     for (const p of this.state.projectiles.values()) {
       mix(p.x);
@@ -477,6 +482,7 @@ export class Game {
         const enemy = combatant(s, cmd.target);
         const movers: Unit[] = [];
         for (const u of units) {
+          const src = sourceFor(s, cmd.target, u);
           // right-click on an enemy attacks it if units.json → interactions.attack.targets allows
           const kinds = DATA.units[u.type]?.interactions.attack?.targets ?? [];
           if (
@@ -490,19 +496,26 @@ export class Game {
               { kind: 'attack', target: enemy.id, auto: false, homeX: u.x, homeY: u.y },
               cmd.queue ?? false,
             );
-          } else if (node && gatherRate(u.type, node.kind) > 0) {
-            this.giveOrder(
-              u,
-              {
-                kind: 'gather',
-                target: node.id,
-                resource: node.resource,
-                phase: 'toNode',
-                lastX: node.x,
-                lastY: node.y,
-              },
-              cmd.queue ?? false,
-            );
+          } else if (src) {
+            // a node, or an own gather building (a farm); a full farm sends the worker to a free one
+            const free = !src.building || hasFreeSlot(s, src.building, u);
+            const pick = free
+              ? src
+              : findSource(s, u, src.resource, src.x + src.w / 2, src.y + src.h / 2, src.id);
+            if (pick)
+              this.giveOrder(
+                u,
+                {
+                  kind: 'gather',
+                  target: pick.id,
+                  resource: pick.resource,
+                  phase: 'toNode',
+                  lastX: pick.x,
+                  lastY: pick.y,
+                },
+                cmd.queue ?? false,
+              );
+            else movers.push(u);
           } else {
             movers.push(u);
           }
@@ -702,6 +715,7 @@ export class Game {
       cooldown: 0,
       target: null,
       strikeTick: -1,
+      gatherers: [],
     };
     this.state.buildings.set(b.id, b);
     if (block) this.state.grid.block(b.x, b.y, b.w, b.h);

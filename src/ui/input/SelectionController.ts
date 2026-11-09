@@ -34,7 +34,7 @@ export interface SelectionOptions {
   pickOther: (clientX: number, clientY: number) => EntityId | null;
   /** True if `id` is an own building that has a setRally action. */
   canRally: (id: EntityId) => boolean;
-  /** True if `id` is a resource node. */
+  /** True if `id` can be gathered from: a resource node, or an own finished gather building (a Farm). */
   isResource: (id: EntityId) => boolean;
   /** True if `id` is an enemy unit or building. */
   isEnemy: (id: EntityId) => boolean;

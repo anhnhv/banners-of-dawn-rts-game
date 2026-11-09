@@ -13,6 +13,7 @@ const SECTIONS: Array<[string, string[]]> = [
     'Economy',
     [
       'Workers gather food (berry bushes), wood (trees) and gold (gold mines): select them and right click a resource.',
+      'Farms (build menu S) give food forever to one worker each, a little slower than berries: build them when the berries run low.',
       'What they gather goes straight to your stockpile. No carrying, no drop-off.',
       'The Town Hall trains more workers. Houses raise your population limit.',
     ],
@@ -21,13 +22,13 @@ const SECTIONS: Array<[string, string[]]> = [
     'Building',
     [
       'Press B (or the hammer button), pick a building, then click the map. It builds itself: no workers needed.',
-      'Barracks: Militia and Archers. Stable: Scout Riders and Knights. Watch Tower: shoots nearby enemies.',
+      'Barracks: Militia and Archers. Stable: Scout Riders and Knights. Siege Workshop: Catapults. Watch Tower: shoots nearby enemies.',
     ],
   ],
   [
     'Army',
     [
-      'Militia beat cavalry, Archers beat Militia from range, Knights run Archers down, Scout Riders are fast raiders.',
+      'Militia beat cavalry, Archers beat Militia from range, Knights run Archers down, Scout Riders are fast raiders. Catapults break towers and bases from out of their range but need an escort.',
       'Right click an enemy to attack it. Attack-move (Q) fights everything on the way.',
       'Hold ground (E) keeps units in place; Aggressive (R) lets them chase.',
     ],

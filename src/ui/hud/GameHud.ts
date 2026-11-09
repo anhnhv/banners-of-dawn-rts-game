@@ -692,7 +692,7 @@ function fieldText(f: PanelField, e: UnitView | BuildingView | ResourceView, vie
         // best rate per resource type, from interactions.gather.targets
         const best = new Map<string, number>();
         for (const [kind, rate] of Object.entries(def?.interactions.gather?.targets ?? {})) {
-          const r = DATA.nodes[kind]?.resource;
+          const r = DATA.nodes[kind]?.resource ?? DATA.buildings[kind]?.gather?.resource;
           if (r) best.set(r, Math.max(best.get(r) ?? 0, rate));
         }
         return [...best].map(([r, rate]) => `${r} ${rate}/s`).join(' · ');
@@ -715,6 +715,8 @@ function fieldText(f: PanelField, e: UnitView | BuildingView | ResourceView, vie
       return attackText(def?.attack);
     case 'pop':
       return `Population ${view.self.pop}/${view.self.popCap} (+${def?.popProvided ?? 0} here)`;
+    case 'gatherers':
+      return def?.gather ? `Workers ${e.gatherers}/${def.gather.slots}` : '';
     default:
       return '';
   }
@@ -736,7 +738,7 @@ function signature(view: PlayerView, sel: Selected): string {
         : 1,
     )
     .join('');
-  return `b:${b.id}:${b.queue.map((q) => q.unit).join(',')}:${b.popBlocked}:${afford}`;
+  return `b:${b.id}:${b.queue.map((q) => q.unit).join(',')}:${b.popBlocked}:${afford}:${b.gatherers}`;
 }
 
 /** Which build-menu entries are affordable (changes → the menu is rebuilt). */
