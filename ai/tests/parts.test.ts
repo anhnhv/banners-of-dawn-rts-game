@@ -1,12 +1,12 @@
 /** Unit tests for the machine player's parts: placement and budget. */
 import { describe, expect, it } from 'vitest';
-import { allocate, type Request } from '../../src/ai/Budget';
-import { TileMap } from '../../src/ai/TileMap';
-import { bestCounter } from '../../src/ai/counters';
-import { PROFILES } from '../../src/ai/profiles';
+import { allocate, type Request } from '../Budget';
+import { TileMap } from '../TileMap';
+import { bestCounter } from '../counters';
+import { PROFILES } from '../../src/ai';
 import { createGame, GAME_DATA } from '../../src/engine';
 import type { Command, ObservedUnit } from '../../src/shared';
-import { openMap } from '../engine/helpers';
+import { openMap } from '../../tests/engine/helpers';
 
 function req(label: string, priority: number, cost: Request['cost']): Request {
   return { label, priority, cost, commit: (): Command[] => [{ type: 'stop', units: [] }] };
@@ -79,7 +79,7 @@ describe('TileMap placement', () => {
   });
 });
 
-describe('counter pick (src/ai/counters.ts)', () => {
+describe('counter pick (ai/counters.ts)', () => {
   const army = (type: string, n: number): ObservedUnit[] =>
     Array.from({ length: n }, (_, i) => ({
       id: i + 1,

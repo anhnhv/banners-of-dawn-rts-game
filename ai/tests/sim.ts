@@ -1,16 +1,11 @@
 /** Headless match helpers for AI tests: real engine + inline machine players. */
-import { readFileSync } from 'node:fs';
 import { createGame, type Game } from '../../src/engine';
 import { InlineAIController } from '../../src/host/aiController';
-import type { AIMode } from '../../src/ai';
+import { PROFILES, type AIMode } from '../../src/ai';
 import { decodeMap, TICK_RATE, type MapFile, type PlayerId } from '../../src/shared';
+import { GREEN_VALLEY, mapFile } from '../../tests/engine/helpers';
 
-/** A shipped map file from maps/. */
-export function mapFile(id: string): MapFile {
-  return JSON.parse(readFileSync(new URL(`../../maps/${id}.json`, import.meta.url), 'utf8')) as MapFile;
-}
-
-export const GREEN_VALLEY = mapFile('green_valley');
+export { GREEN_VALLEY, mapFile };
 
 export interface Match {
   game: Game;
@@ -38,7 +33,9 @@ export function match(opts: {
   });
   const modeOf = (p: PlayerId): AIMode =>
     (typeof opts.mode === 'string' ? opts.mode : opts.mode?.[p]) ?? 'easy';
-  const ais = opts.ai.map((p) => new InlineAIController(game, p, modeOf(p), undefined, opts.seed ?? 5));
+  const ais = opts.ai.map(
+    (p) => new InlineAIController(game, p, PROFILES[modeOf(p)], undefined, opts.seed ?? 5),
+  );
   const trained = new Map<PlayerId, Record<string, number>>();
   return {
     game,

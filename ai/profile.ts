@@ -1,7 +1,8 @@
 /**
- * Machine-player mode profiles (docs/ai-modes.md): every tunable number of one difficulty mode.
- * The files live in src/ai/profiles/<mode>.json; this schema checks them when the AI starts and in
- * tests. Times are seconds, distances tiles, chances 0..1, priorities: higher is bought first.
+ * The machine player's settings (a "profile"): every tunable number it plays with.
+ * The AI module owns this schema; the app owns the values (e.g. its difficulty modes in
+ * src/ai/profiles/<mode>.json, explained in docs/ai-modes.md) and passes one checked profile to
+ * AIPlayer.init(). Times are seconds, distances tiles, chances 0..1, priorities: higher is bought first.
  */
 import { z } from 'zod';
 
@@ -124,4 +125,12 @@ export function parseAIProfile(raw: unknown, id: string): AIProfile {
   if (r.data.economy.minWorkers > r.data.economy.workerTarget)
     throw new Error(`AI profile "${id}": economy.minWorkers is above economy.workerTarget`);
   return r.data;
+}
+
+/** Think interval and reaction delay of a profile, in ticks (both at least 1). */
+export function aiTicks(profile: AIProfile, tickRate: number): { think: number; delay: number } {
+  return {
+    think: Math.max(1, Math.round(profile.tempo.thinkSeconds * tickRate)),
+    delay: Math.max(1, Math.round(profile.tempo.reactionSeconds * tickRate)),
+  };
 }

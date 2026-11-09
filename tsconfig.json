@@ -1,11 +1,11 @@
 {
-  // Root project: entry point, tests, tools and config files.
-  // Each module under src/ has its own tsconfig.json with its own `lib`
+  // Root project: entry point, tests (tests/ and ai/tests/), tools and config files.
+  // Each module (src/*, ai/) has its own tsconfig.json with its own `lib`
   // (engine/shared/ai get NO DOM types). `npm run typecheck` checks all of them.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node", "vite/client"]
   },
-  "include": ["src/main.ts", "tests/**/*.ts", "tools/**/*.ts", "vite.config.ts"]
+  "include": ["src/main.ts", "tests/**/*.ts", "ai/tests/**/*.ts", "tools/**/*.ts", "vite.config.ts"]
 }

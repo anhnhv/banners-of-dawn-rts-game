@@ -1,9 +1,9 @@
 /**
  * The machine player's modes. Each mode is one JSON file in this folder with every tunable number
- * (schema: src/shared/aiProfile.ts, explained in docs/ai-modes.md). To add a mode, add a file and
- * list it here.
+ * (schema: ai/profile.ts, explained in docs/ai-modes.md). To add a mode, add a file and list it
+ * here.
  */
-import { parseAIProfile, type AIProfile } from '../../shared';
+import { parseAIProfile, type AIProfile } from '../../../ai';
 import easy from './easy.json';
 import normal from './normal.json';
 

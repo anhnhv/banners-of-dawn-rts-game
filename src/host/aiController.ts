@@ -4,10 +4,18 @@
  *  - WorkerAIController runs it in a Web Worker (the browser default), so thinking never stalls
  *    the frame. Its commands are applied at the tick they were meant for, or at once if they
  *    arrive late; the host logs them like the human's.
+ * Both take the profile (settings) the AI plays with, e.g. a difficulty mode from src/ai/profiles.
  */
-import { createAIPlayer, DEFAULT_AI_MODE, type AIMode, type AIPlayer } from '../ai';
+import {
+  aiTicks,
+  createAIPlayer,
+  type AIPlayer,
+  type AIProfile,
+  type FromAIMessage,
+  type ToAIMessage,
+} from '../../ai';
 import type { Game } from '../engine';
-import type { Command, CommandEnvelope, FromAIMessage, GameEvent, PlayerId, ToAIMessage } from '../shared';
+import type { Command, CommandEnvelope, GameEvent, PlayerId } from '../shared';
 
 export interface AIController {
   readonly player: PlayerId;
@@ -32,11 +40,11 @@ export class InlineAIController implements AIController {
   constructor(
     private readonly game: Game,
     readonly player: PlayerId,
-    mode: AIMode = DEFAULT_AI_MODE,
+    profile: AIProfile,
     private readonly sink: Sink = (env) => game.enqueue(env),
     seed = 1,
   ) {
-    this.ai.init(game.staticInfo(player), mode, seed);
+    this.ai.init(game.staticInfo(player), profile, seed);
   }
 
   afterStep(events: readonly GameEvent[]): void {
@@ -62,27 +70,25 @@ export class WorkerAIController implements AIController {
   private next = 0;
   private waiting = false;
   private text = 'Machine player starting…';
-  /** Think interval in ticks (same profile as the worker's). */
+  /** Think interval in ticks (from the same profile the worker plays with). */
   private readonly thinkTicks: number;
 
   constructor(
     private readonly game: Game,
     readonly player: PlayerId,
-    mode: AIMode = DEFAULT_AI_MODE,
+    profile: AIProfile,
     private readonly sink: Sink = (env) => game.enqueue(env),
     seed = 1,
   ) {
-    const probe = createAIPlayer();
     const info = game.staticInfo(player);
-    probe.init(info, mode, seed);
-    this.thinkTicks = probe.thinkTicks;
-    this.worker = new Worker(new URL('../ai/worker.ts', import.meta.url), { type: 'module' });
+    this.thinkTicks = aiTicks(profile, info.tickRate).think;
+    this.worker = new Worker(new URL('../../ai/worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<FromAIMessage>) => this.receive(e.data);
     this.worker.onerror = (e) => {
       this.text = `Machine player crashed: ${e.message}`;
       console.error(e);
     };
-    this.post({ type: 'init', info, mode, seed });
+    this.post({ type: 'init', info, profile, seed });
   }
 
   afterStep(events: readonly GameEvent[]): void {

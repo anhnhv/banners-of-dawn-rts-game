@@ -1,4 +1,12 @@
-import type { DecodedMap, MapObject, TerrainType } from '../../src/shared';
+import { readFileSync } from 'node:fs';
+import type { DecodedMap, MapFile, MapObject, TerrainType } from '../../src/shared';
+
+/** A shipped map file from maps/. */
+export function mapFile(id: string): MapFile {
+  return JSON.parse(readFileSync(new URL(`../../maps/${id}.json`, import.meta.url), 'utf8')) as MapFile;
+}
+
+export const GREEN_VALLEY = mapFile('green_valley');
 
 const CHARS: Record<string, TerrainType> = {
   '.': 'grass',

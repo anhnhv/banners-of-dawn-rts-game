@@ -12,8 +12,8 @@ import type {
   ResourceType,
   StaticMapInfo,
   UnitTypeId,
-} from '../shared';
-import type { AIProfile } from '../shared';
+} from '../src/shared';
+import type { AIProfile } from './profile';
 
 export interface Point {
   x: number;

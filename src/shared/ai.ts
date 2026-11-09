@@ -1,9 +1,11 @@
 /**
- * Contracts between the host and the machine player (PLAN §6, docs/plans/m6-vs-machine.md).
+ * What the game shows any machine player (PLAN §6, docs/plans/m6-vs-machine.md): the static map
+ * info at the start and an Observation each time it thinks. The game engine builds these
+ * (Game.staticInfo / Game.observe); the AI module (top-level ai/) reads them and owns everything
+ * else about itself (its contract, worker messages and settings schema).
  * Everything here is plain data (arrays and objects only) so it can be posted to a Web Worker.
  * Decision 2026-11-07: there is no fog of war, so the observation contains every entity.
  */
-import type { Command } from './commands';
 import type { GameData, ResourceAmounts, ResourceType, Stance } from './gameData';
 import type { EntityId, PlayerId } from './ids';
 import type { BuildingTypeId, GameEvent, NodeKind, UnitTypeId } from './view';
@@ -84,13 +86,3 @@ export interface Observation {
   events: GameEvent[];
   over: boolean;
 }
-
-/** Messages to the AI worker. */
-export type ToAIMessage =
-  | { type: 'init'; info: StaticMapInfo; mode: string; seed: number }
-  | { type: 'observe'; obs: Observation }
-  | { type: 'dispose' };
-
-/** Messages from the AI worker. */
-export type FromAIMessage =
-  { type: 'commands'; forTick: number; commands: Command[] } | { type: 'debug'; text: string };

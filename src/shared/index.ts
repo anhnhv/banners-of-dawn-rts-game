@@ -12,6 +12,5 @@ export * from './commands';
 export * from './view';
 export * from './gameData';
 export * from './ai';
-export * from './aiProfile';
 export * from './rules';
 export * from './setup';

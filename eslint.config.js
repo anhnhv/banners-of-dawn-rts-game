@@ -4,6 +4,7 @@
 //   - which module may import which (eslint-plugin-boundaries)
 //   - no network APIs in the engine / machine player (PLAN §6.2: no external AI, no network)
 //   - no DOM in engine / shared / AI
+//   - the AI module (top-level ai/) holds no configuration: no JSON imports, settings come via init()
 //   - no non-deterministic APIs in the engine (PLAN §5.1)
 // tests/lint/architecture.test.ts proves that violations are actually reported.
 
@@ -60,17 +61,21 @@ const determinismGlobals = [
 const determinismProperties = [{ object: 'Math', property: 'random', message: DETERMINISM_MSG }];
 
 // ---- Module boundaries ------------------------------------------------------------------------
+// The first matching element wins, so ai/tests/** (tests) is listed before ai/** (the AI module).
 const elements = [
+  { type: 'tests', pattern: ['tests/**', 'ai/tests/**'], partialMatch: false },
   { type: 'shared', pattern: 'src/shared/**', partialMatch: false },
   { type: 'engine', pattern: 'src/engine/**', partialMatch: false },
-  { type: 'ai', pattern: 'src/ai/**', partialMatch: false },
+  // The machine player: a self-contained module at the top level, like a third-party module.
+  { type: 'ai', pattern: 'ai/**', partialMatch: false },
+  // The app's AI settings (difficulty modes): configuration only, no algorithm.
+  { type: 'aiConfig', pattern: 'src/ai/**', partialMatch: false },
   { type: 'ui', pattern: 'src/ui/**', partialMatch: false },
   { type: 'host', pattern: 'src/host/**', partialMatch: false },
   { type: 'data', pattern: 'src/data/**', partialMatch: false },
   // src/main.ts (the 5-line browser entry that wires ui + host) is deliberately not an element.
   { type: 'maps', pattern: 'maps/**', partialMatch: false },
   { type: 'tools', pattern: 'tools/**', partialMatch: false },
-  { type: 'tests', pattern: 'tests/**', partialMatch: false },
 ];
 
 const allow = (from, to, message) => ({
@@ -83,10 +88,11 @@ const dependencyPolicies = [
   allow('shared', ['shared']),
   allow('engine', ['shared', 'engine', 'data']),
   allow('ai', ['shared', 'ai']),
+  allow('aiConfig', ['shared', 'ai', 'aiConfig']),
   allow('ui', ['shared', 'ui', 'data']),
-  allow('host', ['shared', 'engine', 'ai', 'ui', 'host', 'data']),
-  allow('tools', ['shared', 'engine', 'ai', 'ui', 'host', 'data', 'maps', 'tools']),
-  allow('tests', ['shared', 'engine', 'ai', 'ui', 'host', 'data', 'maps', 'tools', 'tests']),
+  allow('host', ['shared', 'engine', 'ai', 'aiConfig', 'ui', 'host', 'data']),
+  allow('tools', ['shared', 'engine', 'ai', 'aiConfig', 'ui', 'host', 'data', 'maps', 'tools']),
+  allow('tests', ['shared', 'engine', 'ai', 'aiConfig', 'ui', 'host', 'data', 'maps', 'tools', 'tests']),
 ];
 
 export default tseslint.config(
@@ -113,7 +119,7 @@ export default tseslint.config(
 
   // ---- Architecture: who may import whom -----------------------------------------------------------
   {
-    files: ['src/**/*.ts', 'tools/**/*.ts', 'tests/**/*.ts'],
+    files: ['src/**/*.ts', 'ai/**/*.ts', 'tools/**/*.ts', 'tests/**/*.ts'],
     plugins: { boundaries },
     settings: {
       'import/resolver': {
@@ -141,18 +147,25 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
-    files: ['src/ai/**/*.ts'],
+    files: ['ai/**/*.ts'],
+    ignores: ['ai/tests/**'],
     languageOptions: { globals: { ...globals.worker } },
   },
   {
-    files: ['tools/**/*.{ts,mjs,js}', 'tests/**/*.ts', '*.config.{ts,js}', 'eslint.config.js'],
+    files: [
+      'tools/**/*.{ts,mjs,js}',
+      'tests/**/*.ts',
+      'ai/tests/**/*.ts',
+      '*.config.{ts,js}',
+      'eslint.config.js',
+    ],
     languageOptions: { globals: { ...globals.node } },
     rules: { 'no-console': 'off' },
   },
 
-  // ---- Shared: pure, no DOM, no network --------------------------------------------------------------
+  // ---- Shared and the app's AI settings: pure, no DOM, no network ----------------------------------
   {
-    files: ['src/shared/**/*.ts'],
+    files: ['src/shared/**/*.ts', 'src/ai/**/*.ts'],
     rules: {
       'no-restricted-globals': ['error', ...networkGlobals, ...domGlobals],
       'no-restricted-properties': ['error', ...networkProperties],
@@ -168,9 +181,10 @@ export default tseslint.config(
     },
   },
 
-  // ---- Machine player: local only (PLAN §6.2) -------------------------------------------------------
+  // ---- Machine player (ai/): local only (PLAN §6.2), no configuration of its own -----------------------
   {
-    files: ['src/ai/**/*.ts'],
+    files: ['ai/**/*.ts'],
+    ignores: ['ai/tests/**'],
     rules: {
       'no-restricted-globals': ['error', ...networkGlobals, ...domGlobals],
       'no-restricted-properties': ['error', ...networkProperties, ...determinismProperties],
@@ -179,9 +193,15 @@ export default tseslint.config(
         {
           patterns: [
             {
-              regex: '^(?!\\.{1,2}/)',
+              // zod (pure local validation of its settings schema) is the one package allowed.
+              regex: '^(?!\\.{1,2}/|zod$)',
               message:
-                'The machine player may not import packages. Use only src/shared and src/ai code (PLAN §6.2).',
+                'The machine player may not import packages (only zod). Use only src/shared and ai/ code (PLAN §6.2).',
+            },
+            {
+              regex: '\\.json($|\\?)',
+              message:
+                'The machine player holds no configuration: settings come in through AIPlayer.init(info, profile).',
             },
           ],
         },

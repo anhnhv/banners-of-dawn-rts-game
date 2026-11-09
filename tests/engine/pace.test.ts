@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import paceJson from '../../src/data/pace.json';
 import { createGame, GAME_DATA, type Game } from '../../src/engine';
 import { decodeMap, parsePaceFile, rulesForPace, type MatchRules } from '../../src/shared';
-import { GREEN_VALLEY } from '../ai/sim';
+import { GREEN_VALLEY } from './helpers';
 import { node, openMap } from './helpers';
 
 const PACE = parsePaceFile(paceJson);

@@ -12,13 +12,13 @@ Opponent → Idle (or `/?ai=off`) gives an opponent that does nothing. Match Set
 **Each mode is one config file**: `src/ai/profiles/easy.json` and `src/ai/profiles/normal.json`.
 
 - Every number that shapes how a mode plays is in its file. The code is the same for all modes.
-- The files are checked when the game starts (schema in `src/shared/aiProfile.ts`). A typo or an out-of-range value stops the game with a clear message.
+- The files are checked when the game starts (schema in `ai/profile.ts`). A typo or an out-of-range value stops the game with a clear message.
 - **To add a mode**, copy a file, change the numbers, and list it in `src/ai/profiles/index.ts`.
 - A test fails if a setting is missing from the configuration table (Part 2).
 
 Related files:
 
-- the code is in `src/ai/`;
+- the code is the separate AI module in `ai/` (see `ai/README.md`); it has no modes of its own, the app gives it one of these files when a match starts;
 - how the AI was built (engine, host, tests) is in `docs/plans/m6-vs-machine.md`.
 
 ---
@@ -92,7 +92,7 @@ Each think it lists what it wants. Each item has a priority from `priorities.*`.
 | `random`  | Any button, at random (seeded, so the same game plays the same way)                                                                                          |
 | `counter` | The best answer to the soldiers of yours it sees, for `army.counterShare` of the picks; `fewest` for the rest. With none of your soldiers in sight, `fewest` |
 
-**The counter pick** (`src/ai/counters.ts`) uses only the game data and the engine's damage formula (`docs/units.md` §4). For each soldier type it could train, against your soldiers weighted by their cost:
+**The counter pick** (`ai/counters.ts`) uses only the game data and the engine's damage formula (`docs/units.md` §4). For each soldier type it could train, against your soldiers weighted by their cost:
 
 - **kill** = how much of your army's value it destroys per second;
 - **hurt** = how much damage it takes per second, per resource of your army;

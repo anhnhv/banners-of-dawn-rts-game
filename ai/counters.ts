@@ -11,7 +11,7 @@
  * more bodies, and both its damage and its staying power grow with the count. A ranged unit
  * shooting at melee units gets free hits while they walk in, which `rangedEdge` stands for.
  */
-import type { GameData, ObservedUnit, UnitTypeId } from '../shared';
+import type { GameData, ObservedUnit, UnitTypeId } from '../src/shared';
 
 export function unitValue(data: GameData, type: UnitTypeId): number {
   return Object.values(data.units[type]?.cost ?? {}).reduce((a, b) => a + (b ?? 0), 0);

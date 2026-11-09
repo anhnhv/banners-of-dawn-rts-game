@@ -3,7 +3,7 @@
  * building and resource node in the latest observation, plus spots it has just asked for.
  * A spot needs a free 1-tile walkable ring around the footprint, so the AI never walls itself in.
  */
-import type { Observation, StaticMapInfo } from '../shared';
+import type { Observation, StaticMapInfo } from '../src/shared';
 import type { Point } from './situation';
 
 export type Side = 'front' | 'back' | 'any';

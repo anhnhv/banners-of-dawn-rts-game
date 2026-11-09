@@ -111,7 +111,7 @@ describe('Normal: a careful player', () => {
 
   it('defends its base when attacked', () => {
     const game = createGame(decodeMap(GREEN_VALLEY), { seed: 2, testArmy: 14 });
-    const ai = new InlineAIController(game, 1, 'normal');
+    const ai = new InlineAIController(game, 1, PROFILES.normal);
     const step = (seconds: number, each?: () => void): void => {
       for (let i = 0; i < seconds * TICK_RATE && !game.result; i++) {
         ai.afterStep(game.step());

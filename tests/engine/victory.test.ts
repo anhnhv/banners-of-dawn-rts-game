@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, GAME_DATA, type Game } from '../../src/engine';
 import { decodeMap, type GameEvent } from '../../src/shared';
-import { GREEN_VALLEY } from '../ai/sim';
+import { GREEN_VALLEY } from './helpers';
 import { openMap } from './helpers';
 
 function townHall(game: Game, owner: 0 | 1): { hp: number; id: number } {

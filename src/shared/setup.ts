@@ -5,7 +5,7 @@
 export interface MatchSetup {
   /** Map id from maps/index.json. */
   map: string;
-  /** Machine player mode id (src/ai/profiles), or 'off' for an idle opponent. */
+  /** Machine player mode id (src/ai/profiles, the app's AI settings), or 'off' for an idle opponent. */
   opponent: string;
   /** 'scenario' = the map's ready-made battle (if it has one), 'standard' = Town Hall + start units. */
   start: 'scenario' | 'standard';

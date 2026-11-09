@@ -84,7 +84,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 800,
   },
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'ai/tests/**/*.test.ts'],
     environment: 'node',
     testTimeout: 30_000,
   },

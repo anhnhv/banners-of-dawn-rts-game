@@ -25,20 +25,22 @@ beforeAll(async () => {
 
 const BOUNDARY = 'boundaries/dependencies';
 
-describe('machine player (src/ai) isolation', () => {
-  const file = 'src/ai/__probe__.ts';
+describe('machine player (ai/) isolation', () => {
+  const file = 'ai/__probe__.ts';
 
-  it('may import shared', async () => {
+  it('may import shared and zod', async () => {
     expect(
-      await ruleIds(file, "import { TICK_RATE } from '../shared';\nexport const t = TICK_RATE;\n"),
+      await ruleIds(file, "import { TICK_RATE } from '../src/shared';\nexport const t = TICK_RATE;\n"),
     ).toEqual([]);
+    expect(await ruleIds(file, "import { z } from 'zod';\nexport const s = z.string();\n")).toEqual([]);
   });
 
   it.each([
-    ['engine', "import { ENGINE_INFO } from '../engine';\nexport const x = ENGINE_INFO;\n"],
-    ['ui', "import { createMapView } from '../ui';\nexport const x = createMapView;\n"],
-    ['host', "import { FixedStepClock } from '../host';\nexport const x = FixedStepClock;\n"],
-    ['data', "import palette from '../data/palette.json';\nexport const x = palette;\n"],
+    ['engine', "import { ENGINE_INFO } from '../src/engine';\nexport const x = ENGINE_INFO;\n"],
+    ['ui', "import { createMapView } from '../src/ui';\nexport const x = createMapView;\n"],
+    ['host', "import { FixedStepClock } from '../src/host';\nexport const x = FixedStepClock;\n"],
+    ['data', "import palette from '../src/data/palette.json';\nexport const x = palette;\n"],
+    ["the app's AI settings", "import { PROFILES } from '../src/ai';\nexport const x = PROFILES;\n"],
   ])('may NOT import %s', async (_name, code) => {
     expect(await ruleIds(file, code)).toContain(BOUNDARY);
   });
@@ -60,8 +62,18 @@ describe('machine player (src/ai) isolation', () => {
     expect(await ruleIds(file, code)).toContain(rule);
   });
 
-  it('may NOT import npm packages', async () => {
-    expect(await ruleIds(file, "import { z } from 'zod';\nexport const s = z.string();\n")).toContain(
+  it.each([
+    ['three', "import * as THREE from 'three';\nexport const x = THREE;\n"],
+    ['openai', "import OpenAI from 'openai';\nexport const x = OpenAI;\n"],
+  ])('may NOT import any other npm package: %s', async (_name, code) => {
+    expect(await ruleIds(file, code)).toContain('no-restricted-imports');
+  });
+
+  it('may NOT import a JSON file, even its own (it holds no configuration)', async () => {
+    expect(await ruleIds(file, "import cfg from './hard.json';\nexport const x = cfg;\n")).toContain(
+      'no-restricted-imports',
+    );
+    expect(await ruleIds(file, "import cfg from './hard.json?raw';\nexport const x = cfg;\n")).toContain(
       'no-restricted-imports',
     );
   });
@@ -69,6 +81,30 @@ describe('machine player (src/ai) isolation', () => {
   it('may NOT use the DOM or Math.random', async () => {
     expect(await ruleIds(file, 'export const t = document.title;\n')).toContain('no-restricted-globals');
     expect(await ruleIds(file, 'export const r = Math.random();\n')).toContain('no-restricted-properties');
+  });
+
+  it('its tests (ai/tests) may use Node and the whole game', async () => {
+    const code =
+      "import { readFileSync } from 'node:fs';\nimport { createGame } from '../../src/engine';\nimport { PROFILES } from '../../src/ai';\nexport const x = [readFileSync, createGame, PROFILES];\n";
+    expect(await ruleIds('ai/tests/__probe__.ts', code)).toEqual([]);
+  });
+});
+
+describe("the app's AI settings (src/ai)", () => {
+  const file = 'src/ai/__probe__.ts';
+
+  it('may import shared and the AI module (its settings schema)', async () => {
+    const code =
+      "import { TICK_RATE } from '../shared';\nimport { parseAIProfile } from '../../ai';\nexport const x = [TICK_RATE, parseAIProfile];\n";
+    expect(await ruleIds(file, code)).toEqual([]);
+  });
+
+  it.each([
+    ['engine', "import { ENGINE_INFO } from '../engine';\nexport const x = ENGINE_INFO;\n"],
+    ['ui', "import { createMapView } from '../ui';\nexport const x = createMapView;\n"],
+    ['host', "import { FixedStepClock } from '../host';\nexport const x = FixedStepClock;\n"],
+  ])('may NOT import %s', async (_name, code) => {
+    expect(await ruleIds(file, code)).toContain(BOUNDARY);
   });
 });
 
@@ -86,7 +122,7 @@ describe('engine (src/engine) purity', () => {
 
   it.each([
     ['ui', "import { createMapView } from '../ui';\nexport const x = createMapView;\n"],
-    ['ai', "import { AI_INFO } from '../ai';\nexport const x = AI_INFO;\n"],
+    ['ai', "import { AI_INFO } from '../../ai';\nexport const x = AI_INFO;\n"],
     ['host', "import { FixedStepClock } from '../host';\nexport const x = FixedStepClock;\n"],
   ])('may NOT import %s', async (_name, code) => {
     expect(await ruleIds(file, code)).toContain(BOUNDARY);
@@ -110,7 +146,10 @@ describe('UI, shared and host boundaries', () => {
     expect(
       await ruleIds(file, "import { ENGINE_INFO } from '../engine';\nexport const x = ENGINE_INFO;\n"),
     ).toContain(BOUNDARY);
-    expect(await ruleIds(file, "import { AI_INFO } from '../ai';\nexport const x = AI_INFO;\n")).toContain(
+    expect(await ruleIds(file, "import { AI_INFO } from '../../ai';\nexport const x = AI_INFO;\n")).toContain(
+      BOUNDARY,
+    );
+    expect(await ruleIds(file, "import { PROFILES } from '../ai';\nexport const x = PROFILES;\n")).toContain(
       BOUNDARY,
     );
   });
@@ -122,10 +161,10 @@ describe('UI, shared and host boundaries', () => {
     ).toContain(BOUNDARY);
   });
 
-  it('host may wire engine, AI and UI together', async () => {
+  it('host may wire engine, AI, AI settings and UI together', async () => {
     const file = 'src/host/__probe__.ts';
     const code =
-      "import { ENGINE_INFO } from '../engine';\nimport { AI_INFO } from '../ai';\nimport { createMapView } from '../ui';\nexport const x = [ENGINE_INFO, AI_INFO, createMapView];\n";
+      "import { ENGINE_INFO } from '../engine';\nimport { AI_INFO } from '../../ai';\nimport { PROFILES } from '../ai';\nimport { createMapView } from '../ui';\nexport const x = [ENGINE_INFO, AI_INFO, PROFILES, createMapView];\n";
     expect(await ruleIds(file, code)).toEqual([]);
   });
 });

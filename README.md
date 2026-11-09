@@ -95,16 +95,17 @@ The URL shortcuts above work locally too, e.g. `http://localhost:5173/?play`. Ev
 
 ## Module layout
 
-| Folder        | Module                                              | May import                   |
-| ------------- | --------------------------------------------------- | ---------------------------- |
-| `src/shared/` | Contracts shared by everyone                        | nothing                      |
-| `src/engine/` | Deterministic simulation on a square grid           | shared, data                 |
-| `src/ai/`     | Machine player (local, rule-based, in a Web Worker) | shared                       |
-| `src/ui/`     | 3D voxel rendering (three.js), HUD, input, audio    | shared, data                 |
-| `src/host/`   | Glue: game loop, wiring engine + UI + AI            | shared, engine, ai, ui, data |
-| `src/data/`   | Balance data (JSON)                                 | —                            |
-| `maps/`       | Map files (JSON)                                    | —                            |
-| `assets/`     | Audio presets / music data                          | —                            |
+| Folder        | Module                                                                                                                 | May import                           |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `src/shared/` | Contracts shared by everyone                                                                                           | nothing                              |
+| `src/engine/` | Deterministic simulation on a square grid                                                                              | shared, data                         |
+| `ai/`         | Machine player: a self-contained module (local, rule-based, in a Web Worker), no config of its own; see `ai/README.md` | shared, zod                          |
+| `src/ai/`     | The app's AI settings: difficulty modes (`profiles/<mode>.json`)                                                       | shared, ai                           |
+| `src/ui/`     | 3D voxel rendering (three.js), HUD, input, audio                                                                       | shared, data                         |
+| `src/host/`   | Glue: game loop, wiring engine + UI + AI                                                                               | shared, engine, ai, src/ai, ui, data |
+| `src/data/`   | Balance data (JSON)                                                                                                    | —                                    |
+| `maps/`       | Map files (JSON)                                                                                                       | —                                    |
+| `assets/`     | Audio presets / music data                                                                                             | —                                    |
 
 These rules are enforced by `eslint.config.js`, and `tests/lint/architecture.test.ts` proves it.
 The machine player and the engine **cannot use any network API**: no external AI, no third-party

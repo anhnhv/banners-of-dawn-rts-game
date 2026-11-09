@@ -6,7 +6,7 @@
 import { GAME_SPEEDS, IDLE_OPPONENT, type DecodedMap, type MatchRules, type MatchSetup } from '../shared';
 import { createGame, validateMap } from '../engine';
 import { createGameScreen, showFatalError, type Settings } from '../ui';
-import { isAIMode } from '../ai';
+import { isAIMode, PROFILES } from '../ai';
 import { WorkerAIController } from './aiController';
 import { GameHost } from './GameHost';
 import type { DevOptions } from './setupUrl';
@@ -60,7 +60,7 @@ export function startMatch(container: HTMLElement, o: MatchOptions): GameHost | 
   });
   host.attach(screen);
   if (setup.opponent !== IDLE_OPPONENT && isAIMode(setup.opponent))
-    host.attachAI(new WorkerAIController(game, 1, setup.opponent, host.aiSink, seed));
+    host.attachAI(new WorkerAIController(game, 1, PROFILES[setup.opponent], host.aiSink, seed));
   else screen.setOpponentStatus('Opponent: idle (does nothing)');
   host.start();
   return host;

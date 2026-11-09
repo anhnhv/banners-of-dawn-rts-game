@@ -8,9 +8,8 @@
  * It reacts to whatever the game looks like (a fresh start or a built-up base), not to a script.
  * Units, buildings, costs and what trains what all come from the game data (StaticMapInfo.data).
  */
-import { Rng } from '../shared';
+import { Rng } from '../src/shared';
 import type {
-  AIProfile,
   BuildingTypeId,
   Command,
   EntityId,
@@ -23,10 +22,10 @@ import type {
   ResourceType,
   StaticMapInfo,
   UnitTypeId,
-} from '../shared';
+} from '../src/shared';
 import { allocate, type Cost, type Request } from './Budget';
 import { bestCounter, counterScore } from './counters';
-import { DEFAULT_AI_MODE, PROFILES, type AIMode } from './profiles';
+import { aiTicks, type AIProfile } from './profile';
 import {
   analyze,
   center,
@@ -62,7 +61,8 @@ type Pending = PendingBuild | PendingTrain;
 const RESOURCES: ResourceType[] = ['food', 'wood', 'gold'];
 
 export class MachinePlayer {
-  profile: AIProfile = PROFILES[DEFAULT_AI_MODE];
+  /** The settings it plays with; set by init() (the module itself holds no configuration). */
+  profile!: AIProfile;
   private rng = new Rng(1);
   /** Separate stream for unit picks, so they do not shift the daydream and defence rolls. */
   private pickRng = new Rng(2);
@@ -89,15 +89,15 @@ export class MachinePlayer {
   private debug = 'thinking…';
 
   get thinkTicks(): number {
-    return Math.max(1, Math.round(this.profile.tempo.thinkSeconds * this.info.tickRate));
+    return aiTicks(this.profile, this.info.tickRate).think;
   }
 
   get delayTicks(): number {
-    return Math.max(1, Math.round(this.profile.tempo.reactionSeconds * this.info.tickRate));
+    return aiTicks(this.profile, this.info.tickRate).delay;
   }
 
-  init(info: StaticMapInfo, mode: AIMode = DEFAULT_AI_MODE, seed = 1): void {
-    this.profile = PROFILES[mode] ?? PROFILES[DEFAULT_AI_MODE];
+  init(info: StaticMapInfo, profile: AIProfile, seed = 1): void {
+    this.profile = profile;
     this.rng = new Rng(seed);
     this.pickRng = new Rng(seed * 31 + 7);
     this.waveSize = this.profile.attack.minWavePop;

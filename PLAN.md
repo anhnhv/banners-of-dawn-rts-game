@@ -228,7 +228,7 @@ Pace is chosen in Match Setup and **fixed for the whole match**. It is separate 
 |---|---|---|---|
 | **Shared contracts** | `src/shared/` | Types and pure helpers everyone agrees on: Commands, Events, Observation, MatchRules, IDs, data schemas | anywhere |
 | **Game engine** | `src/engine/` | The authoritative simulation on a **square tile grid**: rules, systems, pathfinding, fog, victory | main thread / Node |
-| **Machine player (AI)** | `src/ai/` | Local rule-based AI. Decides commands using **only** fog-filtered Observations | **Web Worker** / Node |
+| **Machine player (AI)** | `ai/` (top level; was `src/ai/` until 2026-11-09) | Local rule-based AI, a self-contained module with no config of its own. Decides commands using **only** Observations. Its settings (difficulty modes) are app config in `src/ai/profiles/` | **Web Worker** / Node |
 | **UI** | `src/ui/` | **3D voxel rendering (three.js)**, HTML HUD, menus, input → Commands, audio | browser main thread |
 | **Host (glue)** | `src/host/` | Creates the match and wires the engine, UI controller and AI controller together. Owns the game loop and the command log | browser main thread / Node |
 | **Game data** | `src/data/` | Balance data as JSON: units, buildings, techs, eras, pace presets, palette | loaded by all |
@@ -576,6 +576,8 @@ export interface Game {
 ---
 
 ## 6. Machine Player (AI): separate module
+> **2026-11-09:** the AI moved to the top-level `ai/` folder as a self-contained module (contract, worker protocol, settings schema, tests); it takes a profile in `init(info, profile, seed)` and knows no modes. The modes stay app config in `src/ai/profiles/`. Read `src/ai/` below as `ai/`; details in `docs/plans/ai-engine-extract.md` and `ai/README.md`.
+>
 > **2026-11-07:** this section is the original long-term design (with eras, fog and three difficulties). What is actually built (Easy only, no eras, no fog, situation-driven instead of build orders) is described in `docs/plans/m6-vs-machine.md`; how the machine plays in each mode is in `docs/ai-modes.md`. The isolation rules in §6.1–6.2 apply unchanged.
 
 ### 6.1 Isolation guarantees
@@ -1371,6 +1373,20 @@ User request (2026-11-08): a main menu, match setup, pause and simple settings (
 - The pause menu stops every key in the capture phase while it is open, and the camera ignores edge scrolling then. Surrender closes the menu first, because commands only apply while time runs.
 - Shadows are switched with `sun.castShadow`; three.js swaps the shaders by itself. Render quality Low uses a pixel ratio of 0.75.
 
+### AI module extraction (S) ✅ done 2026-11-09, details in `docs/plans/ai-engine-extract.md`
+User request (2026-11-09): later, players should customize their own AI for auto play, so first move the AI algorithm out of `src/` into a top-level `ai/` folder (next to `docs/`, `maps/`). The AI is the engine; the difficulty configs are app-level config and stay in `src/ai/profiles/`. The AI is treated like a third-party module: its contract and settings schema move with it, its tests live in `ai/tests/`, and it may use `zod`.
+- [x] `ai/`: `AIPlayer.ts`, `situation.ts`, `Budget.ts`, `counters.ts`, `TileMap.ts`, `worker.ts` moved with `git mv`; new `contract.ts` (`AIPlayer` interface), `protocol.ts` (`ToAIMessage` / `FromAIMessage`), `profile.ts` (schema from `src/shared/aiProfile.ts` + `aiTicks()`), `README.md`.
+- [x] The engine takes a profile: `init(info, profile, seed)` (was a mode name it looked up itself); the worker's `init` message carries the profile; `AI_INFO.difficulties` removed.
+- [x] `src/ai/` = the app's AI settings only: `profiles/easy.json`, `normal.json` unchanged; `profiles/index.ts` imports the schema from `ai/`; `src/ai/index.ts` re-exports it.
+- [x] Host: `InlineAIController` / `WorkerAIController` take an `AIProfile`; `boot.ts` is the one place that turns the chosen mode into a profile (`PROFILES[setup.opponent]`); the worker controller computes its think interval with `aiTicks()` instead of a throw-away probe AI.
+- [x] `src/shared/ai.ts` keeps only what the game shows any AI (`StaticMapInfo`, `Observation`, `Observed*`), because the game engine builds those and may not import `ai/`.
+- [x] Lint: elements `ai` = `ai/**`, `aiConfig` = `src/ai/**` (tests element `ai/tests/**` listed first); `ai` may import only shared + itself (+ `zod`), never `src/ai`; **no `.json` imports in `ai/`** (it holds no configuration); `aiConfig` may import shared + `ai`; host/tools/tests may import both.
+- [x] Build: `tools/typecheck.mjs` checks `ai` and `src/ai`; `ai/tsconfig.json` excludes `tests/` (typechecked by the root project); vitest also runs `ai/tests/**/*.test.ts`.
+- [x] Tests moved to `ai/tests/` (`parts`, `ai`, `maps`, `novice`, `sim`); new `engine.test.ts` (plays with a non-shipped profile; no JSON files in `ai/`) and `profile.test.ts` (schema). The app part of the old profiles test (every mode valid and documented) is `tests/aiConfig/profiles.test.ts`. `mapFile()` / `GREEN_VALLEY` moved to `tests/engine/helpers.ts` so game tests do not import AI tests.
+- **Review fixes (2026-11-09):** the worker checks the profile it receives with `parseAIProfile()` (a message is a trust boundary; player-made profiles later), a bad one shows as "Machine player crashed: …"; the planned `profileFor()` was dropped (unused: an unknown mode must mean no AI, not a silent Easy); the no-JSON lint rule also catches `./x.json?raw`.
+- **Proof nothing changed:** two fixed 5-minute AI-vs-AI matches (Green Valley scenario, Twin Rivers standard; Normal vs Easy, seed 5) give the same 150 commands and the same hash before and after the move. 32 test files / 254 tests pass. Production build and dev server both start the AI worker (Normal and Easy status lines in headless Chrome, no console errors). The main bundle went from 859 kB to 840 kB and the worker from 131 kB to 127 kB (mode JSONs no longer in the worker).
+- **Next for custom AIs** (not built): a Custom AI editor in Match Setup (profile saved in `localStorage`, checked with `parseAIProfile()`, passed in `boot.ts`); the same AI as auto play for the human side; other AI modules implementing `ai/contract.ts`.
+
 ### Later: Remaining content (was M6)
 - [ ] Eras and all techs.
 - [ ] Blacksmith, Siege Workshop, Castle; Catapult. (Archer, Scout Rider, Knight and the Stable are done in M6.5; the Barracks trains Archers, so there is no Archery Range.)
@@ -1465,8 +1481,9 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Default start for testing | The map's `scenario` (§8.1) is the default start (2026-11-07): built-up bases, gathering workers, an army each; the enemy army stands away from its base so it can be fought without base fire. `/?setup=standard` = plain start. Since M7a it is the default of the Start option in Match Setup |
 | Menus and settings | (2026-11-08, M7a) `/` opens a Main Menu; Match Setup picks map, opponent (Easy / Normal / Idle), start, pace preset and game speed; simple settings only (edge scroll, scroll speed, shadows, render quality, FPS line, machine's plan line). Pace = presets only for now (no custom sliders). Leaving a match reloads the page |
 | Placeholder art | (2026-11-08, M7a) Every entity has its own HUD icon and model (a test enforces it); `/?models` shows them all for review |
+| AI module | (2026-11-09) The AI is a self-contained top-level module `ai/` (like a third-party module: own contract, worker protocol, settings schema, tests in `ai/tests/`, may use `zod`). It holds no configuration; the app's difficulty modes stay in `src/ai/profiles/` and are passed in `init(info, profile, seed)`. Goal: players customize their own AI for auto play later |
 
-### Current status (updated 2026-11-08)
+### Current status (updated 2026-11-09)
 | Milestone | State |
 |---|---|
 | M0 setup, M0.5 style preview, M1 maps, M2 units & movement | ✅ done and committed |
@@ -1476,7 +1493,8 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | Test scenario start (map `scenario`, §8.1) | ✅ done (2026-11-07) |
 | M6 Play against the machine (Easy) | ✅ done (2026-11-07) |
 | M6.5 Army roster (Barracks: Militia + Archer; new Stable: Scout Rider + Knight) | ✅ done (2026-11-07); details in `docs/plans/m6.5-army-roster.md`, units in `docs/units.md` |
-| M7a Menus & match settings, art clean-up, Twin Rivers + Forest Pass | ✅ done (2026-11-08), waiting for review; details in `docs/plans/m7-menus-art-maps.md`, screenshots `docs/milestones/m7-*.png` |
+| M7a Menus & match settings, art clean-up, Twin Rivers + Forest Pass | ✅ done (2026-11-08); details in `docs/plans/m7-menus-art-maps.md`, screenshots `docs/milestones/m7-*.png` |
+| AI module extraction (`ai/` at the top level, configs stay in `src/ai/profiles/`) | ✅ done (2026-11-09), waiting for review; details in `docs/plans/ai-engine-extract.md`, `ai/README.md` |
 | **Next** | user's choice: e.g. a Farm for infinite food, a Hard mode, fog of war, custom pace sliders, sound |
 
 **How to resume:**
@@ -1488,8 +1506,8 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 
 **Agreed priorities (2026-11-06):** focus on game logic and units. Map polish (forest density, layout) can wait and is not worth time now.
 
-**Where we are (2026-11-08):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.5×–2× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json`; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all.
+**Where we are (2026-11-08):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.5×–2× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json` (app config); the AI itself is the separate top-level module `ai/` (2026-11-09), which takes one profile when a match starts; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all.
 
 **Army (M6.5, 2026-11-07):** the Barracks trains Militia and Archers, and the new Stable (build menu A) trains Scout Riders and Knights. Each unit's role, weakness and best situation are in `docs/units.md`; `tests/engine/balance.test.ts` proves the counter cycle. Normal picks counters to what it sees; Easy only presses the Militia button.
 
-**Next:** ask the user. Open points: Farm (food is still finite, berries now 200 each); a Hard mode (the menu lists modes from `src/ai/profiles/` by itself); fog of war; custom pace sliders and AI timings scaled by pace; sound and music; illustrated How to Play. No eras (decision 2026-11-07).
+**Next:** ask the user. The user wants players to customize their own AI for auto play (2026-11-09); the next step there is a Custom AI profile editor (see the AI module extraction notes in §12). Other open points: Farm (food is still finite, berries now 200 each); a Hard mode (the menu lists modes from `src/ai/profiles/` by itself); fog of war; custom pace sliders and AI timings scaled by pace; sound and music; illustrated How to Play. No eras (decision 2026-11-07).

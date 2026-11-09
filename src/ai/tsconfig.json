@@ -1,7 +1,6 @@
 {
-  // Machine player: runs in a Web Worker. No DOM types.
-  // Network APIs exist in the WebWorker lib but are banned by lint (PLAN §6.2).
+  // The app's machine-player settings (difficulty modes). Plain data + a small registry. No DOM types.
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "lib": ["ES2023", "WebWorker"], "types": [] },
+  "compilerOptions": { "lib": ["ES2023"], "types": [] },
   "include": ["./**/*.ts"]
 }

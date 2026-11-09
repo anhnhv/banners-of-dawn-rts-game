@@ -3,7 +3,7 @@
  * are approved from the highest priority down while they are affordable. The first one that is not
  * affordable reserves what it needs, so cheaper, less important requests cannot starve it.
  */
-import type { Command, ResourceAmounts } from '../shared';
+import type { Command, ResourceAmounts } from '../src/shared';
 
 export type Cost = Partial<ResourceAmounts>;
 
