@@ -1,5 +1,5 @@
 {
-  "note": "Unit definitions (PLAN §2.4). Times in seconds, speed in tiles/second, radius in tiles. 'interactions' say what the unit can do with other entities (right-click): gather lists the node kinds (and gather buildings such as the Farm) it can harvest and the rate per second (harvested resources go straight to the stockpile). 'actions' drive the command grid; 'panel' lists info fields shown when selected. 'attack' is the unit's attack (range 0 = melee; bonus = extra damage by target class; ranged attacks name a projectile from projectiles.json; a negative bonus makes a unit weak against that class, never below game.json → combat.minDamage); 'combat' says how it behaves near enemies (autoAttack, starting stance, fleeWhenHit, and an optional own targetPriority by class that replaces game.json → combat.targetPriority); interactions.attack.targets says what a right-click on an enemy attacks (PLAN §9.5).",
+  "note": "Unit definitions (PLAN §2.4). Times in seconds, speed in tiles/second, radius in tiles; modelScale = drawn size of the model (looks only, default 1). 'interactions' say what the unit can do with other entities (right-click): gather lists the node kinds (and gather buildings such as the Farm) it can harvest and the rate per second (harvested resources go straight to the stockpile). 'actions' drive the command grid; 'panel' lists info fields shown when selected. 'attack' is the unit's attack (range 0 = melee; bonus = extra damage by target class; ranged attacks name a projectile from projectiles.json; a negative bonus makes a unit weak against that class, never below game.json → combat.minDamage); 'combat' says how it behaves near enemies (autoAttack, starting stance, fleeWhenHit, and an optional own targetPriority by class that replaces game.json → combat.targetPriority); interactions.attack.targets says what a right-click on an enemy attacks (PLAN §9.5).",
   "units": {
     "worker": {
       "name": "Worker",
@@ -151,6 +151,7 @@
       "speed": 1.2,
       "sight": 9,
       "radius": 0.42,
+      "modelScale": 2,
       "attack": {
         "damage": 12,
         "range": 8,
@@ -158,6 +159,7 @@
         "cooldown": 5.0,
         "bonus": { "building": 30, "tower": 30 },
         "projectile": "stone",
+        "launchHeight": 1.4,
         "splash": { "radius": 1, "edge": 0.5 }
       },
       "combat": {

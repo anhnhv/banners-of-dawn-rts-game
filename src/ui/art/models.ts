@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { art, type LegPart, type UnitKit } from './collections';
 import type { BuildingModel, TeamName, TreeModel, UnitModel, WallAxis } from './collections';
 import { classic } from './collections/classic';
+import { DATA } from '../data';
 import { voxelMaterial } from './materials';
 import { resolveColor } from './palette';
 import { VoxelBuilder, type BuiltGeometry } from './VoxelBuilder';
@@ -93,10 +94,18 @@ export interface UnitParts {
   legs: THREE.Object3D[];
 }
 
+/** Size factor for a unit model: units.json → modelScale of the first unit using it (default 1). */
+export function unitModelScale(model: UnitModel): number {
+  return Object.values(DATA.units).find((u) => u.model === model)?.modelScale ?? 1;
+}
+
 export function unitParts(model: UnitModel, team: TeamName): UnitPartGeometry {
-  const kit: UnitKit = { body: builder(team), team, part: () => builder(team), legs: [], arms: [] };
+  const s = unitModelScale(model);
+  const scaled = (): VoxelBuilder => builder(team).setScale(s);
+  const kit: UnitKit = { body: scaled(), team, part: scaled, legs: [], arms: [] };
   art().units[model](kit);
-  return { body: kit.body.build(), legs: kit.legs, arms: kit.arms };
+  const pivot = (l: LegPart): LegPart => ({ ...l, pivot: [l.pivot[0] * s, l.pivot[1] * s, l.pivot[2] * s] });
+  return { body: kit.body.build(), legs: kit.legs.map(pivot), arms: kit.arms.map(pivot) };
 }
 
 /** Unit as a scene-graph group with separate leg meshes (style preview). */

@@ -91,6 +91,8 @@ export const UnitDefSchema = z.object({
   speed: z.number().positive(),
   sight: z.number().positive(),
   radius: z.number().positive().max(0.5),
+  /** Drawn size of the model (1 = as drawn). Looks only: radius, sight and range are unchanged. */
+  modelScale: z.number().positive().default(1),
   attack: AttackSchema.optional(),
   /** How the unit behaves around enemies. */
   combat: z

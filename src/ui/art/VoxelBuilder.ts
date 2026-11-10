@@ -45,11 +45,26 @@ const tmpColor = new THREE.Color();
 export class VoxelBuilder {
   private readonly buckets = new Map<TexKey, Bucket>();
   private colorFilter: ((c: THREE.ColorRepresentation) => THREE.ColorRepresentation) | null = null;
+  private scale = 1;
 
   /** Optional hook that maps every color (used to apply team colors). */
   setColorFilter(filter: ((c: THREE.ColorRepresentation) => THREE.ColorRepresentation) | null): this {
     this.colorFilter = filter;
     return this;
+  }
+
+  /**
+   * Uniform size factor for everything drawn afterwards, around the origin. Applied before the
+   * world-scaled UVs, so a bigger model keeps the same texture pixel size as everything else.
+   */
+  setScale(scale: number): this {
+    this.scale = scale;
+    return this;
+  }
+
+  private scaled(p: Vec3): Vec3 {
+    const s = this.scale;
+    return s === 1 ? p : [p[0] * s, p[1] * s, p[2] * s];
   }
 
   /** Axis-aligned box from min corner (x, y, z) with size (w, h, d). */
@@ -246,6 +261,7 @@ export class VoxelBuilder {
 
   /** Quad whose UVs come from world coordinates projected on the dominant axis (seamless boxes). */
   private worldQuad(tex: TexKey, color: THREE.ColorRepresentation, a: Vec3, b: Vec3, c: Vec3, d: Vec3): void {
+    [a, b, c, d] = [this.scaled(a), this.scaled(b), this.scaled(c), this.scaled(d)];
     const n = faceNormal(a, b, d);
     const uv = (p: Vec3): [number, number] => worldUv(p, n);
     this.pushPolygon(tex, color, [a, b, c, d], n, [uv(a), uv(b), uv(c), uv(d)]);
@@ -253,12 +269,14 @@ export class VoxelBuilder {
 
   /** Quad whose UVs follow its own edges (roof slopes: rows of shingles parallel to the eave). */
   private localQuad(tex: TexKey, color: THREE.ColorRepresentation, a: Vec3, b: Vec3, c: Vec3, d: Vec3): void {
+    [a, b, c, d] = [this.scaled(a), this.scaled(b), this.scaled(c), this.scaled(d)];
     const n = faceNormal(a, b, d);
     const uv = localUvFrame(a, b, n);
     this.pushPolygon(tex, color, [a, b, c, d], n, [uv(a), uv(b), uv(c), uv(d)]);
   }
 
   private tri(tex: TexKey, color: THREE.ColorRepresentation, a: Vec3, b: Vec3, c: Vec3): void {
+    [a, b, c] = [this.scaled(a), this.scaled(b), this.scaled(c)];
     const n = faceNormal(a, b, c);
     const uv = localUvFrame(a, b, n);
     this.pushPolygon(tex, color, [a, b, c], n, [uv(a), uv(b), uv(c)]);

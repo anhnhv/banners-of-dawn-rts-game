@@ -1400,6 +1400,7 @@ User decisions (2026-11-09): a much bigger Farm, **4×4**, **1 worker** each, ne
 - **Found while testing:** ordinary units sometimes stand on a blocked tile for a moment (a water corner, a building edge); the walk-out rule therefore only applies inside a gather building with `workInside`, otherwise it broke attacks.
 - **Screenshots:** `docs/milestones/m7b-*.png` (build menu, farm, farmer on the field, Catapult ready, model viewer).
 - **Review fixes (2026-11-09):** a Town Hall rally clicked onto an own farm now sends the farm as its target from the UI too (before, only resource nodes did); farm slots go first to workers already harvesting, so a lower-id newcomer (e.g. a queued order) can never take a working farmer's slot (test added); a chase only uses the tight re-path rule when it really aims beside a field; the AI never trains Catapults while its base is threatened. 280 tests.
+- **Catapult size (2026-11-10):** the Catapult model was too small next to people; `units.json → modelScale` (new, looks only, default 1) draws it at **2×**, and its stone now starts at `launchHeight` 1.4. The scale is applied inside the voxel builder before UVs, so the texture pixels stay the same size as on every other model. Radius, sight and range are unchanged.
 
 ### Later: Remaining content (was M6)
 - [ ] Eras and all techs.
