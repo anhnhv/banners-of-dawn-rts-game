@@ -4,7 +4,7 @@ The machine player has two modes:
 
 | Mode               | Plays like                                  | How to pick it                                    |
 | ------------------ | ------------------------------------------- | ------------------------------------------------- |
-| **Easy** (default) | A primary-school child: anyone can beat it  | Match Setup → Opponent → Easy, or `/?ai=easy`     |
+| **Easy** (default) | A relaxed opponent: anyone can beat it      | Match Setup → Opponent → Easy, or `/?ai=easy`     |
 | **Normal**         | A careful player who counts before fighting | Match Setup → Opponent → Normal, or `/?ai=normal` |
 
 Opponent → Idle (or `/?ai=off`) gives an opponent that does nothing. Match Setup lists every mode in `src/ai/profiles/index.ts` and shows its `persona` as the help text, so a new mode file appears in the menu by itself.
@@ -279,15 +279,15 @@ Values as of 2026-11-09 (M7b: Farm and Catapult). Times are seconds, distances t
 
 ---
 
-## Part 3. Easy: plays like a primary-school child
+## Part 3. Easy: a relaxed opponent
 
-> Persona (`easy.json → persona`): _a primary-school child: slow and often distracted; few workers; forgets houses until it is full; one Barracks, no towers, always presses the same button; does not count before fighting; attacks late, in small groups, running off one by one at the nearest building; never retreats; often does not notice when its base is attacked._
+> Persona (`easy.json → persona`, shown in Match Setup): _A relaxed opponent. Good for learning the game._
 
 The goal of Easy: **anyone can win**. A player who only trains some Militia, stays home and attacks once wins.
 
-### 3.1 How a child thinks, and the setting for each habit
+### 3.1 Easy's habits, and the setting for each
 
-| The child…                                    | So Easy…                                                                                                                              | Settings                                                                                                                           |
+| Easy…                                         | So it…                                                                                                                                | Settings                                                                                                                           |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | is slow and often looks away                  | Thinks every 2 s, reacts 3 s late, does nothing 30% of the time, and sends at most 4 commands at a time                               | `tempo.*`                                                                                                                          |
 | does not like boring work                     | Keeps only 8 workers, queues one at a time, sends one idle worker per think, never rebalances                                         | `economy.workerTarget` 8, `economy.workerQueue` 1, `economy.idleWorkersPerThink` 1, `economy.rebalanceSeconds` 0                   |
@@ -302,7 +302,7 @@ The goal of Easy: **anyone can win**. A player who only trains some Militia, sta
 | never gives up a fight                        | Never retreats; after losing everything it waits 60 s                                                                                 | `retreat.retreatRatio` 0, `retreat.retreatCooldownSeconds` 60                                                                      |
 | often does not notice its base being attacked | Notices only enemies right next to its buildings (6 tiles), and only one time in four                                                 | `defence.threatRadius` 6, `defence.defendChance` 0.25                                                                              |
 
-What a child still does right: workers gather and avoid danger (safe nodes), and buildings never block each other. Its Town Hall still shoots arrows; that is the building, not the child.
+What Easy still does right: workers gather and avoid danger (safe nodes), and buildings never block each other. Its Town Hall still shoots arrows; that is the building, not the AI.
 
 ### 3.2 A typical game against Easy
 
@@ -331,7 +331,7 @@ What a child still does right: workers gather and avoid danger (safe nodes), and
 
 ## Part 4. Normal: a careful player
 
-> Persona (`normal.json → persona`): _a careful player who counts before fighting: builds a full economy, keeps houses ahead, gathers its army before attacking, retreats when losing and always defends._
+> Persona (`normal.json → persona`, shown in Match Setup): _A solid opponent. A fair fight for players who know the basics._
 
 This was Easy's behavior before 2026-11-07.
 

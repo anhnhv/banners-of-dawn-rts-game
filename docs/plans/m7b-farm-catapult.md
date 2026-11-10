@@ -289,7 +289,7 @@ data (`StaticMapInfo.data`), never the words "farm" or "catapult".
 Each new setting gets a row in the configuration table of `docs/ai-modes.md` (a test fails
 otherwise), and Part 1 of that doc gets a "Farms" and a "Siege" paragraph.
 
-**Easy stays a child:** at most two late farms (so it does not stall forever), no Workshop, no Catapults.
+**Easy stays relaxed:** at most two late farms (so it does not stall forever), no Workshop, no Catapults.
 
 ---
 

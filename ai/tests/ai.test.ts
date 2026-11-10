@@ -144,7 +144,7 @@ describe('Normal: a careful player', () => {
   });
 });
 
-describe('Easy: plays like a primary-school child', () => {
+describe('Easy: a relaxed opponent', () => {
   const easy = PROFILES.easy;
 
   it('keeps a small economy: few workers, one Barracks, no tower, no Stable, only Militia', () => {

@@ -1,7 +1,7 @@
 {
   "note": "Machine player mode 'normal': the logic Easy used before 2026-11-07 (a sensible, careful player). Every field is explained in docs/ai-modes.md (configuration table). Times in seconds, distances in tiles, chances 0..1.",
   "name": "Normal",
-  "persona": "A careful player who counts before fighting: builds a full economy, keeps houses ahead, gathers its army before attacking, retreats when losing and always defends.",
+  "persona": "A solid opponent. A fair fight for players who know the basics.",
   "tempo": { "thinkSeconds": 1, "reactionSeconds": 1.5, "maxCommandsPerThink": 12, "daydreamChance": 0 },
   "economy": {
     "workerTarget": 16,
