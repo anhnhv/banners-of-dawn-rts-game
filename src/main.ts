@@ -15,11 +15,13 @@
  *                   (default: aetherfall; ?art=classic for the base look)
  * Any match parameter skips the menu; unspecified options come from the last setup.
  */
-import { startApp } from './host';
+import { startAnalytics, startApp } from './host';
 import { setArtCollection, startHudGallery, startModelViewer, startStylePreview } from './ui';
 
 const container = document.getElementById('app');
 if (!container) throw new Error('Missing #app container in index.html');
+
+void startAnalytics();
 
 const params = new URLSearchParams(window.location.search);
 setArtCollection(params.get('art'));

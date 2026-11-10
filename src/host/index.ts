@@ -9,6 +9,7 @@
 export { FixedStepClock } from './clock';
 export { GameHost } from './GameHost';
 export { startApp } from './app';
+export { startAnalytics } from './analytics';
 export { startMatch, type MatchOptions } from './boot';
 export { isAIMode, type AIMode } from '../ai';
 export { InlineAIController, WorkerAIController, type AIController } from './aiController';

@@ -611,7 +611,7 @@ The machine player is **ordinary local TypeScript**: heuristics, state machines 
 1. **Lint:**
    - `no-restricted-globals` bans `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `importScripts` and `navigator.sendBeacon` inside `src/ai/**` and `src/engine/**`.
    - `no-restricted-imports` bans every npm package inside `src/ai/**`, so the AI uses only `shared` and its own code.
-2. **Content Security Policy:** `index.html` sets `connect-src 'self'` and `worker-src 'self'`. Even by accident, the page cannot reach any other host.
+2. **Content Security Policy:** `index.html` sets `connect-src 'self'` and `worker-src 'self'`. Even by accident, the page cannot reach any other host. (Exception, only in the deploy build with the optional `.env.prod` analytics config: the Google Analytics / Firebase hosts used by `src/host/analytics.ts`.)
 3. **Test:** a build test scans the bundled AI worker chunk for network APIs and fails if it finds any.
 4. **Data in, commands out:** the worker only receives `init` and `observe` messages and only sends `commands` and `debug`.
 

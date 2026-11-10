@@ -75,6 +75,14 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
+### Analytics (optional)
+
+The deployed site can report page views to Google Analytics through Firebase. It is off unless you provide
+a Firebase web config: copy `.env.example` to `.env.prod` (git-ignored) and fill in the `VITE_FIREBASE_*` values.
+`.env.prod` is the only env file the build reads, and only `npm run deploy` uses it (it builds with
+`--mode prod`). Every other build, and the dev server, runs with no analytics code loaded and a Content
+Security Policy limited to its own origin.
+
 The URL shortcuts above work locally too, e.g. `http://localhost:5173/?play`. Everything is driven by the JSON in
 `src/data/` (see PLAN.md §9).
 
@@ -109,4 +117,5 @@ The URL shortcuts above work locally too, e.g. `http://localhost:5173/?play`. Ev
 
 These rules are enforced by `eslint.config.js`, and `tests/lint/architecture.test.ts` proves it.
 The machine player and the engine **cannot use any network API**: no external AI, no third-party
-services (PLAN §6.2). The page's Content Security Policy also limits connections to its own origin.
+services (PLAN §6.2). The page's Content Security Policy also limits connections to its own origin (the deploy build
+with analytics configured also allows Google Analytics, loaded by `src/host/analytics.ts`).

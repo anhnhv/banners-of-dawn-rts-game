@@ -60,8 +60,16 @@ if [[ $skip_checks -eq 0 ]]; then
   npm run check
 fi
 
+# The deploy build reads its config (Firebase analytics) from .env.prod; see .env.example.
+build_args=()
+if [[ -f .env.prod ]]; then
+  build_args=(-- --mode prod)
+else
+  echo "Note: no .env.prod (see .env.example); building without analytics."
+fi
+
 echo "==> Building"
-npm run build
+npm run build "${build_args[@]}"
 
 if [[ -n "$preview" ]]; then
   echo "==> Deploying to preview channel '$preview'"

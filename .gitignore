@@ -7,3 +7,7 @@ coverage/
 sim-results/
 .firebase
 .claude/
+
+# Deploy environment (Firebase analytics config); .env.example is the committed template.
+.env*
+!.env.example
