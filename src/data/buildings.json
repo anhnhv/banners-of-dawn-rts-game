@@ -44,7 +44,7 @@
     },
     "barracks": {
       "name": "Barracks",
-      "description": "Trains Militia and Archers.",
+      "description": "Trains foot soldiers (Militia, Guards) and shooters (Slingers, Archers).",
       "model": "barracks",
       "icon": "barracks",
       "footprint": [3, 3],
@@ -56,7 +56,9 @@
       "panel": ["hp", "armor", "queue"],
       "actions": [
         { "type": "train", "unit": "militia", "hotkey": "Q" },
-        { "type": "train", "unit": "archer", "hotkey": "W" },
+        { "type": "train", "unit": "guard", "hotkey": "W" },
+        { "type": "train", "unit": "slinger", "hotkey": "A" },
+        { "type": "train", "unit": "archer", "hotkey": "S" },
         { "type": "setRally", "hotkey": "Z" }
       ]
     },
@@ -80,7 +82,7 @@
     },
     "farm": {
       "name": "Farm",
-      "description": "A big field. One worker gathers food here, a little slower than at berries, but it never runs out.",
+      "description": "A big field. Two workers gather food here, as fast as at berries, and it never runs out.",
       "model": "farm",
       "icon": "farm",
       "footprint": [4, 4],
@@ -89,7 +91,7 @@
       "popProvided": 0,
       "cost": { "wood": 60 },
       "buildTime": 25,
-      "gather": { "resource": "food", "slots": 1, "workInside": 0.45 },
+      "gather": { "resource": "food", "slots": 2, "workInside": 0.45 },
       "panel": ["hp", "armor", "gatherers"],
       "actions": []
     },

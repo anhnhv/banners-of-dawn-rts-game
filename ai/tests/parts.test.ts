@@ -94,18 +94,31 @@ describe('counter pick (ai/counters.ts)', () => {
       order: { kind: 'idle' as const },
     }));
   const edge = PROFILES.normal.army.counterRangedEdge;
-  const ALL = ['militia', 'archer', 'scout_rider', 'knight'];
+  const ALL = ['militia', 'guard', 'slinger', 'archer', 'scout_rider', 'knight'];
+  const BARRACKS = ['militia', 'guard', 'slinger', 'archer'];
 
-  it('answers each army the way docs/units.md says', () => {
-    expect(bestCounter(GAME_DATA, ALL, army('militia', 10), edge)).toBe('archer');
-    expect(bestCounter(GAME_DATA, ALL, army('knight', 5), edge)).toBe('militia');
-    expect(bestCounter(GAME_DATA, ALL, army('scout_rider', 8), edge)).toBe('militia');
-    expect(['scout_rider', 'knight']).toContain(bestCounter(GAME_DATA, ALL, army('archer', 10), edge));
+  it('answers each army with one of its counters in docs/units.md §1.3', () => {
+    const best = (enemy: string, n: number) => bestCounter(GAME_DATA, ALL, army(enemy, n), edge);
+    expect(['slinger', 'archer']).toContain(best('militia', 10));
+    expect(['militia', 'slinger']).toContain(best('guard', 6));
+    expect(['archer', 'scout_rider', 'knight']).toContain(best('slinger', 10));
+    expect(['guard', 'scout_rider', 'knight']).toContain(best('archer', 10));
+    expect(['militia', 'guard', 'knight']).toContain(best('scout_rider', 8));
+    expect(['militia', 'guard']).toContain(best('knight', 5));
   });
 
   it('picks within what one building trains: the Barracks answers Knights with Militia', () => {
-    expect(bestCounter(GAME_DATA, ['militia', 'archer'], army('knight', 5), edge)).toBe('militia');
-    expect(bestCounter(GAME_DATA, ['militia', 'archer'], army('militia', 5), edge)).toBe('archer');
+    expect(bestCounter(GAME_DATA, BARRACKS, army('knight', 5), edge)).toBe('militia');
+    expect(bestCounter(GAME_DATA, BARRACKS, army('militia', 5), edge)).toBe('slinger');
+    expect(bestCounter(GAME_DATA, BARRACKS, army('archer', 5), edge)).toBe('guard');
+    expect(bestCounter(GAME_DATA, ['scout_rider', 'knight'], army('slinger', 5), edge)).toBe('knight');
+  });
+
+  it('without gold the answers stay inside the gold-free units', () => {
+    const cheap = ['militia', 'slinger', 'scout_rider'];
+    expect(bestCounter(GAME_DATA, cheap, army('militia', 10), edge)).toBe('slinger');
+    expect(bestCounter(GAME_DATA, cheap, army('slinger', 10), edge)).toBe('scout_rider');
+    expect(bestCounter(GAME_DATA, cheap, army('scout_rider', 8), edge)).toBe('militia');
   });
 
   it('with no enemy army there is no counter pick', () => {

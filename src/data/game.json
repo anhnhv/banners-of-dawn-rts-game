@@ -26,6 +26,7 @@
     "attackerPriority": 0,
     "targetPriority": {
       "infantry": 1,
+      "heavy": 1,
       "ranged": 1,
       "cavalry": 1,
       "siege": 1,

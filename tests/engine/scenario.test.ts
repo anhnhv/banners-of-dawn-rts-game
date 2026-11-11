@@ -96,17 +96,18 @@ describe('map scenario', () => {
     expect(errors).toMatch(/unknown resource "mana"/);
   });
 
-  it('each side has a Barracks (Militia, Archer) and a Stable (Scout Rider, Knight) whose units get out', () => {
+  it('each side has a Barracks (foot soldiers and shooters) and a Stable (riders) whose units get out', () => {
     const game = scenarioGame();
     const trains = (type: string): string[] =>
       (GAME_DATA.buildings[type]?.actions ?? []).flatMap((a) => (a.type === 'train' ? [a.unit] : []));
-    expect(trains('barracks')).toEqual(['militia', 'archer']);
+    expect(trains('barracks')).toEqual(['militia', 'guard', 'slinger', 'archer']);
     expect(trains('stable')).toEqual(['scout_rider', 'knight']);
     expect(GAME_DATA.game.buildMenu.map((m) => m.building)).toContain('stable');
     const before = new Set(game.units.keys());
     for (const owner of [0, 1] as const) {
       game.debugGive(owner, { food: 1000, wood: 1000, gold: 1000 });
-      game.debugBuilding(owner, 'house', owner === 0 ? 66 : 12, owner === 0 ? 50 : 28); // room for 5 more
+      game.debugBuilding(owner, 'house', owner === 0 ? 66 : 12, owner === 0 ? 50 : 28); // room for 10 more
+      game.debugBuilding(owner, 'house', owner === 0 ? 66 : 12, owner === 0 ? 53 : 25);
       for (const type of ['barracks', 'stable']) {
         const b = [...game.buildings.values()].find((x) => x.owner === owner && x.type === type);
         expect(b, `${type} of player ${owner}`).toBeDefined();
@@ -114,10 +115,12 @@ describe('map scenario', () => {
           game.enqueue({ player: owner, tick: game.tick, cmd: { type: 'train', building: b!.id, unit } });
       }
     }
-    run(game, 60);
+    run(game, 90);
     const fresh = [...game.units.values()].filter((u) => !before.has(u.id));
     expect(fresh.map((u) => `${u.owner}:${u.type}`).sort()).toEqual(
-      ['archer', 'knight', 'militia', 'scout_rider'].flatMap((t) => [`0:${t}`, `1:${t}`]).sort(),
+      ['archer', 'guard', 'knight', 'militia', 'scout_rider', 'slinger']
+        .flatMap((t) => [`0:${t}`, `1:${t}`])
+        .sort(),
     );
     // every new unit can walk out of its base (to a spot away from both armies)
     const out = { 0: { x: 64, y: 47 }, 1: { x: 16, y: 33 } } as const;

@@ -91,7 +91,7 @@ describe('Normal: a careful player', () => {
     expect((t.militia ?? 0) / total).toBeGreaterThan(0.5);
   });
 
-  it('against an all-Militia army it trains Archers and leaves its Stable idle (no horses into spears)', () => {
+  it('against an all-Militia army it trains Slingers and Archers and leaves its Stable idle (no horses into spears)', () => {
     const m = match({ scenario: false, ai: [1], mode: 'normal' });
     const th = townHall(m, 0);
     for (let i = 0; i < 12; i++)
@@ -99,7 +99,7 @@ describe('Normal: a careful player', () => {
     m.run(10 * 60);
     const t = m.trained.get(1) ?? {};
     expect(count(m, 1, 'stable')).toBeGreaterThanOrEqual(1);
-    expect(t.archer ?? 0).toBeGreaterThan(3);
+    expect((t.slinger ?? 0) + (t.archer ?? 0)).toBeGreaterThan(3);
     expect((t.scout_rider ?? 0) + (t.knight ?? 0)).toBe(0);
   });
 

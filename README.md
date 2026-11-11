@@ -26,8 +26,9 @@ Banners of Dawn is a classic-style **real-time strategy game** with a 3D voxel l
 textures). You play a 1v1 match against a local machine player, with no install, no account and no server:
 
 - **Economy**: workers gather food, wood and gold, build houses, farms and production buildings.
-- **Army**: train Militia and Archers at the Barracks, Scout Riders and Knights at the Stable
-  (see [docs/units.md](docs/units.md)).
+- **Army**: six field units in a 3×2 grid (foot soldiers, shooters, riders; each with a gold-free
+  and a gold version): Militia, Guards, Slingers and Archers at the Barracks, Scout Riders and
+  Knights at the Stable, Catapults at the Siege Workshop (see [docs/units.md](docs/units.md)).
 - **Battle**: box-select, control groups, rally points, and siege the enemy Town Hall to win.
 - **Opponent**: a rule-based machine player (Easy, Normal or Idle) that runs fully in your browser.
 - **Maps**: Green Valley, Twin Rivers and Forest Pass, each validated to be fair and symmetric.

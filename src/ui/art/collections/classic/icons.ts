@@ -383,6 +383,36 @@ ICONS.catapult = [
   'knBk...knBk.',
   '.kk.....kk..',
 ];
+/** A full helm with a team crest over a tall shield: the Guard (the plain shield is hold-ground). */
+ICONS.guard = [
+  '.....tt.....',
+  '....kTtk....',
+  '...kkkkkk...',
+  '..kiiiiiik..',
+  '..kiIIIIik..',
+  '..kkkkkkkk..',
+  '..kikkkkik..',
+  '..kiIikIik..',
+  '.kkkiIkikkk.',
+  '.ktkkkkkktk.',
+  '.kttyyyyttk.',
+  '..kkkkkkkk..',
+];
+/** A sling: two cords from a hand grip down to a stone in its cradle (the Slinger). */
+ICONS.sling = [
+  'kk........kk',
+  'kBk......kBk',
+  '.kBk....kBk.',
+  '.kBk....kBk.',
+  '..kBk..kBk..',
+  '..kBk..kBk..',
+  '...kBkkBk...',
+  '..kkBBBBkk..',
+  '.kBkXXXXkBk.',
+  '.kBXXxxXXBk.',
+  '..kkXXXXkk..',
+  '....kkkk....',
+];
 /** A tied wheat sheaf (the Farm): three ears on stems, a red band, the stalks spread below. */
 ICONS.farm = [
   '.kk..kk..kk.',

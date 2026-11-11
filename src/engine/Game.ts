@@ -74,7 +74,16 @@ export interface GameOptions {
   rules?: MatchRules;
 }
 
-const TEST_ARMY_MIX: UnitTypeId[] = ['militia', 'militia', 'archer', 'knight', 'worker', 'scout_rider'];
+const TEST_ARMY_MIX: UnitTypeId[] = [
+  'militia',
+  'militia',
+  'archer',
+  'knight',
+  'worker',
+  'scout_rider',
+  'guard',
+  'slinger',
+];
 /** Building type placed at each map spawn. */
 const SPAWN_BUILDING = 'town_hall';
 

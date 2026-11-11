@@ -173,6 +173,7 @@ export class ModelViewer {
           ['Rubble', geometryMesh(rubbleGeometry(3, 3))],
           ['Wall (unused)', geometryMesh(wallGeometry('x'))],
           ['Arrow ×4', scaled(geometryMesh(projectileGeometry('arrow')), 4)],
+          ['Sling stone ×4', scaled(geometryMesh(projectileGeometry('pebble')), 4)],
           ['Stone ×4', scaled(geometryMesh(projectileGeometry('stone')), 4)],
         ],
       },

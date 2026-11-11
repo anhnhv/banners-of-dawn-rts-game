@@ -1512,6 +1512,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 | M7a Menus & match settings, art clean-up, Twin Rivers + Forest Pass | ✅ done (2026-11-08); details in `docs/plans/m7-menus-art-maps.md`, screenshots `docs/milestones/m7-*.png` |
 | AI module extraction (`ai/` at the top level, configs stay in `src/ai/profiles/`) | ✅ done (2026-11-09); details in `docs/plans/ai-engine-extract.md`, `ai/README.md` |
 | M7b Farm (4×4, one farmer on the field) and Catapult (Siege Workshop) | ✅ done (2026-11-09), waiting for review; details in `docs/plans/m7b-farm-catapult.md`, screenshots `docs/milestones/m7b-*.png` |
+| M8 Farm for two workers, 3×2 army grid (new Guard and Slinger), rules 5 and 6 | ✅ done and committed (2026-11-11); details in `docs/plans/m8-roster-grid.md`, units in `docs/units.md` |
 | **Next** | user's choice: e.g. a Farm for infinite food, a Hard mode, fog of war, custom pace sliders, sound |
 
 **How to resume:**
@@ -1526,5 +1527,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 **Where we are (2026-11-09):** the game opens on a Main Menu; a match is set up in Match Setup (Green Valley, Twin Rivers or Forest Pass; Easy, Normal or Idle; ready-made battle or standard start; Relaxed / Standard / Fast / Blitz pace; 0.8×–8× speed) and can be paused, sped up, restarted, surrendered or quit from the pause menu (Esc). Each AI mode's numbers are in `src/ai/profiles/<mode>.json` (app config); the AI itself is the separate top-level module `ai/` (2026-11-09), which takes one profile when a match starts; `docs/ai-modes.md` explains the logic. Every entity has its own icon and model; `/?models` shows them all. Since M7b: Farms (4×4, one farmer working on the field, food forever at 0.35/s) and the Siege Workshop with the Catapult; both AI modes farm, Normal also builds Catapults.
 
 **Army (M6.5, 2026-11-07):** the Barracks trains Militia and Archers, and the new Stable (build menu A) trains Scout Riders and Knights. Each unit's role, weakness and best situation are in `docs/units.md`; `tests/engine/balance.test.ts` proves the counter cycle. Normal picks counters to what it sees; Easy only presses the Militia button.
+
+**M8 (2026-11-11):** Farm = 2 workers at 0.45 food/s. Six field units in a 3×2 grid (Militia/Guard, Slinger/Archer, Scout Rider/Knight; left needs no gold, right needs gold); every unit has at least two counters (rule 5) and the game works without gold (rule 6). Open points are listed in `docs/plans/m8-roster-grid.md` §6 (starting gold, Catapult vs Slinger).
 
 **Next:** ask the user. The user wants players to customize their own AI for auto play (2026-11-09); the next step there is a Custom AI profile editor (see the AI module extraction notes in §12). Other open points: a Hard mode (the menu lists modes from `src/ai/profiles/` by itself); fog of war; custom pace sliders and AI timings scaled by pace; sound and music; illustrated How to Play. No eras (decision 2026-11-07).

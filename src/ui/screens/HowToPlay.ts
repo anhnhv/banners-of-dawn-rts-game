@@ -13,7 +13,7 @@ const SECTIONS: Array<[string, string[]]> = [
     'Economy',
     [
       'Workers gather food (berry bushes), wood (trees) and gold (gold mines): select them and right click a resource.',
-      'Farms (build menu S) give food forever to one worker each, a little slower than berries: build them when the berries run low.',
+      'Farms (build menu S) cost wood and give food forever to two workers each, as fast as berries: build them before the berries run out.',
       'What they gather goes straight to your stockpile. No carrying, no drop-off.',
       'The Town Hall trains more workers. Houses raise your population limit.',
     ],
@@ -22,13 +22,15 @@ const SECTIONS: Array<[string, string[]]> = [
     'Building',
     [
       'Press B (or the hammer button), pick a building, then click the map. It builds itself: no workers needed.',
-      'Barracks: Militia and Archers. Stable: Scout Riders and Knights. Siege Workshop: Catapults. Watch Tower: shoots nearby enemies.',
+      'Barracks: foot soldiers (Militia, Guards) and shooters (Slingers, Archers). Stable: riders (Scout Riders, Knights). Siege Workshop: Catapults. Watch Tower: shoots nearby enemies.',
     ],
   ],
   [
     'Army',
     [
-      'Militia beat cavalry, Archers beat Militia from range, Knights run Archers down, Scout Riders are fast raiders. Catapults break towers and bases from out of their range but need an escort.',
+      'Foot soldiers beat riders, riders beat shooters, shooters beat foot soldiers. One exception: the Guard carries a shield, so it beats Archers (Slingers still beat it).',
+      'Each kind has a unit that needs no gold (Militia, Slinger, Scout Rider) and a stronger one that does (Guard, Archer, Knight). Every unit has at least two counters, and one of them never needs gold: hover a train button to see what a unit is strong and weak against.',
+      'Catapults break towers and bases from out of their range but need an escort.',
       'Right click an enemy to attack it. Attack-move (Q) fights everything on the way.',
       'Hold ground (E) keeps units in place; Aggressive (R) lets them chase.',
     ],

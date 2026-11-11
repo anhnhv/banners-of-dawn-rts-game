@@ -1,4 +1,4 @@
-/** docs/units.md must match the game data (§4 damage table, §5 stats table; all five army units). */
+/** docs/units.md must match the game data (§4 damage table, §5 stats table; all seven army units). */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { GAME_DATA } from '../../src/engine';
@@ -6,7 +6,7 @@ import { tableAfter } from './markdown';
 
 const DOC = readFileSync(new URL('../../docs/units.md', import.meta.url), 'utf8');
 const U = GAME_DATA.units;
-const ARMY = ['militia', 'archer', 'scout_rider', 'knight', 'catapult'];
+const ARMY = ['militia', 'guard', 'slinger', 'archer', 'scout_rider', 'knight', 'catapult'];
 
 const name = (type: string): string => U[type]!.name;
 const fmt = (n: number): string => String(n);

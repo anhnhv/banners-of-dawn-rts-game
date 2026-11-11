@@ -93,6 +93,41 @@ export const units: ArtCollectionParts['units'] = {
     b.boxC(-0.235, HIP + 0.07, 0.02, 0.02, 0.05, 0.05, 'plain', 'iron');
   },
 
+  // heavy foot soldier: full helm, mail, a tall team shield and a short sword
+  guard: (kit) => {
+    const sword = (a: VoxelBuilder): void => {
+      a.boxC(0.01, -0.24, 0.05, 0.05, 0.03, 0.12, 'plain', 'iron-dark'); // crossguard
+      a.boxC(0.01, -0.22, 0.2, 0.035, 0.025, 0.3, 'plain', 'iron'); // blade, pointing forward
+    };
+    humanoid(kit.body, HIP, 'iron');
+    kit.arms.push(arm(kit, 'iron-dark', -0.165, SHOULDER));
+    kit.arms.push(arm(kit, 'iron-dark', 0.165, SHOULDER, sword));
+    kit.legs.push(leg(kit, 'iron-dark', 0.09, HIP, 0.1, 0.065, HIP, 0));
+    kit.legs.push(leg(kit, 'iron-dark', 0.09, HIP, 0.1, -0.065, HIP, 0));
+    const b = kit.body;
+    b.boxC(0, HIP + 0.1, 0, 0.27, 0.06, 0.17, 'cloth', 'team'); // tabard band
+    b.boxC(0, HIP + 0.36, 0, 0.24, 0.12, 0.24, 'plain', 'iron'); // helm
+    b.boxC(0, HIP + 0.3, 0.1, 0.16, 0.03, 0.02, 'plain', 'ink'); // visor slit
+    b.boxC(0, HIP + 0.48, 0, 0.05, 0.07, 0.16, 'cloth', 'team-light'); // crest
+    b.boxC(-0.22, HIP - 0.12, 0.05, 0.05, 0.42, 0.26, 'planks', 'team'); // tall shield
+    b.boxC(-0.25, HIP + 0.06, 0.05, 0.02, 0.07, 0.07, 'plain', 'iron');
+    b.boxC(-0.22, HIP + 0.3, 0.05, 0.055, 0.03, 0.27, 'plain', 'iron-dark'); // shield rim
+  },
+
+  // light skirmisher: no armor, a headband, a pouch of stones and a sling
+  slinger: (kit) => {
+    const sling = (a: VoxelBuilder): void => {
+      a.boxC(0.02, -0.34, 0.05, 0.015, 0.14, 0.015, 'plain', 'leather'); // the two cords
+      a.boxC(-0.02, -0.34, 0.05, 0.015, 0.14, 0.015, 'plain', 'leather');
+      a.boxC(0, -0.4, 0.05, 0.07, 0.06, 0.07, 'rock', 'stone'); // the stone in its cradle
+    };
+    person(kit, 'team-light', 'cloth', 'leather', sling);
+    const b = kit.body;
+    b.boxC(0, HIP + 0.33, 0, 0.22, 0.04, 0.21, 'cloth', 'team'); // headband
+    b.boxC(-0.1, HIP + 0.02, 0.1, 0.1, 0.1, 0.06, 'plain', 'leather'); // pouch
+    b.boxC(-0.1, HIP + 0.12, 0.1, 0.06, 0.03, 0.04, 'rock', 'stone');
+  },
+
   archer: (kit) => {
     person(kit, 'team', 'team-dark', 'leather');
     const b = kit.body;

@@ -50,7 +50,7 @@ describe('game data', () => {
 
   it('checks gather buildings (Farm): a gather target may be one; the panel field needs gather', () => {
     const ok = parseGameData(raw());
-    expect(ok.buildings.farm?.gather).toMatchObject({ resource: 'food', slots: 1 });
+    expect(ok.buildings.farm?.gather).toMatchObject({ resource: 'food', slots: 2 });
     expect(ok.units.worker?.interactions.gather?.targets.farm).toBeGreaterThan(0);
 
     const r = raw() as unknown as {

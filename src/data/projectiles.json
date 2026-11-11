@@ -2,6 +2,7 @@
   "note": "Projectile types used by ranged attacks (units.json / buildings.json → attack.projectile). speed in tiles/second; arc = peak height as a fraction of the flight length; homing projectiles follow the target and always hit, the others land where the target was (with optional splash from the attack). launchHeight is used when the attack does not set its own.",
   "projectiles": {
     "arrow": { "speed": 11, "arc": 0.18, "homing": true, "model": "arrow", "launchHeight": 0.5 },
+    "pebble": { "speed": 10, "arc": 0.12, "homing": true, "model": "pebble", "launchHeight": 0.6 },
     "stone": { "speed": 7, "arc": 0.4, "homing": false, "model": "stone", "launchHeight": 0.6 }
   }
 }

@@ -2,7 +2,14 @@
 import { createGame, type Game } from '../../src/engine';
 import { InlineAIController } from '../../src/host/aiController';
 import { PROFILES, type AIMode } from '../../src/ai';
-import { decodeMap, TICK_RATE, type MapFile, type PlayerId } from '../../src/shared';
+import {
+  decodeMap,
+  TICK_RATE,
+  type DecodedMap,
+  type MapFile,
+  type MatchRules,
+  type PlayerId,
+} from '../../src/shared';
 import { GREEN_VALLEY, mapFile } from '../../tests/engine/helpers';
 
 export { GREEN_VALLEY, mapFile };
@@ -25,11 +32,17 @@ export function match(opts: {
   mode?: AIMode | Partial<Record<PlayerId, AIMode>>;
   seed?: number;
   testArmy?: number;
+  /** Change the decoded map before the match starts (e.g. take the gold mines out). */
+  edit?: (map: DecodedMap) => DecodedMap;
+  /** Match rules (pace, starting resources); default: game.json. */
+  rules?: MatchRules;
 }): Match {
-  const game = createGame(decodeMap(opts.map ?? GREEN_VALLEY), {
+  const decoded = decodeMap(opts.map ?? GREEN_VALLEY);
+  const game = createGame(opts.edit ? opts.edit(decoded) : decoded, {
     seed: opts.seed ?? 5,
     scenario: opts.scenario,
     testArmy: opts.testArmy,
+    rules: opts.rules,
   });
   const modeOf = (p: PlayerId): AIMode =>
     (typeof opts.mode === 'string' ? opts.mode : opts.mode?.[p]) ?? 'easy';

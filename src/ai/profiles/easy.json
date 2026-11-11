@@ -26,7 +26,7 @@
     "houseDistance": [5, 10],
     "militaryDistance": [7, 12],
     "towerDistance": [5, 9],
-    "maxFarms": 2,
+    "maxFarms": 1,
     "farmDistance": [5, 14],
     "siegeAfterSeconds": 99999
   },

@@ -58,14 +58,14 @@ Every `tempo.thinkSeconds` it does the following:
 
 ### 1.3 Analysis
 
-| Fact            | How it is worked out                                                                                                                                                                                                                                                                     |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Front           | The direction from its Town Hall to yours                                                                                                                                                                                                                                                |
-| Staging point   | Where its army waits: at least `army.stagingDistance` toward you, on the first walkable spot outside the range of its own Town Hall and towers (+2 tiles). Its army waits in the open field, not under its own arrows                                                                    |
-| Threats         | Your soldiers within `defence.threatRadius` of any of its buildings (workers do not count)                                                                                                                                                                                               |
-| Free population | Pop cap − population − population already queued                                                                                                                                                                                                                                         |
-| Safe nodes      | Resource nodes nearer its Town Hall than yours and more than (range + 3) tiles from any shooting building of yours                                                                                                                                                                       |
-| Strength        | Each soldier: **hp × damage ÷ cooldown** (Militia 120, Archer 75, Scout Rider 133, Knight 667). Each shooting building: `army.defenceHp` × damage ÷ cooldown (Town Hall 300, Watch Tower 450 with 150). "Enemy base defence" = your shooting buildings within 14 tiles of your Town Hall |
+| Fact            | How it is worked out                                                                                                                                                                                                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Front           | The direction from its Town Hall to yours                                                                                                                                                                                                                                                                       |
+| Staging point   | Where its army waits: at least `army.stagingDistance` toward you, on the first walkable spot outside the range of its own Town Hall and towers (+2 tiles). Its army waits in the open field, not under its own arrows                                                                                           |
+| Threats         | Your soldiers within `defence.threatRadius` of any of its buildings (workers do not count)                                                                                                                                                                                                                      |
+| Free population | Pop cap − population − population already queued                                                                                                                                                                                                                                                                |
+| Safe nodes      | Resource nodes nearer its Town Hall than yours and more than (range + 3) tiles from any shooting building of yours                                                                                                                                                                                              |
+| Strength        | Each soldier: **hp × damage ÷ cooldown** (Militia 120, Guard 238, Slinger 32, Archer 75, Scout Rider 133, Knight 667). Each shooting building: `army.defenceHp` × damage ÷ cooldown (Town Hall 300, Watch Tower 450 with 150). "Enemy base defence" = your shooting buildings within 14 tiles of your Town Hall |
 
 ### 1.4 What it buys: the wish list and the budget
 
@@ -82,7 +82,7 @@ Each think it lists what it wants. Each item has a priority from `priorities.*`.
 | First military building   | `priorities.firstProducer`                                              | It has none of that kind, and it has at least `buildings.firstProducerAtWorkers` workers. It uses the first `buildings.militaryBuildingTypes` kinds in build-menu order (Barracks, then Stable, then Siege Workshop); a kind is built only once the one before it stands. A building that trains only siege units (the Workshop) waits until `buildings.siegeAfterSeconds`, is never built when `army.maxSiege` is 0, and is never doubled |
 | Another military building | `priorities.extraProducer`                                              | It has fewer than `buildings.maxProducersPerType`, none is being built, all finished ones are full, and it holds more than `buildings.extraProducerBank` of each resource that building costs                                                                                                                                                                                                                                              |
 | Tower                     | `priorities.tower`                                                      | Game time ≥ `buildings.towerAfterSeconds` and fewer than `buildings.towers` towers                                                                                                                                                                                                                                                                                                                                                         |
-| Farm                      | `priorities.farm`                                                       | The food left in safe nodes is below `economy.farmWhenFoodBelow`, no Farm is being built, and it has fewer than min(`buildings.maxFarms`, food share × workers) Farms. One farmer each, so it keeps about one Farm per food worker                                                                                                                                                                                                         |
+| Farm                      | `priorities.farm`                                                       | The food left in safe nodes is below `economy.farmWhenFoodBelow`, no Farm is being built, and it has fewer than min(`buildings.maxFarms`, food share × workers ÷ farmers per Farm) Farms. Two farmers each, so it keeps about one Farm per two food workers                                                                                                                                                                                |
 | Siege unit (Catapult)     | `priorities.siege`                                                      | It has fewer than `army.maxSiege` siege units alive or queued, and its base is not threatened (a Catapult cannot defend). Siege units are not part of the counter pick (1.4.1): they lose every field fight by design, and are there for towers and the Town Hall                                                                                                                                                                          |
 
 #### 1.4.1 Which soldier it trains (`army.unitChoice`)
@@ -102,15 +102,16 @@ Each think it lists what it wants. Each item has a priority from `priorities.*`.
   - Dividing by the square of the cost follows Lanchester's square law: for the same money a cheaper unit fields more bodies, and both its damage and its staying power grow with the count.
   - A ranged unit shooting at melee units gets free shots while they walk in, so its kill counts `army.counterRangedEdge` times.
 
-It trains the type with the best score. A building whose best answer scores below `army.counterMinShare` × the best answer of all its army buildings **skips its turn**. So against a block of Militia, the Stable stays idle and the money goes to Archers.
+It trains the type with the best score. A building whose best answer scores below `army.counterMinShare` × the best answer of all its army buildings **skips its turn**. So against a block of Militia, the Stable stays idle and the money goes to Slingers and Archers.
 
 A type it can never pay for any more is skipped: one that needs a resource gone from its stock and from every safe node.
 
 What this gives (tested):
 
-- against your Militia it trains Archers;
+- against your Militia it trains Slingers and Archers;
 - against Knights, Militia;
-- against Archers, cavalry.
+- against Archers, Knights (the Barracks alone: Guards);
+- with only the gold-free units (no gold left), the gold-free answer: Slingers to Militia, Scout Riders to Slingers, Militia to Scout Riders.
 
 **Placement:**
 
@@ -132,7 +133,7 @@ What this gives (tested):
 - **Idle workers:** up to `economy.idleWorkersPerThink` per think go to the resource most below its share.
   - The node: safe, of that resource, within `economy.gatherRadius` of its Town Hall if there is one.
   - Score = distance to its Town Hall + ½ × distance to the worker + 3 × workers already on it. Workers spread out.
-  - **Farms:** when no node of that resource is left (or none is safe), the worker goes to its nearest own Farm with a free slot. Berries come first because they are faster (0.45 against 0.35 food/s). A Farm never runs out, so with one, food never counts as "short" for the food reserve. When berries run out under a worker, the game itself sends it on to a free Farm nearby.
+  - **Farms:** when no node of that resource is left (or none is safe), the worker goes to its nearest own Farm with a free slot. Berries come first because they cost nothing (a Farm costs wood; both give 0.45 food/s per worker). A Farm never runs out, so with one, food never counts as "short" for the food reserve. When berries run out under a worker, the game itself sends it on to a free Farm nearby.
 - **Rebalancing:** every `economy.rebalanceSeconds` (0 = never), it moves one worker from the most over-staffed resource (≥ 1.5 too many) to the most under-staffed one (≥ 1.5 short).
 - Workers never fight. When hit, they flee by themselves (`fleeWhenHit` in `units.json`).
 
@@ -198,7 +199,7 @@ It shows, in order: the mode, the posture, its army population, its strength vs 
 
 ## Part 2. Configuration table
 
-Values as of 2026-11-09 (M7b: Farm and Catapult). Times are seconds, distances tiles, chances 0–1.
+Values as of 2026-11-11 (M8: Farm for two, six field units). Times are seconds, distances tiles, chances 0–1.
 
 | Setting                                 | What it does                                                                                            | Easy            | Normal   |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------- | -------- |
@@ -229,7 +230,7 @@ Values as of 2026-11-09 (M7b: Farm and Catapult). Times are seconds, distances t
 | `buildings.houseDistance`               | [preferred, max] from its Town Hall, to the back                                                        | [5, 10]         | [5, 10]  |
 | `buildings.militaryDistance`            | Same for military buildings, to the front                                                               | [7, 12]         | [7, 12]  |
 | `buildings.towerDistance`               | Same for towers, to the front                                                                           | [5, 9]          | [5, 9]   |
-| `buildings.maxFarms`                    | Most Farms (one farmer each; 0 = never)                                                                 | 2               | 6        |
+| `buildings.maxFarms`                    | Most Farms (two farmers each; 0 = never)                                                                | 1               | 6        |
 | `buildings.farmDistance`                | [preferred, max] for Farms, to the back                                                                 | [5, 14]         | [6, 18]  |
 | `buildings.siegeAfterSeconds`           | No Siege Workshop before this game time                                                                 | 99999           | 480      |
 | **priorities** (higher is bought first) |                                                                                                         |                 |          |
@@ -250,7 +251,7 @@ Values as of 2026-11-09 (M7b: Farm and Catapult). Times are seconds, distances t
 | `army.reissueSeconds`                   | Minimum time between army orders                                                                        | 6               | 4        |
 | `army.unitChoice`                       | Which soldier to train: `first`, `fewest`, `random` or `counter` (1.4.1)                                | first           | counter  |
 | `army.counterShare`                     | With `counter`: share of picks that follow the counter pick                                             | 0               | 0.7      |
-| `army.counterRangedEdge`                | With `counter`: a ranged unit's kill counts this many times against melee units                         | 1               | 1.5      |
+| `army.counterRangedEdge`                | With `counter`: a ranged unit's kill counts this many times against melee units                         | 1               | 2        |
 | `army.counterMinShare`                  | With `counter`: a building whose best answer scores below this share of the best overall skips its turn | 0               | 0.5      |
 | `army.maxSiege`                         | Siege units (Catapults) alive or queued at a time (0 = never trains one)                                | 0               | 3        |
 | **attack**                              |                                                                                                         |                 |          |
@@ -342,7 +343,7 @@ This was Easy's behavior before 2026-11-07.
 | Builds Houses early, keeping 3 + 2 per producer of free population                         | `buildings.houseBuffer` 3, `buildings.houseBufferPerProducer` 2           |
 | Barracks at 6 workers, then a Stable, a second of each when rich, a Watch Tower after 5:00 | `buildings.*`                                                             |
 | A Siege Workshop after 8:00 and up to 3 Catapults that go with its waves                   | `buildings.siegeAfterSeconds` 480, `army.maxSiege` 3                      |
-| Farms once the safe berries drop below 400 food, about one per food worker, up to 6        | `economy.farmWhenFoodBelow` 400, `buildings.maxFarms` 6                   |
+| Farms once the safe berries drop below 400 food, one per two food workers, up to 6         | `economy.farmWhenFoodBelow` 400, `buildings.maxFarms` 6                   |
 | Trains the answer to what you have (7 picks in 10), and does not send horses into spears   | `army.unitChoice` counter, `army.counter*`                                |
 | Keeps 2 soldiers queued per Barracks, with no pause                                        | `army.militaryQueue` 2, `army.trainEverySeconds` 0                        |
 | Attacks after 5:00 with at least 8 population and 1.6× your strength                       | `attack.earliestAttackSeconds`, `attack.minWavePop`, `attack.attackRatio` |
@@ -354,7 +355,7 @@ This was Easy's behavior before 2026-11-07.
 
 **A typical game against Normal (you do nothing):**
 
-- **Standard start:** 13 workers, a Barracks and then a Stable. It trains a mixed army (9 Militia, 6 Archers, 2 Knights, 1 Scout Rider by the end), and your Town Hall falls at about 7:30.
-- **Scenario start:** it uses the Barracks and the Stable from the start (5 Militia, 5 Archers, 5 Scout Riders and 6 Knights trained), and your Town Hall falls at about 6:00.
+- **Standard start:** 13 workers, a Barracks and then a Stable. It trains a mixed army (5 Militia, 3 Guards, 2 Slingers, 2 Archers, 4 Knights by the end), and your Town Hall falls at about 7:30.
+- **Scenario start:** it uses the Barracks and the Stable from the start (15 Militia, 2 Guards and 6 Knights trained), and your Town Hall falls at about 6:00.
 
-Measured on 2026-11-07, after the army roster (M6.5).
+Measured on 2026-11-11, after the 3×2 grid (M8).

@@ -1,6 +1,7 @@
 /**
- * Gather buildings (docs/plans/m7b-farm-catapult.md §1): the Farm is a 4×4 building that one of
- * its owner's workers can gather food from, a little slower than at berries, and it never runs out.
+ * Gather buildings (docs/plans/m7b-farm-catapult.md §1, docs/plans/m8-roster-grid.md §2): the Farm is
+ * a 4×4 building that two of its owner's workers can gather food from, at the berry rate, and it
+ * never runs out. The only advantage of berries is that they cost no wood.
  */
 import { describe, expect, it } from 'vitest';
 import { createGame, GAME_DATA, type Game } from '../../src/engine';
@@ -30,10 +31,11 @@ const food = (game: Game, p: PlayerId = 0): number => game.player(p).resources.f
 const orderOf = (game: Game, id: EntityId) => game.units.get(id)?.orders[0];
 
 describe('Farm (buildings.json → gather)', () => {
-  it('is a 4×4 field for one worker, slower than berries per worker', () => {
+  it('is a 4×4 field for two workers, at the berry rate, and costs only wood', () => {
     expect(FARM.footprint).toEqual([4, 4]);
-    expect(FARM.gather).toMatchObject({ resource: 'food', slots: 1 });
-    expect(RATES.farm).toBeLessThan(RATES.berry_bush!);
+    expect(FARM.gather).toMatchObject({ resource: 'food', slots: 2 });
+    expect(RATES.farm).toBe(RATES.berry_bush!);
+    expect(Object.keys(FARM.cost)).toEqual(['wood']);
   });
 
   it('a worker gathers food from it at its rate, and it never runs out', () => {
@@ -52,48 +54,72 @@ describe('Farm (buildings.json → gather)', () => {
     expect(orderOf(game, w)?.kind).toBe('gather');
   });
 
-  it('holds one farmer: a second worker goes to another free farm', () => {
+  it('holds two farmers: a third worker goes to another free farm', () => {
     const { game } = setup();
     const a = game.debugBuilding(0, 'farm', 12, 12);
     const b = game.debugBuilding(0, 'farm', 18, 12);
     const w1 = game.debugSpawn(0, 'worker', 11.4, 13.5);
     const w2 = game.debugSpawn(0, 'worker', 11.4, 14.5);
-    send(game, 0, { type: 'interact', units: [w1, w2], target: a });
+    const w3 = game.debugSpawn(0, 'worker', 11.4, 15.5);
+    send(game, 0, { type: 'interact', units: [w1, w2, w3], target: a });
     run(game, 20);
-    const t1 = orderOf(game, w1);
-    const t2 = orderOf(game, w2);
-    expect(t1?.kind === 'gather' && t1.target).toBe(a);
-    expect(t2?.kind === 'gather' && t2.target).toBe(b);
+    const targets = [w1, w2, w3].map((w) => {
+      const o = orderOf(game, w);
+      return o?.kind === 'gather' ? o.target : null;
+    });
+    expect(targets.filter((t) => t === a)).toHaveLength(2);
+    expect(targets.filter((t) => t === b)).toHaveLength(1);
     const view = game.getView(0).buildings;
-    expect(view.find((x) => x.id === a)?.gatherers).toBe(1);
+    expect(view.find((x) => x.id === a)?.gatherers).toBe(2);
     expect(view.find((x) => x.id === b)?.gatherers).toBe(1);
   });
 
-  it('a worker sent to a taken farm with no free one nearby gathers other food, or stops', () => {
-    const { game } = setup([node('berry_bush', 18, 13)]);
-    const farm = game.debugBuilding(0, 'farm', 12, 12);
-    const w1 = game.debugSpawn(0, 'worker', 11.4, 13.5);
-    send(game, 0, { type: 'interact', units: [w1], target: farm });
-    run(game, 5);
-    const w2 = game.debugSpawn(0, 'worker', 11.4, 14.5);
-    send(game, 0, { type: 'interact', units: [w2], target: farm });
-    run(game, 15);
-    const o = orderOf(game, w2);
-    const bush = [...game.nodes.values()][0]!;
-    expect(o?.kind === 'gather' && o.target).toBe(bush.id);
-  });
-
-  it('frees its slot when the farmer gets another order or dies', () => {
+  it('two farmers on one farm bring in twice the food of one', () => {
     const { game } = setup();
     const farm = game.debugBuilding(0, 'farm', 12, 12);
     const w1 = game.debugSpawn(0, 'worker', 11.4, 13.5);
-    const w2 = game.debugSpawn(0, 'worker', 20.5, 20.5);
-    send(game, 0, { type: 'interact', units: [w1], target: farm });
+    const w2 = game.debugSpawn(0, 'worker', 11.4, 14.5);
+    send(game, 0, { type: 'interact', units: [w1, w2], target: farm });
+    run(game, 10); // both are on the field
+    const before = food(game);
+    run(game, 60);
+    const gained = food(game) - before;
+    expect(gained).toBeGreaterThanOrEqual(Math.floor(2 * 60 * RATES.farm! * 0.95));
+    expect(gained).toBeLessThanOrEqual(Math.ceil(2 * 60 * RATES.farm!) + 1);
+  });
+
+  /** Workers that fill every slot of `farm` (spawned next to it and sent in). */
+  const fill = (game: Game, farm: EntityId): EntityId[] => {
+    const ws = Array.from({ length: FARM.gather!.slots }, (_, i) =>
+      game.debugSpawn(0, 'worker', 11.4, 12.5 + i),
+    );
+    send(game, 0, { type: 'interact', units: ws, target: farm });
     run(game, 5);
-    send(game, 0, { type: 'move', units: [w1], to: { x: 25, y: 25 } });
-    send(game, 0, { type: 'interact', units: [w2], target: farm });
+    return ws;
+  };
+
+  it('a worker sent to a full farm with no free one nearby gathers other food, or stops', () => {
+    const { game } = setup([node('berry_bush', 18, 13)]);
+    const farm = game.debugBuilding(0, 'farm', 12, 12);
+    fill(game, farm);
+    const extra = game.debugSpawn(0, 'worker', 11.4, 15.5);
+    send(game, 0, { type: 'interact', units: [extra], target: farm });
     run(game, 15);
-    const o = orderOf(game, w2);
+    const o = orderOf(game, extra);
+    const bush = [...game.nodes.values()][0]!;
+    expect(o?.kind === 'gather' && o.target).toBe(bush.id);
+    expect(game.getView(0).buildings.find((b) => b.id === farm)?.gatherers).toBe(FARM.gather!.slots);
+  });
+
+  it('frees a slot when a farmer gets another order or dies', () => {
+    const { game } = setup();
+    const farm = game.debugBuilding(0, 'farm', 12, 12);
+    const [w1] = fill(game, farm);
+    const extra = game.debugSpawn(0, 'worker', 20.5, 20.5);
+    send(game, 0, { type: 'move', units: [w1!], to: { x: 25, y: 25 } });
+    send(game, 0, { type: 'interact', units: [extra], target: farm });
+    run(game, 15);
+    const o = orderOf(game, extra);
     expect(o?.kind === 'gather' && o.target).toBe(farm);
   });
 
@@ -202,12 +228,13 @@ describe('Farm (buildings.json → gather)', () => {
 });
 
 describe('Farm slots', () => {
-  it('a newcomer with a lower id never takes the slot of the farmer already at work', () => {
+  it('a newcomer with a lower id never takes the slot of a farmer already at work', () => {
     const game = createGame(openMap(40, 40), { seed: 1 });
     game.debugBuilding(0, 'town_hall', 4, 4);
     const early = game.debugSpawn(0, 'worker', 30.5, 30.5); // lower id
     const farm = game.debugBuilding(0, 'farm', 12, 12);
-    const farmer = game.debugSpawn(0, 'worker', 11.4, 13.5);
+    const slots = FARM.gather!.slots;
+    const farmers = Array.from({ length: slots }, (_, i) => game.debugSpawn(0, 'worker', 11.4, 13.5 + i));
     // while the farm is still free, the lower-id worker queues: a long walk, then farm it
     game.enqueue({ player: 0, tick: 0, cmd: { type: 'move', units: [early], to: { x: 22.5, y: 14.5 } } });
     game.enqueue({
@@ -216,12 +243,14 @@ describe('Farm slots', () => {
       cmd: { type: 'interact', units: [early], target: farm, queue: true },
     });
     game.step();
-    // meanwhile the other worker starts farming it
-    game.enqueue({ player: 0, tick: game.tick, cmd: { type: 'interact', units: [farmer], target: farm } });
+    // meanwhile the other workers fill every slot
+    game.enqueue({ player: 0, tick: game.tick, cmd: { type: 'interact', units: farmers, target: farm } });
     for (let i = 0; i < 15 * 20; i++) game.step();
-    const o = game.units.get(farmer)!.orders[0];
-    expect(o?.kind === 'gather' && o.target).toBe(farm);
-    expect(game.getView(0).buildings.find((b) => b.id === farm)?.gatherers).toBe(1);
+    for (const farmer of farmers) {
+      const o = game.units.get(farmer)!.orders[0];
+      expect(o?.kind === 'gather' && o.target).toBe(farm);
+    }
+    expect(game.getView(0).buildings.find((b) => b.id === farm)?.gatherers).toBe(slots);
     const e = game.units.get(early)!.orders[0];
     expect(e?.kind === 'gather' && e.target).not.toBe(farm);
   });

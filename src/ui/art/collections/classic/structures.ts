@@ -71,6 +71,10 @@ export const projectiles: ArtCollectionParts['projectiles'] = {
     b.boxC(0, -0.02, 0.2, 0.04, 0.04, 0.07, 'plain', 'iron'); // tip
     b.boxC(0, -0.02, -0.22, 0.05, 0.04, 0.08, 'cloth', 'plaster'); // fletching
   },
+  // a sling stone: small and round
+  pebble: (b) => {
+    b.boxC(0, -0.035, 0, 0.07, 0.07, 0.07, 'rock', 'stone');
+  },
   stone: (b) => {
     b.boxC(0, -0.08, 0, 0.16, 0.16, 0.16, 'rock', 'stone');
     b.boxC(0.03, -0.04, 0.02, 0.1, 0.1, 0.1, 'rock', 'stone-light');

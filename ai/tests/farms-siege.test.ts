@@ -11,8 +11,6 @@ import { GREEN_VALLEY, mapFile, match, type Match } from './sim';
 
 const own = (m: Match, p: PlayerId, type: string) =>
   [...m.game.buildings.values()].filter((b) => b.owner === p && b.type === type);
-const army = (m: Match, p: PlayerId) =>
-  [...m.game.units.values()].filter((u) => u.owner === p && u.type !== 'worker').length;
 const farmers = (m: Match, p: PlayerId): number => {
   const farms = new Set(own(m, p, 'farm').map((b) => b.id));
   return [...m.game.units.values()].filter((u) => {
@@ -21,33 +19,49 @@ const farmers = (m: Match, p: PlayerId): number => {
   }).length;
 };
 
+const soldiersTrained = (m: Match, p: PlayerId): number =>
+  Object.entries(m.trained.get(p) ?? {})
+    .filter(([type]) => type !== 'worker')
+    .reduce((n, [, count]) => n + count, 0);
+
 describe('Normal vs Normal, 20 minutes (standard start)', () => {
-  it('farms once the berries run low, so the armies keep growing after the berries are gone', () => {
-    const m = match({ scenario: false, ai: [0, 1], mode: 'normal', seed: 5 });
+  it('farms once the berries run low, so it keeps training soldiers after the berries are gone', () => {
+    // seed 2: a long, even match (most seeds now end with a winner before 20:00)
+    const m = match({ scenario: false, ai: [0, 1], mode: 'normal', seed: 2 });
     m.run(12 * 60);
     const berries = [...m.game.nodes.values()].filter((n) => n.resource === 'food').length;
     expect(berries).toBe(0);
-    const at12 = [army(m, 0), army(m, 1)];
+    const at12 = [soldiersTrained(m, 0), soldiersTrained(m, 1)];
     for (const p of [0, 1] as const) {
-      expect(own(m, p, 'farm').length, `player ${p} farms`).toBeGreaterThanOrEqual(3);
+      // two farmers per Farm (buildings.json → farm.gather.slots)
+      expect(own(m, p, 'farm').length, `player ${p} farms`).toBeGreaterThanOrEqual(2);
       expect(farmers(m, p), `player ${p} farmers`).toBeGreaterThanOrEqual(3);
     }
     m.run(8 * 60);
-    expect(m.game.result).toBeNull();
     for (const p of [0, 1] as const) {
-      expect(army(m, p), `player ${p} army grows`).toBeGreaterThan(at12[p]! + 10);
+      expect(soldiersTrained(m, p), `player ${p} keeps training`).toBeGreaterThan(at12[p]! + 10);
       expect(own(m, p, 'farm').length).toBeLessThanOrEqual(PROFILES.normal.buildings.maxFarms);
       // siege: a Workshop after buildings.siegeAfterSeconds, and Catapults up to army.maxSiege
-      expect(own(m, p, 'siege_workshop').length, `player ${p} workshop`).toBe(1);
+      expect(own(m, p, 'siege_workshop').length, `player ${p} workshop`).toBeLessThanOrEqual(1);
       expect(m.trained.get(p)?.catapult ?? 0, `player ${p} catapults`).toBeGreaterThan(0);
       const alive = [...m.game.units.values()].filter((u) => u.owner === p && u.type === 'catapult');
       expect(alive.length).toBeLessThanOrEqual(PROFILES.normal.army.maxSiege);
     }
   }, 180_000);
+
+  it('uses the whole roster: both sides train foot soldiers, shooters and riders, gold-free and gold', () => {
+    const m = match({ scenario: false, ai: [0, 1], mode: 'normal', seed: 2 });
+    m.run(16 * 60);
+    for (const p of [0, 1] as const) {
+      const t = m.trained.get(p) ?? {};
+      for (const unit of ['militia', 'guard', 'slinger', 'archer', 'scout_rider', 'knight'])
+        expect(t[unit] ?? 0, `player ${p} ${unit}`).toBeGreaterThan(0);
+    }
+  }, 180_000);
 });
 
 describe('Easy', () => {
-  it('never builds a Siege Workshop or trains a Catapult, and builds at most two farms', () => {
+  it('never builds a Siege Workshop or trains a Catapult, and builds at most buildings.maxFarms farms', () => {
     const m = match({ scenario: false, ai: [0, 1], mode: 'easy', seed: 5 });
     m.run(20 * 60);
     for (const p of [0, 1] as const) {

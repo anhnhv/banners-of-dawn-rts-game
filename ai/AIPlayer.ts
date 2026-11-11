@@ -353,7 +353,7 @@ export class MachinePlayer {
 
   /**
    * Where a worker gathers `r`: a node near home (nodeFor), or one of our gather buildings with a
-   * free slot. Nodes are preferred while there are some (berries are faster than a farm).
+   * free slot. Nodes are preferred while there are some (berries cost nothing; a farm costs wood).
    */
   private sourceFor(
     obs: Observation,
@@ -521,13 +521,14 @@ export class MachinePlayer {
     }
 
     // farms (gather buildings), one at a time, once the safe nodes of their resource run low:
-    // as many as the workers that resource should get, up to buildings.maxFarms
+    // enough slots for the workers that resource should get, up to buildings.maxFarms
     for (const r of RESOURCES) {
       const farm = this.cheapestBuilding((t) => this.data.buildings[t]?.gather?.resource === r);
       if (!farm || p.maxFarms <= 0 || this.safeAmount(obs, sit, r) >= this.profile.economy.farmWhenFoodBelow)
         continue;
       const share = this.desiredShares(obs, sit, [])[r];
-      const want = Math.min(p.maxFarms, Math.max(1, Math.ceil(share * sit.workers.length)));
+      const slots = Math.max(1, this.data.buildings[farm.type]?.gather?.slots ?? 1);
+      const want = Math.min(p.maxFarms, Math.max(1, Math.ceil((share * sit.workers.length) / slots)));
       if (this.count(sit, farm.type) < want && this.sitesOf(sit, farm.type) === 0)
         this.pushBuild(out, obs, sit, farm.type, prio.farm, 'back', p.farmDistance);
     }

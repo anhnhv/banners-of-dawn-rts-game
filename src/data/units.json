@@ -19,7 +19,7 @@
       "combat": { "autoAttack": false, "stance": "aggressive", "fleeWhenHit": 4 },
       "interactions": {
         "gather": {
-          "targets": { "tree": 0.4, "pine": 0.4, "berry_bush": 0.45, "gold_mine": 0.35, "farm": 0.35 }
+          "targets": { "tree": 0.4, "pine": 0.4, "berry_bush": 0.45, "gold_mine": 0.35, "farm": 0.45 }
         },
         "attack": { "targets": ["unit", "building"] }
       },
@@ -28,7 +28,7 @@
     },
     "militia": {
       "name": "Militia",
-      "description": "Cheap spear wall that stops horses. Strong vs Scout Rider and Knight. Weak vs Archer; too slow to catch anything.",
+      "description": "Cheap spear wall that stops horses. Strong vs Guard, Scout Rider and Knight. Weak vs Slinger and Archer; too slow to catch anything.",
       "model": "militia",
       "icon": "spear",
       "class": "infantry",
@@ -40,7 +40,63 @@
       "speed": 2.0,
       "sight": 4,
       "radius": 0.25,
-      "attack": { "damage": 4, "range": 0, "cooldown": 1.5, "bonus": { "cavalry": 6 } },
+      "attack": { "damage": 4, "range": 0, "cooldown": 1.5, "bonus": { "cavalry": 6, "heavy": 1 } },
+      "combat": { "autoAttack": true, "stance": "aggressive" },
+      "interactions": { "attack": { "targets": ["unit", "building"] } },
+      "panel": ["hp", "armor", "speed", "attack", "stance", "task"],
+      "actions": [
+        { "type": "attackMove", "hotkey": "Q" },
+        { "type": "stop", "hotkey": "W" },
+        { "type": "stance", "stance": "hold", "hotkey": "E" },
+        { "type": "stance", "stance": "aggressive", "hotkey": "R" }
+      ]
+    },
+    "guard": {
+      "name": "Guard",
+      "description": "Shield wall in heavy armor: arrows barely hurt it. Strong vs Archer, Scout Rider and Knight. Weak vs Militia and Slinger; costs gold.",
+      "model": "guard",
+      "icon": "guard",
+      "class": "heavy",
+      "cost": { "food": 45, "gold": 45 },
+      "trainTime": 22,
+      "pop": 1,
+      "hp": 95,
+      "armor": 1,
+      "speed": 2.0,
+      "sight": 4,
+      "radius": 0.27,
+      "attack": { "damage": 4, "range": 0, "cooldown": 1.6, "bonus": { "cavalry": 6 } },
+      "combat": { "autoAttack": true, "stance": "aggressive" },
+      "interactions": { "attack": { "targets": ["unit", "building"] } },
+      "panel": ["hp", "armor", "speed", "attack", "stance", "task"],
+      "actions": [
+        { "type": "attackMove", "hotkey": "Q" },
+        { "type": "stop", "hotkey": "W" },
+        { "type": "stance", "stance": "hold", "hotkey": "E" },
+        { "type": "stance", "stance": "aggressive", "hotkey": "R" }
+      ]
+    },
+    "slinger": {
+      "name": "Slinger",
+      "description": "Cheap stone thrower that needs no gold. Strong vs Militia and Guard. Weak vs Archer, Scout Rider and Knight; short range, barely hurts buildings.",
+      "model": "slinger",
+      "icon": "sling",
+      "class": "ranged",
+      "cost": { "food": 15, "wood": 40 },
+      "trainTime": 16,
+      "pop": 1,
+      "hp": 24,
+      "armor": 0,
+      "speed": 2.2,
+      "sight": 5,
+      "radius": 0.24,
+      "attack": {
+        "damage": 2,
+        "range": 3.5,
+        "cooldown": 1.5,
+        "bonus": { "infantry": 6, "heavy": 6 },
+        "projectile": "pebble"
+      },
       "combat": { "autoAttack": true, "stance": "aggressive" },
       "interactions": { "attack": { "targets": ["unit", "building"] } },
       "panel": ["hp", "armor", "speed", "attack", "stance", "task"],
@@ -53,7 +109,7 @@
     },
     "archer": {
       "name": "Archer",
-      "description": "Back-line shooter that melts infantry. Strong vs Militia. Weak vs Scout Rider and Knight; barely hurts buildings.",
+      "description": "Long-range shooter that melts light foot soldiers. Strong vs Militia and Slinger. Weak vs Guard, Scout Rider and Knight; barely hurts buildings.",
       "model": "archer",
       "icon": "bow",
       "class": "ranged",
@@ -84,7 +140,7 @@
     },
     "scout_rider": {
       "name": "Scout Rider",
-      "description": "Fast raider: hunts workers and archers, then runs. Strong vs Archer and workers. Weak vs Militia and Knight; barely hurts buildings.",
+      "description": "Fast raider: hunts workers and shooters, then runs. Strong vs Slinger, Archer and workers. Weak vs Militia, Guard and Knight; barely hurts buildings.",
       "model": "scoutRider",
       "icon": "horse",
       "class": "cavalry",
@@ -114,7 +170,7 @@
     },
     "knight": {
       "name": "Knight",
-      "description": "Heavy shock cavalry that breaks archer lines and leads assaults. Strong vs Archer and Scout Rider; shrugs off base arrows. Weak vs Militia; costs gold and 2 population.",
+      "description": "Armored shock cavalry that breaks shooter lines and leads assaults. Strong vs Slinger, Archer and Scout Rider; shrugs off base arrows. Weak vs Militia and Guard; costs gold and 2 population.",
       "model": "knight",
       "icon": "knight",
       "class": "cavalry",
@@ -170,6 +226,7 @@
           "building": 2,
           "siege": 3,
           "infantry": 4,
+          "heavy": 4,
           "ranged": 4,
           "cavalry": 4,
           "worker": 5

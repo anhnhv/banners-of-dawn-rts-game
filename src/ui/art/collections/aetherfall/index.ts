@@ -525,6 +525,36 @@ const units: ArtCollectionParts['units'] = {
     kit.body.boxC(0, 1.14, 0.02, 0.06, 0.16, 0.07, 'cloth', 'team-light');
   },
 
+  // Heavy foot soldier: plate, a crested full helm, a tall tapered shield and a short sword.
+  guard: (kit) => {
+    const sword = (a: VoxelBuilder): void => {
+      a.boxC(0.02, -0.4, 0.08, 0.06, 0.04, 0.16, 'plain', 'gold');
+      a.boxC(0.02, -0.39, 0.3, 0.045, 0.03, 0.4, 'plain', 'iron');
+    };
+    person(kit, 'iron-dark', 'iron', 'iron-dark', 'iron', sword);
+    const b = kit.body;
+    b.boxC(0, 0.94, 0.02, 0.23, 0.2, 0.21, 'plain', 'iron'); // closed helm over the face
+    b.boxC(0, 0.97, 0.13, 0.15, 0.035, 0.02, 'plain', 'shadow'); // visor slit
+    b.boxC(0, 1.16, 0.0, 0.06, 0.14, 0.2, 'cloth', 'team-light'); // crest
+    taperedPrism(b, -0.25, 0.22, 0.1, 0.36, 0.1, 0.3, 0.08, 0.68, 'planks', 'team', 'team-light');
+    b.boxC(-0.25, 0.6, 0.16, 0.12, 0.12, 0.035, 'plain', 'gold');
+    b.boxC(-0.25, 0.9, 0.1, 0.32, 0.04, 0.1, 'plain', 'iron-dark');
+  },
+
+  // Light skirmisher: bare-headed with a team headband, a stone pouch and a loaded sling.
+  slinger: (kit) => {
+    const sling = (a: VoxelBuilder): void => {
+      a.boxC(0.025, -0.52, 0.03, 0.018, 0.2, 0.018, 'plain', 'leather');
+      a.boxC(-0.025, -0.52, 0.03, 0.018, 0.2, 0.018, 'plain', 'leather');
+      taperedPrism(a, 0, -0.68, 0.03, 0.1, 0.1, 0.07, 0.07, 0.08, 'rock', 'stone', 'stone-light');
+    };
+    person(kit, 'team-light', 'cloth', 'leather', 'skin', sling);
+    const b = kit.body;
+    b.boxC(0, 1.06, 0.015, 0.23, 0.05, 0.23, 'cloth', 'team'); // headband
+    b.boxC(-0.13, 0.4, 0.13, 0.14, 0.14, 0.08, 'plain', 'leather'); // pouch
+    b.boxC(-0.13, 0.54, 0.13, 0.08, 0.04, 0.05, 'rock', 'stone-light');
+  },
+
   archer: (kit) => {
     person(kit, 'team-dark', 'leather', 'leather', 'team-dark');
     kit.body.boxC(0, 1.1, -0.1, 0.26, 0.17, 0.2, 'cloth', 'team');
@@ -715,6 +745,9 @@ const projectiles: NonNullable<ArtCollection['projectiles']> = {
     b.boxC(0, 0, 0, 0.025, 0.025, 0.44, 'bark', 'wood-light');
     b.pyramidRoof(-0.045, -0.035, 0.16, 0.09, 0.09, 0.16, 'plain', 'iron', 0.01);
     b.boxC(0, 0, -0.22, 0.08, 0.045, 0.1, 'cloth', 'team-light');
+  },
+  pebble: (b) => {
+    taperedPrism(b, 0, -0.04, 0, 0.09, 0.09, 0.06, 0.06, 0.08, 'rock', 'stone', 'stone-light');
   },
   stone: (b) => {
     taperedPrism(b, 0, -0.08, 0, 0.2, 0.2, 0.12, 0.12, 0.18, 'rock', 'stone-dark', 'stone-light');

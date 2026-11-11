@@ -49,7 +49,7 @@
     "reissueSeconds": 4,
     "unitChoice": "counter",
     "counterShare": 0.7,
-    "counterRangedEdge": 1.5,
+    "counterRangedEdge": 2,
     "counterMinShare": 0.5,
     "maxSiege": 3
   },

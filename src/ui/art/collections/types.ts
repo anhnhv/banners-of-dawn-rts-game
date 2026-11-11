@@ -27,7 +27,8 @@ export type BuildingModel =
   | 'tower'
   | 'goldMine'
   | 'berryBush';
-export type UnitModel = 'worker' | 'militia' | 'archer' | 'scoutRider' | 'knight' | 'catapult';
+export type UnitModel =
+  'worker' | 'militia' | 'guard' | 'slinger' | 'archer' | 'scoutRider' | 'knight' | 'catapult';
 export type TreeModel = 'oak' | 'oakTall' | 'pine' | 'pineSmall';
 export type WallAxis = 'x' | 'z';
 
@@ -56,6 +57,8 @@ export type IconName =
   | 'berryBush'
   | 'goldMine'
   | 'catapult'
+  | 'guard'
+  | 'sling'
   | 'farm'
   | 'workshop'
   | 'help'
