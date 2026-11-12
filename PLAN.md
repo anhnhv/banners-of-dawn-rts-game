@@ -1224,7 +1224,16 @@ Sizes: **S** ≈ small, **M** ≈ medium, **L** ≈ large (relative effort).
   - Paths are smoothed by a line-of-sight check that refuses corner squeezing.
   - Units follow their path at terrain speed.
   - A unit with no progress for 24 ticks requests a new path, up to 3 times. In a crowd at the destination it counts as arrived once within 1 tile.
-  - Soft separation: a standing unit yields to a moving one, and no unit is ever pushed onto a blocked tile.
+  - ~~Soft separation: a standing unit yields to a moving one~~ (replaced 2026-11-11, see "No pushing" below). No unit is ever pushed onto a blocked tile.
+  - **No pushing (2026-11-11):** a walking unit never walks into another unit and never shoves it.
+    - Steering: if the next step would touch a unit it is closing in on, it turns 20°, 40° … 100° to one side (away from that unit, kept until the way is clear so it does not zig-zag), then the other side. If nothing is free it waits. Head-on walkers both turn the same way and pass.
+    - Paths: A\* adds 4 steps of cost to tiles where a unit stands (`isStanding` = no path, none pending), and smoothing will not cut across them, so routes go around standing units when there is room. After getting stuck, the new path also avoids the units right next to it (walkers included).
+    - Waiting behind a standing unit counts 4× faster as stuck (it will not move). On the last leg, standing units within 3 tiles of the goal mean "arrived, it is full".
+    - A crowd cannot all pass through one corner point: a unit within 0.9 tiles of a waypoint heads for the next one once it is in clear sight.
+    - Make way (last resort): a unit still boxed in after one new path asks an **idle unit of its own player** in the way to take a short step aside by itself (a 1-step `move` order). Units with orders, at work, on hold or of another player are never asked.
+    - Separation only fixes overlaps that still happen (spawns, squeezes): the more settled unit (working > standing > walking) keeps its spot; equals share.
+    - Attack and gather spots: `approachPoint` skips spots another unit stands on or walks to; melee attackers of a unit pick their own free spot on a ring around it (`spotAround` in `orders.ts`). Without this, everyone lined up behind the same spot.
+    - Tests: `tests/engine/game.test.ts` (walk around standing units without touching or moving them; head-on pass; boxed-in unit gets out).
 - **Group moves:** `formationSlots` and `assignSlots` give every unit its own spot around the click. Each unit walks at its own speed, so cavalry arrives first.
 - **Host:** `host/GameHost.ts` owns the `requestAnimationFrame` loop. `FixedStepClock` runs 20 ticks/s; the host stamps UI commands with the current tick (and logs them), then calls `GameScreen.frame(dt, view, alpha)`.
 - **UI:**
@@ -1529,5 +1538,7 @@ Map editor, random maps, save/load, replay viewer, camera rotation, terrain elev
 **Army (M6.5, 2026-11-07):** the Barracks trains Militia and Archers, and the new Stable (build menu A) trains Scout Riders and Knights. Each unit's role, weakness and best situation are in `docs/units.md`; `tests/engine/balance.test.ts` proves the counter cycle. Normal picks counters to what it sees; Easy only presses the Militia button.
 
 **M8 (2026-11-11):** Farm = 2 workers at 0.45 food/s. Six field units in a 3×2 grid (Militia/Guard, Slinger/Archer, Scout Rider/Knight; left needs no gold, right needs gold); every unit has at least two counters (rule 5) and the game works without gold (rule 6). Open points are listed in `docs/plans/m8-roster-grid.md` §6 (starting gold, Catapult vs Slinger).
+
+**Movement fix (2026-11-11, not committed yet):** units no longer push others; they step around them, wait, or (only idle own units, as a last resort) ask them to step aside. Details in §12 M2 "No pushing". `npm run check`: 374 of 377 tests pass. The 3 that fail are balance claims that relied on melee units barging through the enemy front line: (1) `ai/tests/novice.test.ts`: the novice's single Militia attack at 12:00 leaves Easy's Town Hall at 516 HP; (2) `balance.test.ts`: "Militia beat the Guard + Archer + Knight mix" now loses narrowly; (3) the `docs/units.md` §3.1 pairs table changed (melee pairs such as M+G and M+K win fewer matchups). **Open:** the user decides: retune (unit stats, Easy profile) and regenerate the §3.1 table, or tune movement further.
 
 **Next:** ask the user. The user wants players to customize their own AI for auto play (2026-11-09); the next step there is a Custom AI profile editor (see the AI module extraction notes in §12). Other open points: a Hard mode (the menu lists modes from `src/ai/profiles/` by itself); fog of war; custom pace sliders and AI timings scaled by pace; sound and music; illustrated How to Play. No eras (decision 2026-11-07).

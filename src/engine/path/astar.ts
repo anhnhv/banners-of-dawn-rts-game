@@ -1,7 +1,9 @@
 /**
  * A* on the tile grid (PLAN §5.5): 8 directions, octile heuristic, no corner cutting,
  * terrain cost = 1 / terrain speed, binary heap, node cap. If the goal cannot be reached
- * (or the cap is hit) it returns the path to the closest node found.
+ * (or the cap is hit) it returns the path to the closest node found. Optional `avoid` tiles (where
+ * units stand) cost `avoidCost` extra to enter: paths go around them when there is room, and
+ * through them only when there is no other way.
  *
  * Scratch arrays are reused between searches (stamped with a search id) so a search allocates
  * almost nothing — important with dozens of path requests per second.
@@ -29,6 +31,14 @@ const DIRS: ReadonlyArray<readonly [number, number, number]> = [
   [-1, -1, SQRT2],
 ];
 
+export interface FindOptions {
+  maxNodes?: number;
+  /** Tiles to walk around if possible (tile indices). */
+  avoid?: ReadonlySet<number>;
+  /** Extra cost of entering an `avoid` tile, in straight steps. */
+  avoidCost?: number;
+}
+
 export class PathFinder {
   private readonly size: number;
   private readonly g: Float32Array;
@@ -50,8 +60,9 @@ export class PathFinder {
     this.heap = new Int32Array(this.size);
   }
 
-  find(sx: number, sy: number, gx: number, gy: number, maxNodes = 6000): PathResult {
+  find(sx: number, sy: number, gx: number, gy: number, opts: FindOptions = {}): PathResult {
     const { grid } = this;
+    const { maxNodes = 6000, avoid, avoidCost = 0 } = opts;
     if (!grid.inBounds(sx, sy) || !grid.inBounds(gx, gy))
       return { tiles: [], reachedGoal: false, expanded: 0 };
     const start = grid.index(sx, sy);
@@ -101,7 +112,8 @@ export class PathFinder {
           continue;
         const n = grid.index(nx, ny);
         if (this.closedStamp[n] === stamp) continue;
-        const cost = gCurrent + step / Math.max(0.1, grid.rule(nx, ny).speed);
+        let cost = gCurrent + step / Math.max(0.1, grid.rule(nx, ny).speed);
+        if (avoid?.has(n)) cost += avoidCost;
         if (this.openStamp[n] === stamp && cost >= (this.g[n] ?? Infinity)) continue;
         this.g[n] = cost;
         this.f[n] = cost + octile(nx, ny, gx, gy);

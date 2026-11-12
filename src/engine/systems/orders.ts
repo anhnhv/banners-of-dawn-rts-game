@@ -18,7 +18,7 @@ import type { Building, Rect, ResourceNode } from '../entities/Building';
 import { gatherRate, type Order, type Unit } from '../entities/Unit';
 import { claimSlot, hasFreeSlot, sourceFor, type GatherSource } from './gatherSources';
 import type { GameState } from '../GameState';
-import { attackOf, centerOf, combatant, gap, inAttackRange, isUnit, strike } from './combat';
+import { attackOf, centerOf, combatant, gap, inAttackRange, isUnit, reachOf, strike } from './combat';
 import { clearGoal, setGoal } from './movement';
 import { approachPoint, inReach } from './reach';
 
@@ -94,11 +94,18 @@ function attack(state: GameState, u: Unit, o: Extract<Order, { kind: 'attack' }>
     const beside = state.grid.isPassable(Math.floor(target.x), Math.floor(target.y))
       ? null
       : besidePoint(state, target, u);
-    const to = beside ?? c;
-    if (!u.goal || Math.hypot(u.goal.x - to.x, u.goal.y - to.y) > (beside ? 0.01 : 0.75))
-      setGoal(state, u, to);
+    if (beside) {
+      if (!u.goal || Math.hypot(u.goal.x - beside.x, u.goal.y - beside.y) > 0.01) setGoal(state, u, beside);
+    } else if (def.range > 0) {
+      if (!u.goal || Math.hypot(u.goal.x - c.x, u.goal.y - c.y) > 0.75) setGoal(state, u, c);
+    } else {
+      // melee: its own free spot next to the target (units do not push each other out of the way)
+      const ring = u.radius + target.radius + reachOf(def) * 0.5;
+      if (!u.goal || Math.hypot(u.goal.x - c.x, u.goal.y - c.y) > ring + 0.75)
+        setGoal(state, u, spotAround(state, u, target, ring));
+    }
   } else if (!u.goal) {
-    const spot = approachPoint(state.grid, target, u);
+    const spot = approachPoint(state.grid, target, u, spotTaken(state, u));
     if (!spot) {
       finish(u);
       return;
@@ -139,7 +146,7 @@ function gather(state: GameState, u: Unit, o: Extract<Order, { kind: 'gather' }>
       o.phase = 'harvest';
       clearGoal(u);
     } else {
-      const spot = approachPoint(state.grid, src, u);
+      const spot = u.goal && !u.arrived ? u.goal : approachPoint(state.grid, src, u, spotTaken(state, u));
       if (!spot || (u.arrived && u.blocked)) {
         // this source cannot be reached: try another one of the same resource
         const other = findSource(state, u, o.resource, src.x, src.y, src.id);
@@ -204,6 +211,41 @@ function walkStraight(u: Unit, p: { x: number; y: number }): boolean {
   u.facing = Math.atan2(dx, dy);
   u.activity = 'walk';
   return false;
+}
+
+/**
+ * Spots next to a target that another unit already uses: it stands there, or walks there. Units
+ * do not push each other, so each attacker or gatherer picks its own spot around the target.
+ */
+function spotTaken(state: GameState, u: Unit): (p: { x: number; y: number }) => boolean {
+  return (p) => {
+    for (const o of state.units.values()) {
+      if (o === u) continue;
+      const g = o.goal && !o.arrived ? o.goal : null;
+      if (g && Math.hypot(g.x - p.x, g.y - p.y) < 0.5) return true;
+      if (Math.hypot(o.x - p.x, o.y - p.y) < u.radius + o.radius) return true;
+    }
+    return false;
+  };
+}
+
+/**
+ * A free spot on a circle of radius `ring` around unit `t`, the nearest one to `u` that is on
+ * passable ground and not taken by another unit (standing there or heading there). The target's
+ * center if every spot is taken.
+ */
+function spotAround(state: GameState, u: Unit, t: Unit, ring: number): { x: number; y: number } {
+  const taken = spotTaken(state, u);
+  const base = Math.atan2(u.y - t.y, u.x - t.x);
+  const STEPS = 12;
+  for (let k = 0; k <= STEPS / 2; k++) {
+    for (const sign of k === 0 || k === STEPS / 2 ? [1] : [1, -1]) {
+      const a = base + (sign * k * 2 * Math.PI) / STEPS;
+      const p = { x: t.x + Math.cos(a) * ring, y: t.y + Math.sin(a) * ring };
+      if (state.grid.isPassable(Math.floor(p.x), Math.floor(p.y)) && !taken(p)) return p;
+    }
+  }
+  return { x: t.x, y: t.y };
 }
 
 /**

@@ -20,11 +20,14 @@ export function inReach(u: Unit, r: Rect, reach: number): boolean {
  * Where to stand to reach a rectangle: the passable tile around it nearest to `from` that can be
  * walked to from `from` (same grid region). Returns null when there is none, e.g. a tree deep
  * inside a forest, or one whose free neighbours are a pocket enclosed by other trees. When `from`
- * is not on a passable tile, any free neighbour counts.
+ * is not on a passable tile, any free neighbour counts. With `taken` (spots where another unit
+ * stands or is heading), the nearest spot that is not taken wins; only when every spot is taken
+ * does the nearest taken one.
  */
-export function approachPoint(grid: Grid, r: Rect, from: Point): Point | null {
+export function approachPoint(grid: Grid, r: Rect, from: Point, taken?: (p: Point) => boolean): Point | null {
   let best: Point | null = null;
   let bestD = Infinity;
+  let bestTaken = true;
   const region = grid.regionAt(Math.floor(from.x), Math.floor(from.y));
   for (let y = r.y - 1; y <= r.y + r.h; y++) {
     for (let x = r.x - 1; x <= r.x + r.w; x++) {
@@ -35,9 +38,11 @@ export function approachPoint(grid: Grid, r: Rect, from: Point): Point | null {
       const cx = x + 0.5 + Math.sign(r.x + r.w / 2 - (x + 0.5)) * (x < r.x || x >= r.x + r.w ? 0.2 : 0);
       const cy = y + 0.5 + Math.sign(r.y + r.h / 2 - (y + 0.5)) * (y < r.y || y >= r.y + r.h ? 0.2 : 0);
       const d = Math.hypot(cx - from.x, cy - from.y);
-      if (d < bestD) {
+      const isTaken = taken?.({ x: cx, y: cy }) ?? false;
+      if ((bestTaken && !isTaken) || (isTaken === bestTaken && d < bestD)) {
         bestD = d;
         best = { x: cx, y: cy };
+        bestTaken = isTaken;
       }
     }
   }

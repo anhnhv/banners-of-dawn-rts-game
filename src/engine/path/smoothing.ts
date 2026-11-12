@@ -14,7 +14,13 @@ export interface Point {
  * Walks every tile the segment touches; when the segment passes exactly through a tile corner,
  * both side tiles must be free (so units never slip diagonally between two blocked tiles).
  */
-export function lineOfSight(grid: Grid, a: Point, b: Point): boolean {
+export function lineOfSight(
+  grid: Grid,
+  a: Point,
+  b: Point,
+  avoid?: (x: number, y: number) => boolean,
+): boolean {
+  const free = (tx: number, ty: number): boolean => grid.isPassable(tx, ty) && !avoid?.(tx, ty);
   let x = Math.floor(a.x);
   let y = Math.floor(a.y);
   const endX = Math.floor(b.x);
@@ -28,12 +34,12 @@ export function lineOfSight(grid: Grid, a: Point, b: Point): boolean {
   let tMaxX = dx !== 0 ? (dx > 0 ? x + 1 - a.x : a.x - x) * tDeltaX : Infinity;
   let tMaxY = dy !== 0 ? (dy > 0 ? y + 1 - a.y : a.y - y) * tDeltaY : Infinity;
 
-  if (!grid.isPassable(x, y)) return false;
+  if (!free(x, y)) return false;
   let guard = 0;
   while ((x !== endX || y !== endY) && guard++ < 4096) {
     if (Math.abs(tMaxX - tMaxY) < 1e-9) {
       // passing through a corner: both neighbours must be free
-      if (!grid.isPassable(x + stepX, y) || !grid.isPassable(x, y + stepY)) return false;
+      if (!free(x + stepX, y) || !free(x, y + stepY)) return false;
       x += stepX;
       y += stepY;
       tMaxX += tDeltaX;
@@ -45,13 +51,21 @@ export function lineOfSight(grid: Grid, a: Point, b: Point): boolean {
       y += stepY;
       tMaxY += tDeltaY;
     }
-    if (!grid.isPassable(x, y)) return false;
+    if (!free(x, y)) return false;
   }
   return true;
 }
 
-/** Greedy string pulling: keep only the waypoints needed to stay on passable tiles. */
-export function smoothPath(grid: Grid, points: readonly Point[]): Point[] {
+/**
+ * Greedy string pulling: keep only the waypoints needed to stay on passable tiles. `avoid` tiles
+ * (where units stand) count as blocked for the shortcut, so a path that walks around a unit stays
+ * around it.
+ */
+export function smoothPath(
+  grid: Grid,
+  points: readonly Point[],
+  avoid?: (x: number, y: number) => boolean,
+): Point[] {
   if (points.length <= 2) return [...points];
   const out: Point[] = [];
   let anchor = 0;
@@ -59,7 +73,7 @@ export function smoothPath(grid: Grid, points: readonly Point[]): Point[] {
   while (anchor < points.length - 1) {
     let next = anchor + 1;
     for (let j = points.length - 1; j > anchor + 1; j--) {
-      if (lineOfSight(grid, points[anchor] as Point, points[j] as Point)) {
+      if (lineOfSight(grid, points[anchor] as Point, points[j] as Point, avoid)) {
         next = j;
         break;
       }

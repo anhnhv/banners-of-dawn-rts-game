@@ -95,6 +95,69 @@ describe('Game: movement', () => {
     expect(u.y).toBeCloseTo(12.5, 1);
   });
 
+  it('walks around a standing unit: never touches it, never pushes it', () => {
+    const game = createGame(openMap(30, 30), { seed: 1 });
+    const idle = game.debugSpawn(0, 'militia', 10.5, 10.5);
+    const other = game.debugSpawn(0, 'worker', 14.5, 10.6);
+    const walker = game.debugSpawn(0, 'knight', 4.5, 10.5);
+    const start = (id: number): [number, number] => [game.units.get(id)!.x, game.units.get(id)!.y];
+    const [ix, iy] = start(idle);
+    const [ex, ey] = start(other);
+    send(game, 0, { type: 'move', units: [walker], to: { x: 20.5, y: 10.5 } });
+    let closest = Infinity;
+    for (let t = 0; t < 20 * 10; t++) {
+      game.step();
+      const w = game.units.get(walker)!;
+      for (const id of [idle, other]) {
+        const o = game.units.get(id)!;
+        closest = Math.min(closest, Math.hypot(o.x - w.x, o.y - w.y) - o.radius - w.radius);
+      }
+    }
+    expect(closest).toBeGreaterThan(0);
+    expect(game.units.get(idle)!.x).toBe(ix);
+    expect(game.units.get(idle)!.y).toBe(iy);
+    expect(game.units.get(other)!.x).toBe(ex);
+    expect(game.units.get(other)!.y).toBe(ey);
+    const w = game.units.get(walker)!;
+    expect(w.orders).toHaveLength(0);
+    expect(Math.hypot(w.x - 20.5, w.y - 10.5)).toBeLessThan(0.1);
+  });
+
+  it('two units walking head-on pass each other without touching', () => {
+    const game = createGame(openMap(30, 30), { seed: 1 });
+    const a = game.debugSpawn(0, 'militia', 4.5, 10.5);
+    const b = game.debugSpawn(0, 'militia', 20.5, 10.5);
+    send(game, 0, { type: 'move', units: [a], to: { x: 20.5, y: 10.5 } });
+    send(game, 0, { type: 'move', units: [b], to: { x: 4.5, y: 10.5 } });
+    let closest = Infinity;
+    for (let t = 0; t < 20 * 12; t++) {
+      game.step();
+      const ua = game.units.get(a)!;
+      const ub = game.units.get(b)!;
+      closest = Math.min(closest, Math.hypot(ua.x - ub.x, ua.y - ub.y) - ua.radius - ub.radius);
+    }
+    expect(closest).toBeGreaterThan(0);
+    expect(Math.hypot(game.units.get(a)!.x - 20.5, game.units.get(a)!.y - 10.5)).toBeLessThan(0.1);
+    expect(Math.hypot(game.units.get(b)!.x - 4.5, game.units.get(b)!.y - 10.5)).toBeLessThan(0.1);
+  });
+
+  it('a unit boxed in by idle friends gets out: they step aside by themselves', () => {
+    const game = createGame(openMap(30, 30), { seed: 1 });
+    const ring: number[] = [];
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4;
+      ring.push(game.debugSpawn(0, 'militia', 10.5 + Math.cos(a) * 0.55, 10.5 + Math.sin(a) * 0.55));
+    }
+    const inside = game.debugSpawn(0, 'militia', 10.5, 10.5);
+    send(game, 0, { type: 'move', units: [inside], to: { x: 20.5, y: 10.5 } });
+    run(game, 20 * 15);
+    const u = game.units.get(inside)!;
+    expect(Math.hypot(u.x - 20.5, u.y - 10.5)).toBeLessThan(0.1);
+    // the ring is still about where it was: only a step aside, nobody got shoved across the map
+    for (const id of ring)
+      expect(Math.hypot(game.units.get(id)!.x - 10.5, game.units.get(id)!.y - 10.5)).toBeLessThan(2);
+  });
+
   it('stops on command', () => {
     const game = createGame(openMap(30, 30), { seed: 1 });
     const id = game.debugSpawn(0, 'militia', 2.5, 2.5);

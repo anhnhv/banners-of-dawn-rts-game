@@ -69,6 +69,8 @@ export interface Unit {
   bestDist: number;
   stuckTicks: number;
   repaths: number;
+  /** Side this unit steps to while walking around another unit (+1 / -1; 0 = not avoiding). */
+  avoidSide: number;
 }
 
 export function createUnit(id: EntityId, owner: PlayerId, type: UnitTypeId, x: number, y: number): Unit {
@@ -106,6 +108,7 @@ export function createUnit(id: EntityId, owner: PlayerId, type: UnitTypeId, x: n
     bestDist: Infinity,
     stuckTicks: 0,
     repaths: 0,
+    avoidSide: 0,
   };
 }
 
@@ -116,6 +119,7 @@ export function clearPath(u: Unit): void {
   u.moving = false;
   u.bestDist = Infinity;
   u.stuckTicks = 0;
+  u.avoidSide = 0;
 }
 
 /** Gather rate (per second) of this unit type for a node kind, or 0 if it cannot gather it. */
