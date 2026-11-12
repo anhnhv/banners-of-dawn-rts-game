@@ -298,30 +298,31 @@ Rule 7: every army of two unit types (half of the budget each) beats at least on
 
 Letters: **M** Militia, **G** Guard, **S** Slinger, **A** Archer, **R** Scout Rider, **K** Knight.
 
-**Measured (2026-11-11), 800 a side.** A pair is listed only for a **clear win**: it wins from either side of the field, and keeps more than 25% of its value both times. Close fights are in neither list, so the two counts of a row do not always add up to 14.
+**Measured (2026-11-12, after the no-pushing movement), 800 a side.** A pair is listed only for a **clear win**: it wins from either side of the field, and keeps more than 25% of its value both times. Close fights are in neither list, so the two counts of a row do not always add up to 14.
 
-| Pair    | Beats                                            | Count | Beaten by                                                       | Count |
-| ------- | ------------------------------------------------ | ----- | --------------------------------------------------------------- | ----- |
-| **M+G** | M+R, M+K, G+R, G+K, S+R, A+R, A+K, R+K           | 8     | M+S, M+A, G+S, G+A, S+A                                         | 5     |
-| **M+S** | M+G, M+R, M+K, G+R, G+K, S+R, R+K                | 7     | M+A, G+A, S+A, S+K, A+K                                         | 5     |
-| **M+A** | M+G, M+S, M+R, M+K, G+R, G+K, S+R, A+R, R+K      | 9     | G+S, G+A, S+A, S+K, A+K                                         | 5     |
-| **M+R** | G+R, S+A, S+R, A+R, R+K                          | 5     | M+G, M+S, M+A, M+K, G+S, G+A, S+K, A+K                          | 8     |
-| **M+K** | M+R, G+A, G+R, G+K, S+A, S+R, S+K, A+R, A+K, R+K | 10    | M+G, M+S, M+A                                                   | 3     |
-| **G+S** | M+G, M+A, M+R, G+A, G+R, S+R, A+R, R+K           | 8     | S+A, S+K, A+K                                                   | 3     |
-| **G+A** | M+G, M+S, M+A, M+R, G+R, S+A, S+R, A+R, R+K      | 9     | M+K, G+S, S+K                                                   | 3     |
-| **G+R** | S+R, A+R, R+K                                    | 3     | M+G, M+S, M+A, M+R, M+K, G+S, G+A, G+K, S+K, A+K                | 10    |
-| **G+K** | G+R, S+A, S+R, S+K, A+R, A+K, R+K                | 7     | M+G, M+S, M+A, M+K                                              | 4     |
-| **S+A** | M+G, M+S, M+A, G+S                               | 4     | M+R, M+K, G+A, G+K, S+R, S+K, A+R, A+K, R+K                     | 9     |
-| **S+R** | S+A                                              | 1     | M+G, M+S, M+A, M+R, M+K, G+S, G+A, G+R, G+K, S+K, A+R, A+K, R+K | 13    |
-| **S+K** | M+S, M+A, M+R, G+S, G+A, G+R, S+A, S+R, A+R      | 9     | M+K, G+K, A+K, R+K                                              | 4     |
-| **A+R** | S+A, S+R                                         | 2     | M+G, M+A, M+R, M+K, G+S, G+A, G+R, G+K, S+K, A+K, R+K           | 11    |
-| **A+K** | M+S, M+A, M+R, G+S, G+R, S+A, S+R, S+K, A+R, R+K | 10    | M+G, M+K, G+K                                                   | 3     |
-| **R+K** | S+A, S+R, S+K, A+R                               | 4     | M+G, M+S, M+A, M+R, M+K, G+S, G+A, G+R, G+K, A+K                | 10    |
+| Pair    | Beats                                       | Count | Beaten by                                                  | Count |
+| ------- | ------------------------------------------- | ----- | ---------------------------------------------------------- | ----- |
+| **M+G** | M+R, M+K, G+R, G+K, S+R, A+R, A+K, R+K      | 8     | M+S, M+A, G+S, G+A, S+A                                    | 5     |
+| **M+S** | M+G, M+R, G+R, S+R                          | 4     | M+A, G+A, S+A, S+K, A+K                                    | 5     |
+| **M+A** | M+G, M+S, M+R, M+K, G+R, G+K, S+R, A+R, R+K | 9     | G+S, G+A, S+A, A+K                                         | 4     |
+| **M+R** | G+R, S+R, R+K                               | 3     | M+G, M+S, M+A, M+K, G+S, G+A, G+K, A+K                     | 8     |
+| **M+K** | M+R, G+R, S+A, S+R, S+K, A+R, R+K           | 7     | M+G, M+A                                                   | 2     |
+| **G+S** | M+G, M+A, M+R, G+A, G+R, A+R                | 6     | S+A, S+K, A+K                                              | 3     |
+| **G+A** | M+G, M+S, M+A, M+R, G+R, S+A, S+R, A+R, R+K | 9     | G+S, S+K                                                   | 2     |
+| **G+R** | S+A, S+R                                    | 2     | M+G, M+S, M+A, M+R, M+K, G+S, G+A, G+K, S+K, A+K           | 10    |
+| **G+K** | M+R, G+R, S+A, S+R, S+K, A+R, A+K, R+K      | 8     | M+G, M+A                                                   | 2     |
+| **S+A** | M+G, M+S, M+A, G+S                          | 4     | M+K, G+A, G+R, G+K, S+K, A+R, A+K, R+K                     | 8     |
+| **S+R** |                                             | 0     | M+G, M+S, M+A, M+R, M+K, G+A, G+R, G+K, S+K, A+R, A+K, R+K | 12    |
+| **S+K** | M+S, G+S, G+A, G+R, S+A, S+R, A+R           | 7     | M+K, G+K, A+K                                              | 3     |
+| **A+R** | S+A, S+R                                    | 2     | M+G, M+A, M+K, G+S, G+A, G+K, S+K, A+K, R+K                | 9     |
+| **A+K** | M+S, M+A, M+R, G+S, G+R, S+A, S+R, S+K, A+R | 9     | M+G, G+K                                                   | 2     |
+| **R+K** | S+A, S+R, A+R                               | 3     | M+G, M+A, M+R, M+K, G+A, G+K                               | 6     |
 
-- Every pair beats between 1 and 10 pairs and loses to between 3 and 13: none wins everything, none is useless.
+- Every pair but one beats between 2 and 9 pairs and loses to between 2 and 12. None wins everything.
+- **Rule 7 is broken for Slinger + Scout Rider (800 a side):** it beats no pair since units stopped pushing through each other (2026-11-12). At 400 a side it still beats Guard + Slinger and Slinger + Archer. Known failure in `balance.test.ts`; open until the user decides on a retune.
 - The test checks the rule at 400 and 800 a side, and this table at 800.
-- **Weakest pairs:** a pair of two light units with no front line. Slinger + Scout Rider beats only Slinger + Archer, and Archer + Scout Rider only the two pairs of shooters without a front line. They are raiding parties, not armies.
-- **Strongest pairs:** a foot soldier or shooter with a Knight (Militia + Knight, Archer + Knight: 10 wins). Each still loses to 3 pairs. Militia + Knight loses only to pairs with Militia, which needs no gold; Archer + Knight also loses to Guard + Knight.
+- **Weakest pairs:** a pair of two light units with no front line. Slinger + Scout Rider beats nothing at 800, and Archer + Scout Rider only the two pairs of shooters without a front line. They are raiding parties, not armies.
+- **Strongest pairs:** a foot soldier or shooter with an Archer or a Knight (Militia + Archer, Guard + Archer, Archer + Knight: 9 wins). Each still loses to 2 to 4 pairs.
 
 ## 4. Damage per hit
 

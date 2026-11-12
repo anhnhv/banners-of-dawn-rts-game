@@ -1,8 +1,9 @@
 /**
  * Movement systems (PLAN §5.3 steps 5–7). Orders decide WHERE a unit should go by setting its
  * `goal` (setGoal); these systems find the path (budgeted, around standing units), walk it with
- * stuck detection while stepping around any unit in the way (never through it, never pushing it),
- * and keep units apart. When the goal is reached `arrived` is set; the order system reacts next tick.
+ * stuck detection while stepping around any unit in the way (never through it, never pushing it,
+ * never asking it to move), and keep units apart.
+ * When the goal is reached `arrived` is set; the order system reacts next tick.
  */
 import { TICK_RATE } from '../../shared';
 import { clearPath, type Unit } from '../entities/Unit';
@@ -15,6 +16,8 @@ export const PATH_BUDGET_PER_TICK = 20000;
 /** Ticks without progress before a unit asks for a new path. */
 const STUCK_TICKS = 24;
 const MAX_REPATHS = 3;
+/** Stuck among walking units (traffic that will clear): keep asking for new paths up to this many times. */
+const MAX_REPATHS_IN_TRAFFIC = 10;
 const ARRIVE_EPSILON = 0.02;
 /** Room kept between two units when one walks past the other (tiles). */
 const UNIT_GAP = 0.03;
@@ -22,10 +25,19 @@ const UNIT_GAP = 0.03;
 const STEER_ANGLES = [20, 40, 60, 80, 100];
 /** Extra A* cost of a tile where a unit stands (straight steps): walk around it if there is room. */
 const UNIT_TILE_COST = 4;
+/** The same after getting stuck: a real detour beats waiting behind units that will not move. */
+const STUCK_UNIT_TILE_COST = 24;
 /** Distance (tiles) from a waypoint at which a unit may head for the next one if it is in sight. */
 const WAYPOINT_SKIP = 0.9;
-/** On the last leg, standing units this close to the goal (tiles) mean "arrived, it is full". */
+/** On the last leg, a walker this close to a full goal (tiles) counts as arrived. */
 const CROWD_ARRIVE = 3;
+/** Standing units around the goal (within GOAL_CROWD_RADIUS) that make it "full". */
+const GOAL_CROWD_COUNT = 3;
+const GOAL_CROWD_RADIUS = 1.25;
+/** While going around a unit, how far ahead (tiles) the straight way must be clear to take it again. */
+const STEER_LOOKAHEAD = 0.5;
+/** Ticks the chosen side is kept after the way ahead clears (so the next blocker is passed the same way). */
+const AVOID_HOLD_TICKS = 8;
 /** Waiting behind a standing unit (it will not make room) counts this many times faster as stuck. */
 const STANDING_STUCK_RATE = 4;
 
@@ -124,7 +136,10 @@ function computePath(state: GameState, u: Unit, target: Point, standing: Readonl
   }
   const startTile = grid.inBounds(sx, sy) ? grid.index(sx, sy) : -1;
   const goalTile = grid.index(gx, gy);
-  const result = state.pathFinder.find(sx, sy, gx, gy, { avoid, avoidCost: UNIT_TILE_COST });
+  const result = state.pathFinder.find(sx, sy, gx, gy, {
+    avoid,
+    avoidCost: u.repaths > 0 ? STUCK_UNIT_TILE_COST : UNIT_TILE_COST,
+  });
   if (result.tiles.length === 0) {
     arrive(u, true);
     return result.expanded + 1;
@@ -158,11 +173,26 @@ export function movementSystem(state: GameState): void {
   const { grid, spatial } = state;
   spatial.clear();
   for (const u of state.units.values()) spatial.insert(u);
+  let standingNow: StandingAvoid | null = null;
   for (const u of state.units.values()) {
     const path = u.path;
     if (!path) {
       u.moving = false;
       continue;
+    }
+    // a crowd cannot all pass through the exact same corner point: once the next waypoint is in
+    // clear sight from nearby (not cutting across a standing unit), head for it in the same tick
+    const next = path[u.pathIndex + 1];
+    const cur = path[u.pathIndex];
+    if (
+      cur &&
+      next &&
+      Math.hypot(cur.x - u.x, cur.y - u.y) < WAYPOINT_SKIP &&
+      lineOfSight(grid, u, next, (standingNow ??= standingAvoid(state)).blocks(u, path))
+    ) {
+      u.pathIndex++;
+      u.bestDist = Infinity;
+      u.stuckTicks = 0;
     }
     const wp = path[u.pathIndex];
     if (!wp) {
@@ -177,16 +207,6 @@ export function movementSystem(state: GameState): void {
     const ty = Math.floor(u.y);
     const terrain = grid.inBounds(tx, ty) ? grid.rule(tx, ty).speed : 1;
     const step = (u.speed * (terrain > 0 ? terrain : 1)) / TICK_RATE;
-
-    // a crowd cannot all pass through the exact same corner point: once the next waypoint is in
-    // clear sight from nearby, head for it instead
-    const next = path[u.pathIndex + 1];
-    if (next && dist < WAYPOINT_SKIP && lineOfSight(grid, u, next)) {
-      u.pathIndex++;
-      u.bestDist = Infinity;
-      u.stuckTicks = 0;
-      continue;
-    }
 
     if (dist <= Math.max(step, ARRIVE_EPSILON) && !unitInTheWay(state, u, wp.x, wp.y)) {
       u.x = wp.x;
@@ -211,8 +231,6 @@ export function movementSystem(state: GameState): void {
       u.moving = false; // waiting for room
       const inTheWay = unitInTheWay(state, u, u.x + (dx / dist) * step, u.y + (dy / dist) * step);
       crowded = !!inTheWay && isStanding(inTheWay);
-      // boxed in even after looking for a way around (a packed crowd): an idle friend steps aside
-      if (inTheWay && crowded && u.repaths >= 1) askToMakeWay(state, u, inTheWay, dx / dist, dy / dist);
     }
 
     const now = Math.hypot(wp.x - u.x, wp.y - u.y);
@@ -220,9 +238,9 @@ export function movementSystem(state: GameState): void {
       u.bestDist = now;
       u.stuckTicks = 0;
     } else if ((u.stuckTicks += crowded ? STANDING_STUCK_RATE : 1) > STUCK_TICKS) {
-      if (isLast && (now < 1.0 || (crowded && now < CROWD_ARRIVE))) {
-        arrive(u, false); // crowded at the destination (others stand on the way in): close enough
-      } else if (u.repaths >= MAX_REPATHS) {
+      if (isLast && (now < 1.0 || (crowded && now < CROWD_ARRIVE && goalIsFull(state, u, wp)))) {
+        arrive(u, false); // the destination is full (others stand on and around it): close enough
+      } else if (u.repaths >= (inTraffic(state, u) ? MAX_REPATHS_IN_TRAFFIC : MAX_REPATHS)) {
         arrive(u, true);
       } else {
         u.repaths++;
@@ -236,13 +254,18 @@ export function movementSystem(state: GameState): void {
 /**
  * The direction `u` steps in this tick, starting from the wanted one (wx, wy): straight on when
  * nobody is in the way, otherwise the smallest turn to one side that is free (the side away from
- * the unit in the way, kept until the way ahead is clear again so it does not zig-zag), then the
- * other side. Null when every direction is taken: wait.
+ * the unit in the way), then the other side. Null when every direction is taken: wait.
+ * While going around a unit, straight on is only taken again once it is clear a little further
+ * ahead than one step (else the unit flips between straight and turning each tick and wobbles
+ * along the other unit's edge), and the side is kept for a few ticks after that.
  */
 function steer(state: GameState, u: Unit, wx: number, wy: number, step: number): Point | null {
-  const ahead = unitInTheWay(state, u, u.x + wx * step, u.y + wy * step);
+  const probe = u.avoidSide !== 0 ? Math.max(step, STEER_LOOKAHEAD) : step;
+  const ahead =
+    unitInTheWay(state, u, u.x + wx * step, u.y + wy * step) ??
+    (probe > step ? unitInTheWay(state, u, u.x + wx * probe, u.y + wy * probe) : null);
   if (!ahead) {
-    u.avoidSide = 0;
+    if (u.avoidSide !== 0 && --u.avoidHold <= 0) u.avoidSide = 0;
     return { x: wx, y: wy };
   }
   if (u.avoidSide === 0) {
@@ -250,6 +273,7 @@ function steer(state: GameState, u: Unit, wx: number, wy: number, step: number):
     const cross = wx * (ahead.y - u.y) - wy * (ahead.x - u.x);
     u.avoidSide = cross > 1e-6 ? -1 : 1;
   }
+  u.avoidHold = AVOID_HOLD_TICKS;
   const { grid } = state;
   for (const side of [u.avoidSide, -u.avoidSide]) {
     for (const deg of STEER_ANGLES) {
@@ -270,26 +294,55 @@ function steer(state: GameState, u: Unit, wx: number, wy: number, step: number):
 }
 
 /**
- * `u` (walking in direction (wx, wy)) cannot get past `o` and there is no way around: if `o` is an
- * idle unit of the same player, it walks a short step aside by itself, off `u`'s line (or ahead
- * along it when the side is blocked). Units with orders, at work, on hold or of another player
- * are never asked.
+ * The goal really is full: a standing unit covers it, or several standing units crowd around it.
+ * One unit standing somewhere on the way in does not count (the walker keeps trying).
  */
-function askToMakeWay(state: GameState, u: Unit, o: Unit, wx: number, wy: number): void {
-  if (o.owner !== u.owner || o.orders.length > 0 || o.activity !== 'idle' || o.stance === 'hold') return;
+function goalIsFull(state: GameState, u: Unit, goal: Point): boolean {
+  let around = 0;
+  let covered = false;
+  state.spatial.forEachNear(goal.x, goal.y, GOAL_CROWD_RADIUS, (o) => {
+    if (o === u || !isStanding(o)) return;
+    const d = Math.hypot(o.x - goal.x, o.y - goal.y);
+    if (d < u.radius + o.radius) covered = true;
+    if (d < GOAL_CROWD_RADIUS) around++;
+  });
+  return covered || around >= GOAL_CROWD_COUNT;
+}
+
+/** Walking units right around `u`: the jam it is in will clear by itself, so it does not give up. */
+function inTraffic(state: GameState, u: Unit): boolean {
+  let found = false;
+  state.spatial.forEachNear(u.x, u.y, 1.5, (o) => {
+    if (o !== u && !isStanding(o)) found = true;
+  });
+  return found;
+}
+
+interface StandingAvoid {
+  /** Tile test for lineOfSight: another unit stands there (not `u`'s own tile, not its goal tile). */
+  blocks(u: Unit, path: Point[]): (x: number, y: number) => boolean;
+}
+
+/** Tiles where standing units are, built once per tick (only when a unit looks ahead). */
+function standingAvoid(state: GameState): StandingAvoid {
   const { grid } = state;
-  const cross = wx * (o.y - u.y) - wy * (o.x - u.x);
-  const side = cross >= 0 ? 1 : -1;
-  const d = u.radius + o.radius + 0.35;
-  const options = [
-    { x: o.x - wy * side * d, y: o.y + wx * side * d },
-    { x: o.x + wx * d, y: o.y + wy * d },
-  ];
-  for (const p of options) {
-    if (!grid.isPassable(Math.floor(p.x), Math.floor(p.y))) continue;
-    o.orders = [{ kind: 'move', x: p.x, y: p.y }];
-    return;
-  }
+  const tiles = standingTiles(state, state.units.values());
+  const tileOf = (p: Point): number => {
+    const x = Math.floor(p.x);
+    const y = Math.floor(p.y);
+    return grid.inBounds(x, y) ? grid.index(x, y) : -1;
+  };
+  return {
+    blocks(u, path) {
+      const own = tileOf(u);
+      const goal = tileOf(path[path.length - 1] ?? u);
+      return (x, y) => {
+        if (!grid.inBounds(x, y)) return false;
+        const i = grid.index(x, y);
+        return i !== own && i !== goal && tiles.has(i);
+      };
+    },
+  };
 }
 
 /**

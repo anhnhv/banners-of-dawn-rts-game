@@ -20,7 +20,15 @@ export type Order =
    * Attack `target` (unit or building) until it dies. `auto` = picked by the targeting system:
    * such a chase gives up beyond combat.leash from (homeX, homeY), and hold-stance units never chase.
    */
-  | { kind: 'attack'; target: EntityId; auto: boolean; homeX: number; homeY: number }
+  | {
+      kind: 'attack';
+      target: EntityId;
+      auto: boolean;
+      homeX: number;
+      homeY: number;
+      /** Melee: radius of the ring around the target its current spot is on. */
+      ring?: number;
+    }
   /** Walk to (x, y) and fight every enemy met on the way (the targeting system inserts attacks). */
   | { kind: 'attackMove'; x: number; y: number };
 
@@ -71,6 +79,8 @@ export interface Unit {
   repaths: number;
   /** Side this unit steps to while walking around another unit (+1 / -1; 0 = not avoiding). */
   avoidSide: number;
+  /** Ticks left to keep `avoidSide` after the way ahead cleared. */
+  avoidHold: number;
 }
 
 export function createUnit(id: EntityId, owner: PlayerId, type: UnitTypeId, x: number, y: number): Unit {
@@ -109,6 +119,7 @@ export function createUnit(id: EntityId, owner: PlayerId, type: UnitTypeId, x: n
     stuckTicks: 0,
     repaths: 0,
     avoidSide: 0,
+    avoidHold: 0,
   };
 }
 
@@ -120,6 +131,7 @@ export function clearPath(u: Unit): void {
   u.bestDist = Infinity;
   u.stuckTicks = 0;
   u.avoidSide = 0;
+  u.avoidHold = 0;
 }
 
 /** Gather rate (per second) of this unit type for a node kind, or 0 if it cannot gather it. */

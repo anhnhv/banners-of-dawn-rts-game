@@ -818,7 +818,12 @@ export class MachinePlayer {
         let squad = sit.army;
         if (p.groupSize > 0) {
           const fighting = sit.army.filter(busy);
-          const rest = sit.army.filter((u) => !busy(u)).sort((a, b) => a.id - b.id);
+          // units do not push each other, so the ones on the enemy side of the crowd go first (the
+          // ones in the middle could not get out past the units left standing)
+          const toward = sit.enemyHomeCenter;
+          const rest = sit.army
+            .filter((u) => !busy(u))
+            .sort((a, b) => dist(a, toward) - dist(b, toward) || a.id - b.id);
           squad = [...fighting, ...rest.slice(0, Math.max(0, p.groupSize - fighting.length))];
         }
         const at = centroid(squad) ?? sit.homeCenter;

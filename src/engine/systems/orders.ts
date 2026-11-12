@@ -20,32 +20,56 @@ import { claimSlot, hasFreeSlot, sourceFor, type GatherSource } from './gatherSo
 import type { GameState } from '../GameState';
 import { attackOf, centerOf, combatant, gap, inAttackRange, isUnit, reachOf, strike } from './combat';
 import { clearGoal, setGoal } from './movement';
-import { approachPoint, inReach } from './reach';
+import { approachPoint, distanceToRect, inReach } from './reach';
+import { SpatialHash } from '../spatial/SpatialHash';
 
 const REACH = DATA.game.gathering.reach;
+/** Widest unit radius in the data: how far around a spot to look for units standing on it. */
+const MAX_RADIUS = Math.max(...Object.values(DATA.units).map((d) => d.radius));
+
+/** Where each unit is heading (one entry per goal set; stale entries are skipped on lookup). */
+interface GoalEntry {
+  x: number;
+  y: number;
+  u: Unit;
+}
+const goals = new SpatialHash<GoalEntry>(1);
 
 export function orderSystem(state: GameState): void {
+  // fresh positions and goals for spotTaken (units moved, spawned and died since the last fill)
+  state.spatial.clear();
+  goals.clear();
   for (const u of state.units.values()) {
-    u.activity = 'idle';
-    const order = u.orders[0];
-    // a worker that worked inside a building (a farmer on its field) first walks back out
-    if (u.hp > 0 && !state.grid.isPassable(Math.floor(u.x), Math.floor(u.y)) && !worksInside(state, u)) {
-      const field = fieldAround(state, u);
-      if (field && walkOut(state, u, field)) continue;
-    }
-    if (!order) {
-      if (u.goal) clearGoal(u);
-      continue;
-    }
-    if (u.hp <= 0) continue;
-    if (order.kind === 'move' || order.kind === 'attackMove') {
-      setGoal(state, u, order);
-      if (u.arrived) finish(u);
-    } else if (order.kind === 'attack') {
-      attack(state, u, order);
-    } else {
-      gather(state, u, order);
-    }
+    state.spatial.insert(u);
+    if (u.goal && !u.arrived) goals.insert({ x: u.goal.x, y: u.goal.y, u });
+  }
+  for (const u of state.units.values()) {
+    const before = u.goal;
+    runOrder(state, u);
+    if (u.goal && u.goal !== before && !u.arrived) goals.insert({ x: u.goal.x, y: u.goal.y, u });
+  }
+}
+
+function runOrder(state: GameState, u: Unit): void {
+  u.activity = 'idle';
+  const order = u.orders[0];
+  // a worker that worked inside a building (a farmer on its field) first walks back out
+  if (u.hp > 0 && !state.grid.isPassable(Math.floor(u.x), Math.floor(u.y)) && !worksInside(state, u)) {
+    const field = fieldAround(state, u);
+    if (field && walkOut(state, u, field)) return;
+  }
+  if (!order) {
+    if (u.goal) clearGoal(u);
+    return;
+  }
+  if (u.hp <= 0) return;
+  if (order.kind === 'move' || order.kind === 'attackMove') {
+    setGoal(state, u, order);
+    if (u.arrived) finish(u);
+  } else if (order.kind === 'attack') {
+    attack(state, u, order);
+  } else {
+    gather(state, u, order);
   }
 }
 
@@ -100,9 +124,17 @@ function attack(state: GameState, u: Unit, o: Extract<Order, { kind: 'attack' }>
       if (!u.goal || Math.hypot(u.goal.x - c.x, u.goal.y - c.y) > 0.75) setGoal(state, u, c);
     } else {
       // melee: its own free spot next to the target (units do not push each other out of the way)
+      // every spot on the ring taken: a second, wider ring (waiting its turn); both full: wait
       const ring = u.radius + target.radius + reachOf(def) * 0.5;
-      if (!u.goal || Math.hypot(u.goal.x - c.x, u.goal.y - c.y) > ring + 0.75)
-        setGoal(state, u, spotAround(state, u, target, ring));
+      const outer = ring + 2 * u.radius + 0.1;
+      const g = u.goal ? Math.hypot(u.goal.x - c.x, u.goal.y - c.y) : Infinity;
+      if (Math.abs(g - (o.ring ?? ring)) > 0.75) {
+        const inner = spotAround(state, u, target, ring);
+        const spot = inner ?? spotAround(state, u, target, outer);
+        o.ring = inner ? ring : outer;
+        if (spot) setGoal(state, u, spot);
+        else if (u.goal) clearGoal(u);
+      }
     }
   } else if (!u.goal) {
     const spot = approachPoint(state.grid, target, u, spotTaken(state, u));
@@ -146,7 +178,9 @@ function gather(state: GameState, u: Unit, o: Extract<Order, { kind: 'gather' }>
       o.phase = 'harvest';
       clearGoal(u);
     } else {
-      const spot = u.goal && !u.arrived ? u.goal : approachPoint(state.grid, src, u, spotTaken(state, u));
+      // keep the current spot only if it is one next to this source (not left over from another)
+      const keep = u.goal && !u.arrived && distanceToRect(u.goal.x, u.goal.y, src) <= 1 ? u.goal : null;
+      const spot = keep ?? approachPoint(state.grid, src, u, spotTaken(state, u));
       if (!spot || (u.arrived && u.blocked)) {
         // this source cannot be reached: try another one of the same resource
         const other = findSource(state, u, o.resource, src.x, src.y, src.id);
@@ -219,22 +253,25 @@ function walkStraight(u: Unit, p: { x: number; y: number }): boolean {
  */
 function spotTaken(state: GameState, u: Unit): (p: { x: number; y: number }) => boolean {
   return (p) => {
-    for (const o of state.units.values()) {
-      if (o === u) continue;
-      const g = o.goal && !o.arrived ? o.goal : null;
-      if (g && Math.hypot(g.x - p.x, g.y - p.y) < 0.5) return true;
-      if (Math.hypot(o.x - p.x, o.y - p.y) < u.radius + o.radius) return true;
-    }
-    return false;
+    let taken = false;
+    goals.forEachNear(p.x, p.y, 0.5, (e) => {
+      if (taken || e.u === u || e.u.arrived || e.u.goal?.x !== e.x || e.u.goal?.y !== e.y) return;
+      if (Math.hypot(e.x - p.x, e.y - p.y) < 0.5) taken = true;
+    });
+    if (taken) return true;
+    state.spatial.forEachNear(p.x, p.y, u.radius + MAX_RADIUS, (o) => {
+      if (!taken && o !== u && Math.hypot(o.x - p.x, o.y - p.y) < u.radius + o.radius) taken = true;
+    });
+    return taken;
   };
 }
 
 /**
  * A free spot on a circle of radius `ring` around unit `t`, the nearest one to `u` that is on
- * passable ground and not taken by another unit (standing there or heading there). The target's
- * center if every spot is taken.
+ * passable ground and not taken by another unit (standing there or heading there). Null if every
+ * spot is taken.
  */
-function spotAround(state: GameState, u: Unit, t: Unit, ring: number): { x: number; y: number } {
+function spotAround(state: GameState, u: Unit, t: Unit, ring: number): { x: number; y: number } | null {
   const taken = spotTaken(state, u);
   const base = Math.atan2(u.y - t.y, u.x - t.x);
   const STEPS = 12;
@@ -245,7 +282,7 @@ function spotAround(state: GameState, u: Unit, t: Unit, ring: number): { x: numb
       if (state.grid.isPassable(Math.floor(p.x), Math.floor(p.y)) && !taken(p)) return p;
     }
   }
-  return { x: t.x, y: t.y };
+  return null;
 }
 
 /**

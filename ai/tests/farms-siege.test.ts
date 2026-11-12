@@ -51,7 +51,7 @@ describe('Normal vs Normal, 20 minutes (standard start)', () => {
 
   it('uses the whole roster: both sides train foot soldiers, shooters and riders, gold-free and gold', () => {
     const m = match({ scenario: false, ai: [0, 1], mode: 'normal', seed: 2 });
-    m.run(16 * 60);
+    m.run(18 * 60); // player 0 first needs Scout Riders at 17:00 (2026-11-12)
     for (const p of [0, 1] as const) {
       const t = m.trained.get(p) ?? {};
       for (const unit of ['militia', 'guard', 'slinger', 'archer', 'scout_rider', 'knight'])

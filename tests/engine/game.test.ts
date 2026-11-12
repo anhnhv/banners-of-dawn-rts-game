@@ -141,21 +141,77 @@ describe('Game: movement', () => {
     expect(Math.hypot(game.units.get(b)!.x - 4.5, game.units.get(b)!.y - 10.5)).toBeLessThan(0.1);
   });
 
-  it('a unit boxed in by idle friends gets out: they step aside by themselves', () => {
+  it('a unit boxed in by idle friends waits: nobody is asked to move or shoved', () => {
     const game = createGame(openMap(30, 30), { seed: 1 });
     const ring: number[] = [];
     for (let k = 0; k < 8; k++) {
       const a = (k * Math.PI) / 4;
-      ring.push(game.debugSpawn(0, 'militia', 10.5 + Math.cos(a) * 0.55, 10.5 + Math.sin(a) * 0.55));
+      ring.push(game.debugSpawn(0, 'militia', 10.5 + Math.cos(a) * 0.65, 10.5 + Math.sin(a) * 0.65));
     }
+    run(game, 5); // spawn overlaps settle
+    const before = ring.map((id) => [game.units.get(id)!.x, game.units.get(id)!.y] as const);
     const inside = game.debugSpawn(0, 'militia', 10.5, 10.5);
     send(game, 0, { type: 'move', units: [inside], to: { x: 20.5, y: 10.5 } });
     run(game, 20 * 15);
     const u = game.units.get(inside)!;
-    expect(Math.hypot(u.x - 20.5, u.y - 10.5)).toBeLessThan(0.1);
-    // the ring is still about where it was: only a step aside, nobody got shoved across the map
-    for (const id of ring)
-      expect(Math.hypot(game.units.get(id)!.x - 10.5, game.units.get(id)!.y - 10.5)).toBeLessThan(2);
+    // the player has to move the ring out of the way: the unit gives up inside it
+    expect(Math.hypot(u.x - 10.5, u.y - 10.5)).toBeLessThan(0.3);
+    expect(u.orders).toHaveLength(0);
+    ring.forEach((id, k) => {
+      const o = game.units.get(id)!;
+      expect(o.orders).toHaveLength(0);
+      expect(Math.hypot(o.x - before[k]![0], o.y - before[k]![1])).toBeLessThan(0.05);
+    });
+  });
+
+  it('one idle unit in a corridor does not stop a group short of its goal', () => {
+    const rows = Array.from({ length: 9 }, (_, y) => (y >= 3 && y <= 5 ? '.'.repeat(40) : '#'.repeat(40)));
+    const game = createGame(asciiMap(rows), { seed: 3 });
+    game.debugSpawn(0, 'militia', 30.5, 4.5); // stands in the corridor, 2 tiles before the goal
+    const ids: number[] = [];
+    for (let i = 0; i < 6; i++)
+      ids.push(game.debugSpawn(0, 'militia', 3 + (i % 3) * 0.7, 3.6 + Math.floor(i / 3) * 0.9));
+    send(game, 0, { type: 'move', units: ids, to: { x: 33, y: 4.5 } });
+    run(game, 20 * 30);
+    for (const id of ids) {
+      const u = game.units.get(id)!;
+      expect(u.orders).toHaveLength(0);
+      expect(u.x).toBeGreaterThan(31); // got past the idle unit
+    }
+  });
+
+  it('three big groups crossing each other all arrive without deep overlaps', () => {
+    const game = createGame(openMap(60, 60), { seed: 5 });
+    const groups: { ids: number[]; to: { x: number; y: number } }[] = [];
+    const starts = [
+      { x: 10, y: 30, to: { x: 50, y: 30 } },
+      { x: 50, y: 30, to: { x: 10, y: 30 } },
+      { x: 30, y: 10, to: { x: 30, y: 50 } },
+      { x: 30, y: 50, to: { x: 30, y: 10 } },
+    ];
+    for (const st of starts) {
+      const ids: number[] = [];
+      for (let i = 0; i < 20; i++) {
+        const type = (['militia', 'archer', 'knight', 'worker'] as const)[i % 4];
+        ids.push(game.debugSpawn(0, type, st.x - 2 + (i % 5) * 0.9, st.y - 2 + Math.floor(i / 5) * 0.9));
+      }
+      groups.push({ ids, to: st.to });
+      send(game, 0, { type: 'move', units: ids, to: st.to });
+    }
+    run(game, 20 * 45);
+    const all = groups.flatMap((g) => g.ids.map((id) => game.units.get(id)!));
+    for (const g of groups)
+      for (const id of g.ids) {
+        const u = game.units.get(id)!;
+        expect(u.orders).toHaveLength(0);
+        expect(Math.hypot(u.x - g.to.x, u.y - g.to.y)).toBeLessThan(6);
+      }
+    for (let i = 0; i < all.length; i++)
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i]!;
+        const b = all[j]!;
+        expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan((a.radius + b.radius) * 0.5);
+      }
   });
 
   it('stops on command', () => {
